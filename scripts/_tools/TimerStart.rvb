@@ -1,0 +1,70 @@
+Option Explicit
+'Script written by peter harris with help from David Rutten
+'www.peterwhatcreates.com
+'Script version Monday, February 26, 2007 4:00:04 AM
+
+'StartProjectTimer
+	
+Sub TimerStart()
+	Dim CurrentMinute
+	Dim strProjectNumber : strProjectNumber = Rhino.GetDocumentData("ProjectInfo", "Number")
+	If IsNull(strProjectNumber) Then
+		Call Define_Project_Number()
+		strProjectNumber = Rhino.GetDocumentData ("ProjectInfo", "Number")
+	End If
+
+		Dim FileLocation : FileLocation = Rhino.InstallFolder + "TimeTracker.txt"
+	
+		Set objFso = CreateObject("Scripting.FileSystemObject")
+		If Not objFso.FileExists(FileLocation) Then
+			objFso.CreateTextFile(FileLocation)
+		End If
+		Set objFso = Nothing
+	
+	
+		CurrentMinute = Minute(now)
+		If CurrentMinute < 10 Then
+			CurrentMinute = "0" & CurrentMinute
+		End If
+
+		Dim strToWrite : strToWrite = vbCrLf & "Start project #" & strProjectNumber & " at " & FormatDateTime(Now(), vbShortTime) & " on " & FormatDateTime(Now(), vbLongDate)
+
+		Dim objFSO, objFile
+		Set objFSO = CreateObject("Scripting.FileSystemObject")
+
+		If (objFSO.FileExists(FileLocation)) Then
+			Set objFile = objFSO.OpenTextFile(FileLocation, 8, True, -2)
+			Call objFile.Write(strToWrite)
+			Call objFile.Close()
+		
+			Set objFile = Nothing
+			Set objFSO = Nothing
+    
+			Call Rhino.Print("Plugin created by Peter Harris with lots of help from David Rutten")
+			Call Rhino.Print(strToWrite)
+		Else
+			Call MsgBox("File not found")
+		End If
+	End Sub
+
+	Sub Define_Project_Number
+		Dim OldProjectNumber, NewProjectNumber
+		Dim TextForStringBox
+
+		OldProjectNumber = Rhino.GetDocumentData("ProjectInfo", "Number") 
+
+		If IsNull(OldProjectNumber) Then
+			OldProjectNumber = "Undefined"
+			TextForStringBox = "Enter a Project # for this document:"
+		Else
+			TextForStringBox = "Change Project # for this document from " & OldProjectNumber & ":"
+		End If
+
+		NewProjectNumber = Rhino.StringBox(TextForStringBox, ,"Project Number")
+		If Not IsNull(NewProjectNumber) Then
+			Call Rhino.SetDocumentData("ProjectInfo", "Number", NewProjectNumber)
+			Call Rhino.Print("Project number set to " & NewProjectNumber & ".")
+		Else
+			Call Rhino.Print("No data added! Try again!")
+		End If
+	End Sub

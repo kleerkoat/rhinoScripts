@@ -1,0 +1,49 @@
+Option Explicit
+'Script written by Pascal
+'Script version Friday, May 28, 2010
+
+'Rhino.AddStartUpScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "NotePlane", "_NoEcho _-RunScript (NotePlane)"
+
+'Call NotePlane()
+
+Sub NotePlane()
+	Dim aCorn: aCorn = Rhino.ViewNearCorners(Rhino.CurrentView())
+	Dim Plane
+	Plane = Rhino.PlaneFromPoints(aCorn(0), aCorn(1), aCorn(3))
+	Plane(0) = AveragePoints(aCorn)
+	Rhino.ViewCPlane ,Plane
+	
+End Sub
+
+
+
+Function AveragePoints(arrPts)
+	'Finds the average location of an array
+	'of points.
+
+	Dim X, Y, Z
+	Dim i
+	
+	X = 0
+	Y = 0
+	Z = 0
+
+	For i=0 To UBound (arrPts)
+			
+		'add all the X values
+		X = X+arrPts(i)(0)
+	
+		'add all th Y values
+		Y = Y+arrPts(i)(1)			
+	
+		'add all the Z values
+		Z = Z+arrpts(i)(2)
+	Next
+	
+	'Divide by the number of points to
+	'get the average  for each
+	'create the output array from the 3 averages
+	AveragePoints  = array(X/(UBound(arrPts)+1), Y/(UBound(arrPts)+1), Z/(UBound(arrPts)+1))
+
+End Function

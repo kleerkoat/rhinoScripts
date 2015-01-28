@@ -1,0 +1,138 @@
+Option Explicit
+'Script written by Pascal
+
+'Script version Thursday, April 28, 2011 
+
+'Match a curve end to any point on another curve. Select near the end of an open curve to 
+'match and select a target curve. Set the target point on the target curve and set the 
+'type of continuity. Since the match is not on the end of the curve, you get a chance to 
+'flip the direction of the match for Tangency and Curvature matches. Adds the following aliases
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile()
+'Rhino.AddAlias "MatchOnCrv", "_NoEcho _-Runscript (MatchOnCrv)"
+
+Private OldCon
+If isEmpty(OldCon) then
+	OldCon = "Tangency"
+End If
+
+'Call MatchOnCrv()
+
+
+Sub MatchOnCrv()
+
+	dim aCrv: aCrv = Rhino.GetCurveObject("Select open curve near the end to match.",false,false)
+	if not isArray(aCrv) then exit sub
+	
+	dim sCrv: sCrv =aCrv(0)
+	If Rhino.isCurveClosed(sCrv) then 
+		Msgbox "Closed curves cannot be matched."
+		Exit sub
+	End If
+	
+	dim intEnd:	intEnd = GetCrvEnd(sCrv, aCrv(4))
+	
+	Dim starg: starg = Rhino.GetObject("Select target curve.",4,false, false)
+	If isNull(sTarg) then exit sub
+	
+	dim Flip: Flip = False
+	If intEnd = 1 then
+		Flip = True
+	End If
+	Dim aEnd
+	
+	if intEnd = 0 then
+		aEnd =  Rhino.CurveStartPoint(sCrv)
+	else
+		aEnd =  Rhino.CurveEndPoint(sCrv)
+	End if
+		
+	Dim aPick: aPick = Rhino.GetPointOnCurve(STarg, "Set target point.")
+	If isNull(aPick) then exit sub
+	Dim TempPt: tempPt = Rhino.AddPoint(aPick)
+	dim Tol: Tol = Rhino.UnitAbsoluteTolerance()
+	
+
+	
+	Dim sCon: sCon = Rhino.GetString("Continuity?" , OldCon, array("Position", "Tangency", "Curvature"))
+	If isNull(sCon) then exit sub
+	
+	If lcase(sCon) = "position" then 
+		sCon = "Position"
+	elseIf lCase(sCon) = "tangency" then
+		sCon = "Tangency"
+	elseIf lcase(sCon) = "curvature" then
+		sCon = "Curvature"
+	Else 
+		Exit sub
+	End If
+	
+	OldCon = sCon
+	
+	If Rhino.PointCompare(aPick, Rhino.CurveStartPoint(sTarg), Tol)then 
+		
+		Rhino.Command "_-Match SelID " & sCrv & " _SelID " & sTarg & " _Mode=_" &sCon & " _AverageCurves=_No _Enter", false 
+		Exit sub
+	elseIf Rhino.PointCompare(aPick, Rhino.CurveEndPoint(sTarg), Tol) then 
+		Rhino.ReverseCurve sTarg
+		Rhino.Command "_-Match SelID " & sCrv & " _SelID " & sTarg & " _Mode=_" &sCon & " _AverageCurves=_No _Enter", false 
+		Rhino.ReverseCurve sTarg
+		Exit sub
+	End If
+	
+	Dim t: t = Rhino.CurveClosestPoint(sTarg, aPick)
+	Dim aTest: aTest = Rhino.EvaluateCurve(starg,t)
+
+	Dim sCopy: sCopy = Rhino.CopyObject(sTarg)
+	Dim aSplit: aSplit = Rhino.SplitCurve(sCopy, t)
+	
+	dim Newtarg, Newtarg2 
+	newTarg = aSplit(0)
+	If Rhino.PointCompare( Rhino.CurveEndPoint(NewTarg), aPick, Rhino.UnitAbsoluteTolerance()) then Rhino.ReverseCurve NewTarg
+	newtarg2 = aSplit(1)
+	If Rhino.PointCompare( Rhino.CurveEndPoint(NewTarg2), aPick, Rhino.UnitAbsoluteTolerance()) then Rhino.ReverseCurve NewTarg2
+	
+	
+	If Flip = True then Rhino.ReverseCurve sCrv
+	
+	dim CopyCrv:CopyCrv = Rhino.CopyObject (sCrv)
+	Rhino.MatchObjectAttributes CopyCrv, sCrv
+	
+	Rhino.EnableRedraw False
+	Rhino.Command "_-Match SelID " & sCrv & " _SelID " & NewTarg & " _Mode=_" &sCon & " _AverageCurves=_No _Enter", false 
+	
+	Rhino.EnableRedraw True
+	
+	If sCon <> "Position" then
+		Dim sRev: sRev = Rhino.GetString("Flip?", "No", array("Yes","No"))
+	
+		If isNull(sRev) or lCase(sRev) = "no" then 
+			Rhino.DeleteObjects Array(NewTarg, Newtarg2, copyCrv, tempPt)
+			If Flip = True then Rhino.ReverseCurve SCrv
+		Elseif lCase(sRev) = "yes" then
+			Rhino.EnableRedraw False
+			Rhino.DeleteObject sCrv
+			Rhino.Command "_-Match SelID " & CopyCrv  & " _SelID " & NewTarg2  & " _Mode=_" &sCon & " _AverageCurves=_No _Enter", false 
+			Rhino.DeleteObjects Array(NewTarg, Newtarg2, tempPt)
+			If Flip = True then Rhino.ReverseCurve CopyCrv
+		
+		End if
+		
+	Else 
+		Rhino.DeleteObjects Array(NewTarg, Newtarg2, copyCrv, tempPt)
+		If Flip = True then Rhino.ReverseCurve SCrv
+	End if
+	Rhino.EnableRedraw True
+	
+End Sub
+
+
+Function GetCrvEnd(crv, t)
+	'0 = Start, 1 = End
+	Dim Dom: dom = Rhino.CurveDomain(crv)
+	If Abs(t-dom(0)) > Abs(t-dom(1)) Then
+		GetCrvEnd = 1
+	Else
+		GetCrvEnd = 0
+	End If
+End Function

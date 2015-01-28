@@ -1,0 +1,70 @@
+Option Explicit
+'Script by Mitch Heynick
+'Version 24 September, 2011
+'Scales objects by their centroid
+'works on surfaces, polysurfaces, meshes
+'uses area centroid (open objects) or volume centroid (closed objects)
+
+Private oldScaleFact
+If IsEmpty(oldScaleFact) Then oldScaleFact=1.0
+
+'Call UniformScaleObjsCentroid()
+Sub UniformScaleObjsCentroid()
+
+	Dim intObjColl,msg1,arrObjs,dblTol
+	intObjColl=8+16+32
+	
+	msg1="Select objects to scale about centroid"
+	dblTol=Rhino.UnitAbsoluteTolerance
+	
+	arrObjs=Rhino.GetObjects(msg1,intObjColl,,True)
+	If not IsArray(arrObjs) Then Exit Sub
+	
+	Dim dblScale,arrScale,arrCP,i,n : n=0
+	dblScale=Rhino.GetReal("Scale factor for objects?",oldScaleFact)
+	If Not IsNumeric(dblScale) Then Exit Sub
+	oldScaleFact=dblScale
+	arrScale=Array(dblScale,dblScale,dblScale)
+	
+	Call Rhino.EnableRedraw(False)
+	For i=0 To Ubound(arrObjs)
+		arrCP=FindCentroid(arrObjs(i))
+		If Not IsNull(arrCP) Then
+			Call Rhino.ScaleObject(arrObjs(i),arrCP,arrScale,False)
+		Else
+			n=n+1
+		End If		
+	Next
+	Call Rhino.EnableRedraw(True)
+	If n>0 Then
+		Call Rhino.Print("Scaled "&i-n&" objects || Unable to scale "&(n)&" objects")
+	Else
+		Call Rhino.Print("Scaled "&i&" objects")
+	End If
+End Sub
+
+Private Function FindCentroid (obj)
+	'attempts to find the centroid of object
+	FindCentroid=Null
+	Dim ctrPt
+	On Error Resume Next
+	If Rhino.IsMesh(obj) Then
+		If Rhino.IsMeshClosed(obj) Then
+			ctrPt=Rhino.MeshVolumeCentroid(obj)(0)
+		Else
+			ctrPt=Rhino.MeshAreaCentroid(obj)(0)
+		End If
+	ElseIf Rhino.IsCurve(obj) Then
+		If Rhino.IsCurvePlanar(obj) Then
+			ctrPt=Rhino.CurveAreaCentroid(obj)(0)
+		End If
+	Else
+		If Rhino.IsObjectSolid(obj) Then
+			ctrPt=Rhino.SurfaceVolumeCentroid(obj)(0)
+		Else
+			ctrPt=Rhino.SurfaceAreaCentroid(obj)(0)
+		End If			
+	End If
+	On Error GoTo 0
+	If IsArray(ctrPt) Then FindCentroid=ctrPt
+End Function

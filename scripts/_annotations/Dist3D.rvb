@@ -1,0 +1,28 @@
+﻿Option Explicit
+Sub Dist3D()
+	Dim sysunits
+	Dim dblDistance
+	Dim dblConversion
+	
+	sysunits = Rhino.UnitSystem
+	If sysunits = 0 Or sysunits = 1 Or sysunits = 3 Or sysunits = 4 Or sysunits = 5 Or _
+		sysunits = 6 Or sysunits = 7 Or sysunits = 9 Or sysunits = 10 Then
+		Call Rhino.MessageBox ("Your model units must be set to millimeters or inches for this command to work.", 16, "3D Distance")
+		Exit Sub
+	End If
+	dblDistance = Rhino.GetDistance 
+	If Rhino.UnitSystem = 2 Then
+		If dblDistance <> vbNull Then
+			dblConversion = CStr(dblDistance)/25.4
+			Call Rhino.Print ("Distance = "& Round(dblDistance,3) & " mm.")   
+			Call Rhino.Print ("Distance = "& Round(dblConversion,4) & " """)
+		End If
+	ElseIf Rhino.UnitSystem = 8 Then
+		If dblDistance <> vbNull Then
+			dblConversion = CStr(dblDistance)*25.4
+			Call Rhino.Print ("Distance = "& Round(dblDistance,4) & " """)
+			Call Rhino.Print ("Distance = "& Round(dblConversion,3) & " mm.")  
+		End If
+	End If
+End Sub
+'Dist3D

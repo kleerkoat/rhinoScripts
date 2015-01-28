@@ -1,0 +1,21 @@
+﻿Option Explicit
+'Script written by Ryan Gilmore
+'Script version Monday, May 21, 2012 10:49:31 AM
+
+'Call ChangeColorPick()
+Sub ChangeColorPick()
+	Dim arrObjects,color,strObject
+	arrObjects = Rhino.GetObjects("Select objects to change color", 0, True, True)
+	If IsArray(arrObjects) Then
+		color = Rhino.GetColor
+		If Not IsNull(color) Then
+			Rhino.EnableRedraw False
+			For Each strObject In arrObjects
+				Rhino.ObjectColor strObject, color
+			Next
+			Rhino.EnableRedraw True
+			Erase arrObjects
+		End If
+	End If
+	
+End Sub

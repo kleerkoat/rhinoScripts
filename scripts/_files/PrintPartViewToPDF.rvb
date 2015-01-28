@@ -1,0 +1,24 @@
+'Script written by Ryan Gilmore (monkeygrip@gmail.com)
+'Script version Thursday, September 27, 2012 1:17:47 PM
+
+'Description: prints part view to PDF based off points in script to set the view
+'
+'Edits:
+'Todo: make a version to work off bounding box
+
+Option Explicit
+
+
+Call PrintPartViewToPDF()
+Sub PrintPartViewToPDF()
+	
+	Dim strPt1, strPt2
+	
+	strPt1 = "-10.10,76.18,0"
+	strPt2 = "133.28,-33.60,0"
+	Rhino.Command("_-Print _Setup _View _ViewportArea _Window " & strPt1 & chr(32) & strPt2 & chr(32) & " EnterEnd")
+	
+	
+End Sub
+
+

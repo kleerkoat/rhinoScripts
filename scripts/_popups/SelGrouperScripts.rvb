@@ -1,0 +1,181 @@
+
+'//////////////////////////////////////////
+
+'Select a group by name from a pop up list.
+
+'//////////////////////////////////////////
+Option explicit
+
+'Rhino.AddStartUpScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "SelGroupPopUp", "_NoEcho _-Runscript SelGrouper_PopUp"
+'Rhino.AddAlias "SelGroupList", "_NoEcho _-Runscript SelGrouper_List"
+'Rhino.AddAlias "GroupNamer" , "_NoEcho _-Runscript GroupNamer"
+
+Sub SelGrouperPopUp()
+	Dim  arrGroup, strGroup, i
+
+	arrGroup = GetValidGroupNames
+	
+	If Not isArray(arrGroup) Then
+		Rhino.Print "No groups found."
+		Exit Sub
+	End If
+
+	If IsUpperBound(arrGroup) Then
+		i = Rhino.PopUpMenu (arrGroup)
+		If Not IsNull(strGroup) Then
+			strGroup = arrGroup(i)
+			Rhino.ObjectsByGroup strGroup, True
+		Else
+			Exit Sub
+		End If
+	Else	Rhino.Print "No groups found."
+	End If
+
+End Sub
+
+'////////////////////////////////////
+
+'Select multiple groups from a list.
+
+'////////////////////////////////////
+
+Sub SelGrouperList()
+	
+	Dim arrGroupNames, arrGroup, arrSelGroup
+	
+	Dim arrStates(), i
+
+	arrGroup = GetValidGroupNames
+	
+	If Not isArray(arrGroup) Then
+		Rhino.Print "No groups found."
+		Exit Sub
+	End If
+	
+	
+	Dim strGroup
+	
+	If IsUpperBound(arrGroup) Then
+		For i = 0 To Ubound(arrGroup)
+			ReDim Preserve arrStates(i)
+			arrStates(i) = False
+		Next
+			
+		arrSelGroup = Rhino.CheckListBox (arrGroup, arrStates, "Available groups" , "Named Groups")
+		If IsArray(arrSelGroup) Then
+ 
+			Dim q : q = 0
+			For q = 0 To Ubound(arrSelGroup)
+				If arrSelGroup(q) = True Then
+					Rhino.ObjectsByGroup arrGroup(q), True
+				End If	
+			Next
+		Else
+			Exit Sub
+		End If
+	Else 	Rhino.Print "No groups found."
+	End If
+
+End Sub
+
+Sub SelGrouperNamer()
+
+	Dim arrobjects, strGroup,  arrCulled
+	Dim arrValues(),  arrGroups(), arrSelGroups()
+	Dim arrRename, arrGroup1
+	Dim i,p,q,r,t,x
+  
+	i=0
+	p=0
+	q=0
+	r=0
+	t=0
+	x=0 
+  
+	arrObjects = Rhino.GetObjects( "Select objects in groups to rename" ,, True, True)
+  
+	If IsArray(arrObjects) Then
+		For i =0 To UBound (arrObjects)
+			arrGroup1 = (Rhino.ObjectGroups (arrObjects(i)))
+			' Build a  list of the groups for the selected objects   
+			If IsArray(arrGroup1) Then
+				x=1  'switch tells the script at least one group exits in the selection
+				For r = 0 To UBound(arrGroup1)
+					ReDim Preserve arrSelGroups(p)
+					arrSelGroups(p) = arrGroup1(r)
+					p = p+1
+					r = r+1
+				Next
+				Erase arrGroup1
+				r=0
+				i = i+1 
+			End If
+		Next
+	Else Exit Sub
+	End If
+    
+	'Cull any duplicate group names from the list 
+ 
+	If IsUpperBound(arrSelGroups) And X=1 Then
+		arrCulled = Rhino.CullDuplicateStrings(arrSelGroups)
+	Else 
+		Rhino.Print "None of the selected objects belongs to a group"
+		Exit Sub
+	End If
+        
+	' Get the changed group names from the user
+	arrRename = Rhino.PropertyListBox (arrCulled, arrCulled, "Change group names", "Group Namer")
+   
+	'Rename the groups
+	If IsArray(arrRename) Then
+		t =0
+		For t=0 To UBound(arrCulled)
+			Rhino.RenameGroup arrCulled(t), arrRename(t)
+		Next
+	Else 
+		Exit Sub
+	End If
+        
+	Erase arrCulled
+	Erase arrSelGroups
+
+End Sub
+
+Function GetValidGroupNames()
+	
+	Dim arrGroupNames:arrGroupNames =Rhino.GroupNames
+	Dim aGroup(), p, q
+	p = 0
+	If IsArray(arrGroupNames) Then
+		Dim arrAllGroup: arrAllGroup = Rhino.CullDuplicateStrings(arrGroupNames)
+		For q =0 To UBound(arrAllGroup)
+			If Not Rhino.IsGroupEmpty(arrAllGroup(q)) Then
+				ReDim Preserve aGroup(p)
+				aGroup(p) = arrAllGroup(q)
+				p = p+1
+			End If
+		Next
+	Else 	Rhino.Print "No groups found."
+		
+	End If
+
+	GetValidGroupNames = aGroup
+	
+End Function
+
+Function IsUpperBound(ByRef arr)
+
+	IsUpperBound = False
+
+	If IsArray(arr) Then
+
+		On Error Resume Next
+
+		UBound arr
+
+		If Err.Number = 0 Then IsUpperBound = True
+
+	End If
+
+End Function

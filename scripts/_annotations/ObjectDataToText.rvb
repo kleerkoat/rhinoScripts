@@ -1,0 +1,31 @@
+﻿Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version Tuesday, April 15, 2008 12:09:32 PM
+
+Call Main()
+Sub Main()
+	Dim strObjects: strObjects = Rhino.GetObjects("Select objects to analyze")
+	If isNull(strObjects) Then Exit Sub
+
+	Dim dataType: dataType = Rhino.GetString("Objects Data Type","Detailed",Array("Detailed","Summarized"))
+	If isNull(dataType) Then Exit Sub
+			
+	Dim TxtFileName: TxtFileName = "ObjectsDataFile"	
+	Dim filesys, filetxt
+	Set filesys = CreateObject("Scripting.FileSystemObject")
+
+	Dim i
+	For i = 0 To Ubound(strObjects)
+		Set filetxt = filesys.OpenTextFile("c:\"&TxtFileName& ".txt", 8, True)
+		If dataType = "Summarized" Then
+			filetxt.WriteLine("Name:"&Rhino.ObjectName(strObjects(i)) & ", Layer:" & Rhino.ObjectLayer(strObjects(i)))
+		Else
+			filetxt.WriteLine(Rhino.ObjectDump (strObjects(i)))
+		End If
+		filetxt.Close 
+	Next
+	
+	Rhino.MessageBox "A text file is saved in C:\"
+		
+End Sub

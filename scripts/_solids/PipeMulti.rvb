@@ -1,0 +1,43 @@
+Option Explicit
+
+Private dblOldrad1
+If IsEmpty(dblOldrad1) Then
+	dblOldrad1 =1
+End If
+
+Sub PipeMulti()
+
+	Dim arrCrv, dblRad1, dblRad2, strCrv, rad
+
+	arrCrv = Rhino.GetObjects("Select curves to pipe.", 4, True, True)
+	If IsArray(arrCrv) Then
+		dblRad1 = Rhino.GetReal("Pipe radius", dblOldrad1)
+		If Not IsNull(dblRad1) Then
+			dblOldrad1 = dblRad1
+			Rhino.UnselectAllObjects
+			Rhino.EnableRedraw False
+			Rad=CStr(dblRad1)
+
+			'*****Here**********
+			'*******************
+			For Each strCrv In arrCrv
+				Rhino.SelectObject strCrv
+				Rhino.Command "_NoEcho _Pipe _Cap=_Yes _Thick=_No " _
+					&dblRad1 &" " &dblRad1 &" Enter"
+				Rhino.UnselectAllObjects
+			Next
+
+			'******************
+			'******************
+
+		Else
+			Rhino.UnselectAllObjects
+			Rhino.EnableRedraw True
+			Exit Sub
+		End If
+	End If
+
+	Rhino.UnselectAllObjects
+	Rhino.Enableredraw True
+
+End Sub 

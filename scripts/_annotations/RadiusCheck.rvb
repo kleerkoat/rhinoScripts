@@ -1,0 +1,23 @@
+Option Explicit
+Sub FindLargeRad()
+	Dim arrObjects, strObject, dblRadius
+	arrObjects = Rhino.NormalObjects
+	For Each strObject In arrObjects
+		If Rhino.IsArc(strObject) Then
+			dblRadius = Rhino.ArcRadius(strObject)
+			If dblRadius > 100 Then
+				Call Rhino.MessageBox("Identified a radius larger than 100.", 16,"Find Large Radii")
+				Call Rhino.ObjectColor(strObject,vbred)
+			End If
+		End If
+		If Rhino.IsCircle(strObject) Then
+			dblRadius = Rhino.CircleRadius(strObject)
+			If dblRadius > 100 Then
+				Call Rhino.MessageBox("Identified a radius larger than 100.", 16,"Find Large Radii")
+				Call Rhino.ObjectColor(strObject,vbred)
+			End If
+		End If
+	Next
+	Call Rhino.Print("Radii analysis complete.")
+End Sub
+FindLargeRad

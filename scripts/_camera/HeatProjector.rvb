@@ -1,0 +1,97 @@
+Option Explicit
+'Script written by willemderks.com
+'Script version Friday, November 12, 2010 23:10:00
+
+'Call HeatProjector()
+Sub HeatProjector()
+
+	'the scalefactor of 1000 is a magic number and should be derived from the geometry
+	'I don't have the time to do that right now, if the extrusions are not long enough,
+	'or to long change it to a higher number.
+	Dim extrudeScale
+	extrudeScale = 10000
+		
+		
+	Dim arrArt
+	arrArt = Rhino.GetObjects("Select art on XY plane (top view) to project",4)
+	If isNull(arrWalls) then Exit sub	
+	
+	'dummy function call to let user set active view
+	Call Rhino.GetObjects("Set perspective view active (press enter when done)",268435456)
+		
+	Dim strView
+	strView = Rhino.CurrentView
+	
+	
+	Dim arrWalls
+	arrWalls = Rhino.GetObjects("Select (poly)surface objects to project on",8+16)
+	If isNull(arrWalls) then Exit sub
+	
+	
+	Dim arrViewXY ,ViewX, ViewY
+	
+	arrViewXY = Rhino.ViewNearCorners(strView)
+
+	ViewX =  Rhino.Distance(arrViewXY(0),arrViewXY(1)) 
+	ViewY =  Rhino.Distance(arrViewXY(0),arrViewXY(3))
+	
+	Dim ViewNearCenter
+	ViewNearCenter = Rhino.PointDivide(Rhino.PointAdd(arrViewXY(0),arrViewXY(2)),2)
+
+	Dim ViewPlane,Cplane
+	ViewPlane = Rhino.ViewCameraPlane(strView)
+
+	ViewPlane(0) = ViewNearCenter
+
+	Dim TransformRotate
+	TransformRotate = Rhino.XformRotation(Rhino.WorldXYPlane,ViewPlane)
+	
+
+	Dim BBox,BBoxCenter,BBoxHeight
+	BBox = Rhino.BoundingBox(arrArt)
+	BBoxHeight = BBox(2)(1) - BBox(0)(1)
+	BBoxCenter = Rhino.PointDivide(Rhino.PointAdd(BBox(0),BBox(2)),2)
+	arrArt = Rhino.CopyObjects(arrArt,BBoxCenter,array(0,0,0))
+	
+	Dim dblScale
+	dblScale = (ViewY/BBoxHeight)
+	arrArt = Rhino.ScaleObjects(arrArt,array(0,0,0),array(dblScale,dblScale,0),False)
+	
+	
+	Call Rhino.TransformObjects(arrArt, TransformRotate, False)
+	
+	Call Rhino.UnselectAllObjects()
+	Call Rhino.SelectObjects(arrArt)
+	
+	Dim i,arrExtruded
+	Redim arrExtruded(Ubound(arrArt))
+	
+	For i=0 to Ubound(arrArt)
+		arrExtruded(i) = Rhino.ExtrudeCurvePoint (arrArt(i), Rhino.ViewCamera (strView))
+	Next
+	
+
+	
+	Call Rhino.ScaleObjects(arrExtruded,Rhino.ViewCamera (strView),array(extrudeScale,extrudeScale,extrudeScale))
+	
+	
+	Call Rhino.UnselectAllObjects()
+	Call Rhino.DeleteObjects(arrArt)
+	
+	Dim j,arrIntersect
+	For i=0 to Ubound(arrExtruded)
+	
+		For j=0 to Ubound(arrWalls)
+			arrIntersect =  Rhino.IntersectBreps (arrExtruded(i),arrWalls(j))
+			If not isNull(arrIntersect) Then
+				Rhino.SelectObjects(arrIntersect)
+			End If
+		Next
+	Next
+	
+	
+	Call Rhino.DeleteObjects(arrExtruded)
+
+	Call Rhino.EnableRedraw(True)
+	
+End Sub

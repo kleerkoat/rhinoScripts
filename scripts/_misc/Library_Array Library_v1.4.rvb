@@ -1,0 +1,913 @@
+'string to array'
+Dim strDelimiter, strObjects
+	strDelimiter = ","
+	strObjects = join(arrObjs, strDelimiter)
+	For Each strObjects In arrObjs 
+		If Not Rhino.IsObjectSolid(strObjects) Then
+			Rhino.Print "Export failed, open solids found. Check for Naked Edges."
+			Exit Sub
+		End If
+	Next
+' ****************************** RhinoScript.org ******************************
+'
+'   Array Library, version 1.4
+'
+'   by Hanno Stehling, published Jun 30, 2008
+'
+'
+'   A collection of functions to make life with arrays in RhinoScript easier
+'
+'
+'
+'
+'   This Library has been downloaded from RhinoScript.org.
+'
+'   Rhino versions: Rhino 3, Rhino 4
+'
+'   LICENSE INFORMATION:
+'   This script is published under the GNU General Public License, version 3
+'   or any later version, and thus comes WITHOUT ANY WARRANTY. You can get
+'   the complete license text here: www.rhinoscript.org/gpl
+'
+' ****************************** RhinoScript.org ******************************
+
+
+
+' Array library - Version 1.4
+' ---------------------------------------
+' Hanno Stehling | post@hanno-stehling.de
+'
+' This library contains some functions to make working with arrays easier.
+' Most functions are inspired by PHPs convenient array_* functions. There is
+' a function list directly beneath this text. More detailed documentation is
+' given directly with the code of each function.
+' IMPORTANT:  Nearly all functions only work with one-dimensional arrays,
+' exceptions are explicitely mentioned in the documentation. You can use
+' array_2to1dim() or array_3to1dim() to create a nested one-dimensional array
+' from a two- or three-dimensional one.
+' ALSO IMPORTANT: Many functions alter the array you feed them.
+' Those arrays are marked * in the documentation (and of course passed ByRef) 
+
+
+
+' Function list:
+' --------------
+'
+' array_dimensions: get number of array dimensions
+' array_dim: dimension a one-dimensional array
+' array_dim2: dimension a two-dimensional array
+' array_dim3: dimension a three-dimensional array
+' array_fill: dimension a one-dimensional array and fill it with a default value
+' array_fill2: dimension a two-dimensional array and fill it with a default value
+' array_fill3: dimension a three-dimensional array and fill it with a default value
+' array_2to1dimension: convert a two-dimensional array into a nested one-dimensional array
+' array_3to1dimension: convert a three-dimensional array into a nested one-dimensional array
+' array_flatten: convert a nested array into a flat array
+' array_flatten2: convert a two-dimensional array into a flat one-dimensional array
+' array_flatten3: convert a three-dimensional array into a flat one-dimensional array
+' array_swap: swaps dimensions of a two-dimensional array
+' array_count: returns the number of elements in an array
+' array_insert: insert a value into an array
+' array_extract: extract a value from an array
+' array_push: append a value to the end of an array
+' array_pop: return and remove a value from the end of an array
+' array_unshift: insert a value at the beginning of an array
+' array_shift: return and remove a value from the beginning of an array
+' array_slice: return part of an array
+' array_clean: remove all elements with a given value from an array
+' array_unique: remove duplicate values from an array
+' array_merge: merge two or more arrays
+' array_pad: expand an array to a given size and fill new elements with a default value
+' array_sort: sort an array
+' array_nsort: sort arrays in a nested array after the element at a given index
+' array_reverse: get an array in reversed order
+' array_search: search an array for a value
+' array_search_neg: search an array for an element that does not equal a value
+' array_min: get the minimal value found in an array
+' array_max: get the maximal value found in an array
+' array_sum: get the sum of all values in an array
+' array_product: get the product of all values in an array
+' array_rand: get the value at a random position of an array
+' array_implode: implode all elements of an array to a string
+' array_print: print an array to the Rhino command window
+
+
+Option Explicit
+Setlocale "en-us"
+Randomize
+
+
+
+' returns the number of dimensions for a given array
+'
+' IN:  Array:   the array to test (can be n-dimensional)
+' OUT: Integer: the number of dimensions (0 if not an array)
+'
+Function array_dimensions(ByVal arr)
+	
+	Dim i
+
+	i = 0
+	If isarray(arr) Then
+		
+		' there is no dimension check in VBScript, so we have to do it via trial & error
+		On Error Resume Next
+		
+		i = 0
+		Do
+			i = i + 1
+			lbound arr, i
+		Loop While err.number = 0
+		Err.clear
+		i = i - 1
+		
+		On Error GoTo 0
+		
+	End If
+	
+	array_dimensions = i
+	
+End Function
+
+
+
+
+' dimensions an array with the given ubound
+'
+' IN:  Integer: the ubound
+' OUT: Array:   the new array
+'
+Function array_dim(ByVal ub)
+	
+	Dim arr : ReDim arr(ub)
+	
+	array_dim = arr
+	
+End Function
+
+
+
+' dimensions a two-dimensional array with the given ubound
+'
+' IN:  Integer: the ubound for 1st dimension
+'      Integer: the ubound for 2nd dimension
+' OUT: Array:   the new array
+'
+Function array_dim2(ByVal ub1, ByVal ub2)
+	
+	Dim arr : ReDim arr(ub1, ub2)
+	
+	array_dim2 = arr
+	
+End Function
+
+
+
+' dimensions a three-dimensional array with the given ubound
+'
+' IN:  Integer: the ubound for 1st dimension
+'      Integer: the ubound for 2nd dimension
+'      Integer: the ubound for 3rd dimension
+' OUT: Array:   the new array
+'
+Function array_dim3(ByVal ub1, ByVal ub2, ByVal ub3)
+	
+	Dim arr : ReDim arr(ub1, ub2, ub3)
+	
+	array_dim3 = arr
+	
+End Function
+
+
+
+
+' fills an array with the given value up to the given ubound
+'
+' IN:  Integer: the ubound
+'      Variant: the value to fill with
+' OUT: Array:   the new array
+'
+Function array_fill(ByVal ub, ByVal val)
+	
+	Dim arr : ReDim arr(ub)
+	Dim i
+	
+	For i = 0 To ub
+		arr(i) = val
+	Next
+	
+	array_fill = arr
+	
+End Function
+
+
+
+' fills a two-dimensional array with the given value up to the given ubound
+'
+' IN:  Integer: the ubound for 1st dimension
+'      Integer: the ubound for 2nd dimension
+'      Variant: the value to fill with
+' OUT: Array:   the new array
+'
+Function array_fill2(ByVal ub1, ByVal ub2, ByVal val)
+	
+	Dim arr : ReDim arr(ub1, ub2)
+	Dim i, j
+	
+	For i = 0 To ub1
+		For j = 0 To ub2
+			arr(i, j) = val
+		Next
+	Next
+	
+	array_fill2 = arr
+	
+End Function
+
+
+
+' fills a two-dimensional with the given value up to the given ubound
+'
+' IN:  Integer: the ubound for 1st dimension
+'      Integer: the ubound for 2nd dimension
+'      Integer: the ubound for 3rd dimension
+'      Variant: the value to fill with
+' OUT: Array:   the new array
+'
+Function array_fill3(ByVal ub1, ByVal ub2, ByVal ub3, ByVal val)
+	
+	Dim arr : ReDim arr(ub1, ub2, ub3)
+	Dim i, j, k
+	
+	For i = 0 To ub1
+		For j = 0 To ub2
+			For k = 0 To ub3
+				arr(i, j, k) = val
+			Next
+		Next
+	Next
+	
+	array_fill3 = arr
+	
+End Function
+
+
+
+' converts a two-dimensional array into a nested one-dimensional array
+'
+' IN:  Array: the array to work with (two-dimensional)
+' OUT: Array: the resulting array
+'
+Function array_2to1dimension(ByVal arr)
+	
+	Dim arr2 : ReDim arr2(ubound(arr, 1))
+	Dim arr3 : ReDim arr3(ubound(arr, 2))
+	Dim i, j
+		
+	For i = 0 To ubound(arr2)
+		For j = 0 To ubound(arr3)
+			arr3(j) = arr(i, j)
+		Next
+		arr2(i) = arr3
+	Next
+		
+	array_2to1dimension = arr2
+	
+End Function
+
+
+
+' converts a three-dimensional array into a nested one-dimensional array
+'
+' IN:  Array: the array to work with (three-dimensional)
+' OUT: Array: the resulting array
+'
+Function array_3to1dimension(ByVal arr)
+	
+	Dim arr2 : ReDim arr2(ubound(arr, 1))
+	Dim arr3 : ReDim arr3(ubound(arr, 2))
+	Dim arr4 : ReDim arr4(ubound(arr, 3))
+	Dim i, j, k
+		
+	For i = 0 To ubound(arr2)
+		For j = 0 To ubound(arr3)
+			For k = 0 To ubound(arr4)
+				arr4(k) = arr(i, j, k)
+			Next
+			arr3(j) = arr4
+		Next
+		arr2(i) = arr3
+	Next
+		
+	array_3to1dimension = arr2
+	
+End Function
+
+
+
+' converts a nested array into a flat one
+'
+' IN:  Array: the array to work with
+' OUT: Array: the resulting array
+'
+Function array_flatten(ByVal arr)
+
+	array_flatten = array__flatten_recursive(arr)
+	
+End Function
+
+Function array__flatten_recursive(ByVal arr)
+	
+	Dim res : res = array()
+	Dim i
+	
+	For i = 0 To ubound(arr)
+		If isarray(arr(i)) Then
+			res = array_merge(array(res, array__flatten_recursive(arr(i))))
+		Else
+			array_push res, arr(i)
+		End If
+	Next
+	
+	array__flatten_recursive = res
+	
+End Function
+
+
+
+' converts a two-dimensional array into a flat one-dimensional array
+'
+' IN:  Array: the array to work with (two-dimensional)
+' OUT: Array: the resulting array
+'
+Function array_flatten2(ByVal arr)
+
+	array_flatten2 = array_flatten(array_2to1dimension(arr))
+	
+End Function
+
+
+
+' converts a three-dimensional array into a flat one-dimensional array
+'
+' IN:  Array: the array to work with (three-dimensional)
+' OUT: Array: the resulting array
+'
+Function array_flatten3(ByVal arr)
+
+	array_flatten3 = array_flatten(array_3to1dimension(arr))
+	
+End Function
+
+
+
+' swaps dimensions of a two-dimensional array
+'
+' IN:  Array: the array to swap (two-dimensional)
+' OUT: Array: the swapped array
+'
+Function array_swap(ByVal arr)
+	
+	Dim i, j
+	Dim arr2 : ReDim arr2(ubound(arr, 2), ubound(arr, 1))
+	
+	For i = 0 To ubound(arr, 1)
+		For j = 0 To ubound(arr, 2)
+			arr2(j, i) = arr(i, j)
+		Next
+	Next
+	
+	array_swap = arr2
+	
+End Function
+
+
+
+' returns the number of elements in an array
+'
+' IN:  Array: the array to work with
+' OUT: Integer: the number of elements (NULL if not an array)
+'
+Function array_count(ByVal arr)
+	
+	If array_dimensions(arr) = 1 Then
+		array_count = ubound(arr) + 1
+	Else
+		array_count = Null
+	End If
+	
+End Function
+
+
+
+' inserts a value into an array at a given position
+'
+' IN:  *Array:  the array to work with
+'      Integer: the position where to insert
+'      Variant: the value to insert
+' OUT: Integer: the array's new ubound (NULL if position is invalid)
+'
+Function array_insert(ByRef arr, ByVal position, ByVal val)
+
+	Dim i
+
+	If position >= 0 And position <= ubound(arr) + 1 Then
+		ReDim Preserve arr(ubound(arr) + 1)
+		For i = ubound(arr) To position + 1 Step -1
+			arr(i) = arr(i - 1)
+		Next
+		arr(position) = val
+		array_insert = ubound(arr)
+	Else
+		array_insert = Null
+	End If
+		
+End Function
+
+
+
+' returns the element at a given position of an array, removes that element, shortens the array by one and moves all following elements down
+'
+' IN:  *Array:  the array to work with
+'      Integer: the position of the element to return
+' OUT: Variant: the value of the removed element (NULL on empty arrays)
+'
+Function array_extract(ByRef arr, ByVal position)
+
+	Dim i
+
+	If position >= 0 And position <= ubound(arr) Then
+		array_extract = arr(position)
+		For i = position + 1 To ubound(arr)
+			arr(i - 1) = arr(i)
+		Next 
+		ReDim Preserve arr(ubound(arr) - 1)
+	Else
+		array_extract = Null
+	End If
+		
+End Function
+
+
+
+
+' appends a value to an array
+'
+' IN:  *Array:  the array to work with
+'      Variant: the value to append
+' OUT: Integer: the array's new ubound
+'
+Function array_push(ByRef arr, ByVal val)
+	
+	array_push = array_insert(arr, ubound(arr) + 1, val)
+	
+End Function
+
+
+
+' returns the last element of an array and shortens the array by one
+'
+' IN:  *Array:  the array to work with
+' OUT: Variant: the value of the removed element (NULL on empty arrays)
+'
+Function array_pop(ByRef arr)
+	
+	array_pop = array_extract(arr, ubound(arr))
+	
+End Function
+
+
+
+' inserts a value at the beginning of an array
+'
+' IN:  *Array:  the array to work with
+'      Variant: the value to append
+' OUT: Integer: the array's new ubound
+'
+Function array_unshift(ByRef arr, ByVal val)
+	
+	array_unshift = array_insert(arr, 0, val)
+	
+End Function
+
+
+
+' returns the first element of an array, shortens the array by one and moves all other elements down
+'
+' IN:  *Array:  the array to work with
+' OUT: Variant: the value of the removed element (NULL on empty arrays)
+'
+Function array_shift(ByRef arr)
+
+	array_shift = array_extract(arr, 0)
+	
+End Function
+
+
+
+' returns part of an array, specified by starting position an length
+'
+' IN:  Array:   the array to extract from
+'      Integer: the starting position of the part to extract (counted from the end if negative, with -1 being the last element)
+'      Integer: the length of the part to extract (if negative the extracted part ends that many elements before ubound + 1 (so -1 is ubound))
+' OUT: Array:   the extracted part of the array
+'
+Function array_slice(ByVal arr, ByVal position, ByVal length)
+	
+	Dim ret : ret = array
+	Dim i
+	
+	If ubound(arr) > -1 And length <> 0 And position <= ubound(arr) Then
+		If position < 0 Then
+			position = ubound(arr) + position + 1
+			If position < 0 Then position = 0
+		End If
+		If length < 0 Then
+			length = ubound(arr) + length - position + 2
+		End If
+		If position + length - 1 > ubound(arr) Then length = ubound(arr) - position + 1
+		For i = position To position + length - 1
+			array_push ret, arr(i)
+		Next
+	End If
+	
+	array_slice = ret
+	
+End Function
+
+
+
+' removes all elements with a given value from an array
+'
+' IN:  *Array:   the array to work with
+'      Variant:  the value to remove
+' OUT: Integer:  the number of elements removed
+'
+Function array_clean(ByRef arr, ByVal val)
+	
+	Dim i, j
+
+	j = 0
+	Do
+		i = array_search(val, arr)
+		If i > -1 Then
+			j = j + 1
+			array_extract arr, i
+		End If
+	Loop While i > -1
+	
+	array_clean = j
+	
+End Function
+
+
+
+' removes duplicate values from an array
+'
+' IN:  *Array:   the array to work with
+' OUT: Integer:  the number of elements removed
+'
+Function array_unique(ByRef arr)
+	
+	Dim ret : ret = array()
+	Dim i
+	
+	For i = 0 To ubound(arr)
+		If array_search(arr(i), ret) = -1 Then array_push ret, arr(i)
+	Next
+	array_unique = ubound(arr) - ubound(ret)
+	arr = ret
+	
+End Function
+
+
+
+' merges two or more arrays together by appending them one by one
+'
+' IN:  Array: an array containig all arrays to merge
+' OUT: Array: the resulting array with all values from the input arrays
+'
+Function array_merge(ByVal arrs)
+	
+	Dim i, j
+	
+	For i = 1 To ubound(arrs)
+		For j = 0 To ubound(arrs(i))
+			array_push arrs(0), arrs(i)(j)
+		Next
+	Next
+	
+	array_merge = arrs(0)
+	
+End Function
+
+
+
+' expands an array to a given size and fills new elements with a default value
+'
+' IN:  Array:   the array to expand
+'      Integer: the target ubound (if negative then the new elements are added at the beginning of the array)
+'      Variant: the value to fill with
+' OUT: Array:   the expanded array (equals the original array if target ubound <= original ubound)
+'
+Function array_pad(ByVal arr, ByVal ub, ByVal val)
+	
+	Dim old_ub, i
+	
+	old_ub = ubound(arr)
+	If ub < 0 Then
+		For i = old_ub To abs(ub) - 1
+			array_unshift arr, val
+		Next
+	Else
+		For i = old_ub To abs(ub) - 1
+			array_push arr, val
+		Next
+	End If
+	
+	array_pad = arr
+	
+	End Function
+
+
+
+' returns an array with all values from an input array sorted from min to max
+'
+' IN:  Array: the array to sort
+' OUT: Array: the sorted array
+'
+Function array_sort(ByVal arr)
+	
+	Dim ret, i
+	
+	ret = array()
+	For i = 0 To ubound(arr)
+		array_push ret, array_extract(arr, array_min(arr))
+	Next
+
+	array_sort = ret
+	
+End Function
+
+
+
+' returns an array with all values from an input array sorted from min to max
+' this function works on nested arrays. The elements of the outer array will be sorted using the elements of the inner arrays at the specified index
+'
+' EXAMPLE:
+' myArr = array(array(1, -2, 3), array(15, 5, 0), array(0, 3, -50))
+' mySortedArr = array_nsort(myArr, 1)
+' 
+' Now mySortedArr looks like this: array(array(1, -2, 3), array(0, 3, -50), array(15, 5, 0))
+' (the inner arrays remain unchanged but are sorted after their elements at index 1)
+'
+' IN:  Array:   the array to sort
+'      Integer: the index to sort after
+' OUT: Array:   the sorted array
+'
+Function array_nsort(ByVal arr, ByVal index)
+	
+	Dim ret, i, j
+	
+	ret = array()
+	Do While ubound(arr) > -1
+		j = 0
+		For i = 1 To ubound(arr)
+			If arr(i)(index) < arr(j)(index) Then j = i
+		Next
+		array_push ret, array_extract(arr, j)
+	Loop
+		
+	array_nsort = ret
+	
+End Function
+
+
+
+' returns an array with all values from the input array, but in reversed order
+'
+' IN:  Array: the array to reverse
+' OUT: Array: the reversed array
+'
+Function array_reverse(ByVal arr)
+	
+	Dim ret, i
+	
+	ret = array()
+	For i = ubound(arr) To 0 Step -1
+		array_push ret, arr(i)
+	Next
+
+	array_reverse = ret
+	
+End Function
+
+
+
+' searches an array for a given value
+'
+' IN:  Variant: the value to search for
+'      Array:   the array to search
+' OUT: Integer: the position of the value's first appearance in the array (-1 if not found)
+'
+Function array_search(ByVal val, ByVal arr)
+	
+	Dim i
+	
+	If isnull(val) Then
+		For i = 0 To ubound(arr)
+			If isnull(arr(i)) Then Exit For
+		Next
+	Else
+		For i = 0 To ubound(arr)
+			If arr(i) = val Then Exit For
+		Next
+	End If
+	If i > ubound(arr) Then i = -1
+	
+	array_search = i
+	
+End Function
+
+
+ 
+' searches an array for an element that does not equal a given value
+'
+' IN:  Variant: the value to search for
+'      Array:   the array to search
+' OUT: Integer: the position of the value's first appearance in the array (-1 if not found)
+'
+Function array_search_neg(ByVal val, ByVal arr)
+	
+	Dim i
+	
+	If isnull(val) Then
+		For i = 0 To ubound(arr)
+			If Not isnull(arr(i)) Then Exit For
+		Next
+	Else
+		For i = 0 To ubound(arr)
+			If arr(i) <> val Then Exit For
+		Next
+	End If
+	If i > ubound(arr) Then i = -1
+	
+	array_search_neg = i
+	
+End Function
+
+
+ 
+' returns the position of the element with the smallest value in an array
+'
+' IN:  Array:   the array to work with
+' OUT: Integer: the position of the element with the smallest value (-1 on emtpy arrays)
+'
+Function array_min(ByVal arr)
+	
+	Dim i, j
+	
+	j = ubound(arr)
+	For i = 0 To ubound(arr) - 1
+		If arr(i) <= arr(j) Then j = i
+	Next
+	
+	array_min = j
+	
+End Function
+
+
+
+' returns the position of the element with the largest value in an array
+'
+' IN:  Array:   the array to work with
+' OUT: Integer: the position of the element with the largest value (-1 on emtpy arrays)
+'
+Function array_max(ByVal arr)
+	
+	Dim i, j
+	
+	j = ubound(arr)
+	For i = 0 To ubound(arr) - 1
+		If arr(i) >= arr(j) Then j = i
+	Next
+	
+	array_max = j
+	
+End Function
+
+
+
+' returns the sum of all values in an array
+'
+' IN:  Array:   the array containing the values to add together
+' OUT: Integer: the sum of all values in the array
+'
+Function array_sum(ByVal arr)
+	
+	Dim i, ret
+	
+	ret = 0
+	For i = 0 To ubound(arr)
+		ret = ret + arr(i)
+	Next
+	
+	array_sum = ret
+	
+End Function
+
+
+
+' returns the product of all values in an array
+'
+' IN:  Array:   the array containing the values to multiply
+' OUT: Integer: the product of all values in the array
+'
+Function array_product(ByVal arr)
+	
+	Dim i, ret
+	
+	ret = 1
+	For i = 0 To ubound(arr)
+		ret = ret * arr(i)
+	Next
+	
+	array_product = ret
+	
+End Function
+
+
+
+' returns the value at a random position of an array
+'
+' IN:  Array:   the array with the values to choose from
+' OUT: Variant: a random value found in the array (NULL on empty arrays)
+'
+Function array_rand(ByVal arr)
+	
+	if ubound(arr) = -1 then
+		array_rand = Null
+	Else
+		array_rand = arr(int((ubound(arr) + 1) * rnd))
+	End If
+	
+End Function
+
+
+
+' implodes all elements of an array to a string
+'
+' IN:  String: the "glue" to connect the elements
+'      Array:  the array with the values to choose from
+' OUT: String: the array as string
+'
+Function array_implode(ByVal glue, ByVal arr)
+	
+	Dim i
+	
+	array_implode = ""
+	If ubound(arr) > -1 Then
+		array_implode = CStr(arr(0))
+		For i = 1 To ubound(arr)
+			array_implode = array_implode + glue + CStr(arr(i))
+		Next
+	End If
+	
+End Function
+
+
+
+' prints the content of an array to the Rhino command window (array can be nested)
+'
+' IN:  Array:   the array to print
+' OUT: Nothing
+'
+Sub array_print(ByVal arr)
+
+	array__print_recursive arr, -1, ""
+	
+End Sub
+
+Sub array__print_recursive(ByVal arr, ByVal key, ByVal indent)
+
+	Dim i
+	
+	If key > -1 Then
+		rhino.printex indent & key & " => Array ("
+	Else
+		rhino.printex indent & "Array ("
+	End If
+	For i = 0 To ubound(arr)
+		If isnull(arr(i)) Then
+			rhino.printex indent & "  " & i & " => NULL"
+		ElseIf isarray(arr(i)) Then
+			array__print_recursive arr(i), i, indent & "  "
+		ElseIf isnumeric(arr(i)) Then
+			rhino.printex indent & "  " & i & " => " & arr(i)
+		Else
+			rhino.printex indent & "  " & i & " => """ & arr(i) & """"
+		End If
+	Next
+	rhino.PrintEx indent & ")"
+	
+End Sub

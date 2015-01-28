@@ -1,0 +1,32 @@
+Option Explicit
+
+Private strOldLayerStateName
+
+If isEmpty(strOldLayerStateName) Then
+	strOldLayerStateName = "LayerState01"
+End If
+
+'Call SaveLayerState()
+Sub SaveLayerState()
+
+	Dim objPlugIn, strLayerStateName 'don't understand why strLayerStateName is declared here and (goto end of line 28)
+	
+	On Error Resume Next
+
+	Set objPlugIn = Rhino.GetPluginObject("Rhino Bonus Tools")
+
+	If Err Then
+
+		MsgBox Err.Description
+
+		Exit Sub
+
+	End If
+
+	strLayerStateName = Rhino.StringBox("Name layer state", strOldLayerStateName, "Save layer state name")
+	
+	strOldLayerStateName = strLayerStateName 'declared here when it seems that strOldLayerStateName is handling everything.  What is going on?
+	
+	Call objPlugIn.SaveLayerState(strOldLayerStateName)
+
+End Sub

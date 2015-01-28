@@ -1,0 +1,78 @@
+
+
+Option Explicit
+'Script by Mitch Heynick
+'Version Friday, 18 June, 2010
+'Mitch-LayerNamesFromFileV2
+'OK, here is the first installment...  There are two scripts attached with lots of comments inside.  See if you manage to follow - if not, yell.
+'The difference between the two is a bit subtle.  The first just adds two sublayers as you asked - it is a light modification of the original script.
+'The second attempts to generalize a bit by creating a subroutine that will add as many sublayers as you specify suffixes for to each parent layer.  You are not limited to two.  Those suffixes are currently hardcoded into the script (I put in 5 as an example), but you could also ask the user, etc.
+'One could go further and read in a set of suffixes from a second file, create an automatic sublayer numbering routine, etc...  infinite variations are possible.
+'Both of the above use the vbScript FSO object.  I will concoct one more that uses the new ReadTextFile method in Rhinoscript.
+
+'--Mitch 
+
+' this version adds two sublayers to each parent layer in file
+
+'Call ImportLayerNamesFromFilePlus2Subs()
+Sub ImportLayerNamesFromFilePlus2Subs()
+	
+	Dim strPath
+	' Calls a browse box for the file you want to open
+	strPath = Rhino.OpenFileName("File with layer names to import", "Text files (*.txt)|*.txt")
+	' exits script gracefully if file path is not specified
+	If IsNull(strPath) Then Exit Sub
+	
+	Dim FSO, objFile
+	
+	' creates an instance of the File System Object and sets it to variable FSO
+	Set FSO = CreateObject("Scripting.FileSystemObject")
+	
+	'OpenTextFile is a *method* of the FileSystemObject
+	'it opens the file specified in the filename argument (strPath)
+	'and returns an instance of the TextStreamObject for that file.
+	'the "1" specifies that the file is open for reading (would be 2 for write, 8 for append)
+	'the "False" argument says not to create a new file if the specified file doesn't exist
+	Set objFile = FSO.OpenTextFile(strPath, 1, False)
+	
+	Dim strLayerName,strSubLayerName
+	
+	' start a loop that will read the file line by line
+	Do While Not objFile.AtEndOfStream ' will continue to the end of the file then stop
+		
+		' read one line and fill the string variable strLayerName with the entire line
+		strLayerName=(ObjFile.ReadLine())
+		
+		'checks if above is a blank line, if so, skip it
+		If strLayerName<>"" Then
+			
+			' checks for existence of layer name in file,
+			' if layer does not exist, add it - by default a parent layer
+			If not Rhino.IsLayer(strLayerName) Then
+				Call Rhino.AddLayer(strLayerName)
+			End If
+			
+			'OK, parent layer is there - now:
+			'add suffix to parent layer name
+			strSubLayerName=strLayerName&"-RT"
+			
+			'check for existence of sublayer name in file
+			If not Rhino.IsLayer(strSubLayerName) Then
+				
+				' if sublayer does not exist, it add it
+				Call Rhino.AddLayer(strSubLayerName,,,,strLayerName)
+				' the additional argument creates it as a sublayer of parent layer above				
+			End If
+			
+			'same procedure for second sublayer
+			strSubLayerName=strLayerName&"-LG"
+			If not Rhino.IsLayer(strSubLayerName) Then
+				Call Rhino.AddLayer(strSubLayerName,,,,strLayerName)
+			End If
+			
+		End If	
+	Loop
+	Set FSO=Nothing
+	Set objFile = Nothing	
+End Sub
+

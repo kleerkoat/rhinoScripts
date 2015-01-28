@@ -1,0 +1,45 @@
+Option Explicit
+
+
+'Call RadialTangentialArcScale()
+Sub RadialTangentialArcScale()
+	
+	Dim strObject,dblGetRad,dblGetAng,arrPlane,dblGetScaleRad,dblGetScaleTan,dblRadius,dblAngle,strArc
+	strObject=Rhino.GetObject("Pick the arc to scale radially and tangentially.")
+	If IsNull(strObject) Then Exit Sub
+	
+	dblGetRad=Rhino.ArcRadius(strObject)
+	dblGetAng=Rhino.ArcAngle(strObject)
+	arrPlane=Rhino.WorldXYPlane
+	
+	dblGetScaleRad=Rhino.GetReal("Enter the radial scale.")
+	If IsNull(dblGetScaleRad) Then Exit Sub
+	
+	dblGetScaleTan=Rhino.GetReal("Enter the tangential scale.")
+	If IsNull(GetScaleTan) Then Exit Sub
+	
+	dblRadius=dblGetRad*dblGetScaleRad
+	dblAngle=dblGetAng
+	strArc=Rhino.AddArc(arrPlane, dblRadius, dblAngle)
+	Call TangentScale(strObject,strArc,dblGetScaleTan)
+End Sub
+
+Sub TangentScale(strObject,strArc,dblGetScaleTan)
+	
+	Dim dblLengthOriginal,dblScaledLengthOriginal,dblLengthArc,dblDiff,dblLength,intType,intSide
+	
+	dblLengthOriginal=Rhino.CurveLength(strObject)
+	
+	dblScaledLengthOriginal=dblLengthOriginal*dblGetScaleTan
+	dblLengthArc=Rhino.CurveLength(strArc)
+	dblDiff=dblScaledLengthOriginal-dblLengthArc
+	dblLength=(dblDiff/2)
+	intType=2 'Curvature smooth
+	intSide=2 'Both sides
+	Call Rhino.ExtendCurveLength(strArc, intType, intSide, dblLength)
+
+	
+	
+End Sub
+
+

@@ -1,0 +1,70 @@
+﻿Option Explicit
+'Script written by Pascal
+'Script version Friday, October 23, 2009 
+
+Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+Rhino.AddAlias "ReplaceObjects", "_NoEcho _-Runscript (ReplaceObjects)"
+
+'Call ReplaceObjects()
+Sub ReplaceObjects()
+
+	
+	Dim aObj: aObj = Rhino.GetObjects("Select objects to replace",,,True)
+	If Not isArray(aObj) Then Exit Sub
+	
+	Dim sObj: sObj = Rhino.GetObject("Select replacement object")
+	If isNull(sObj) Then Exit Sub
+	Dim aBB:aBB = Rhino.BoundingBox(sObj)
+	
+	Dim aBase: aBase = AveragePoints (array(aBB(0), aBB(6)))
+		
+	Dim aTarg, sGoner, tempBB
+
+	Rhino.EnableRedraw(False)
+	
+	For Each sGoner In aObj
+		
+		tempBB = Rhino.BoundingBox(sGoner)
+	
+		atarg = AveragePOints (array(tempBB(0), tempBB(6)))
+	
+		
+		Rhino.CopyObject sObj, abase, aTarg
+		Rhino.DeleteObject sGoner
+	Next
+	
+	Rhino.EnableRedraw(True)
+	
+End Sub
+
+
+
+Function AveragePoints(arrPts)
+	'Finds the average location of an array
+	'of points.
+
+	Dim X, Y, Z
+	Dim i
+	
+	X = 0
+	Y = 0
+	Z = 0
+
+	For i=0 To UBound (arrPts)
+			
+		'add all the X values
+		X = X+arrPts(i)(0)
+	
+		'add all th Y values
+		Y = Y+arrPts(i)(1)			
+	
+		'add all the Z values
+		Z = Z+arrpts(i)(2)
+	Next
+	
+	'Divide by the number of points to
+	'get the average  for each
+	'create the output array from the 3 averages
+	AveragePoints  =array(X/(UBound(arrPts)+1), Y/(UBound(arrPts)+1), Z/(UBound(arrPts)+1))
+
+End Function

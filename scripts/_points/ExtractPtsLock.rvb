@@ -1,0 +1,22 @@
+﻿Option Explicit
+'Script written by ryan gilmoe
+'Script version Sunday, April 29, 2012 11:43:50 AM
+
+'Call ExtractPtsLock()
+Sub ExtractPtsLock()
+	Dim strObject, arrPoints, arrPoint, arrLockPts
+	strObject = Rhino.GetObject("Select a polycurve.",, True)
+	If Rhino.IsPolyCurve(strObject) = False Then
+		Rhino.Print("Selection not a polycurve.")
+		Exit Sub
+	End If
+	arrPoints = Rhino.CurvePoints(strObject)
+	Rhino.EnableRedraw(False)
+	If IsArray(arrPoints) Then
+		For Each arrPoint In arrPoints
+			arrLockPts = Rhino.AddPoint(arrPoint)
+			Rhino.LockObject arrLockPts				
+		Next
+	End If
+	Rhino.EnableRedraw(True)
+End Sub

@@ -1,0 +1,64 @@
+Option Explicit
+
+Sub BallJoint
+  
+	Dim arrObj, arrRef, arrCent
+	Dim strCent, arrRefpt, strRefPt, strSphere
+  
+	arrObj = Rhino.GetObjects("Select objects to pivot",, True, True)
+  
+	If IsArray(arrObj) Then
+
+		arrRef = Rhino.GetPoints (True, ,"Pivot point", "Reference point",2)
+
+		If IsArray (arrRef) Then
+			Rhino.EnableRedraw(False)
+			strCent = Rhino.Pt2Str(arrRef(0),, True)
+			strRefpt = Rhino.Pt2Str(arrRef(1),, True)
+			arrCent = (arrRef(0))
+			arrRefPt = (arrRef(1))
+			Rhino.UnselectAllObjects
+			Rhino.Command "Sphere "&strCent &strRefPt
+      
+			If Rhino.LastCommandResult = 0 Then
+				strSphere = Rhino.FirstObject
+				Rhino.UnselectAllObjects
+				Rhino.SurfaceIsocurveDensity strSphere , -1
+				Rhino.SelectObject strSphere
+									Rhino.Command "SetObjectDisplayMode Mode=WireFrame "
+			Else Exit Sub
+			End If
+        
+			'      Rhino.Command "MeshSphere VerticalFaces=16 AroundFaces=32 "&strCent &strRefPt
+			'      If Rhino.LastCommandResult = 0 Then
+			'        strMeshSphere = Rhino.FirstObject
+			'        Rhino.UnselectAllObjects
+			'        Rhino.SelectObject strSphere
+			'        Rhino.SurfaceIsocurveDensity strSphere , -1
+			'        Rhino.Command "SetObjectDisplayMode Mode=Ghosted "
+			'        Else Exit Sub
+			'       End If
+        
+		Else 
+			Rhino.EnableRedraw(True)
+			Exit Sub
+		End If
+	Else 
+		Rhino.EnableRedraw(True)
+		Exit Sub
+    
+	End If   
+	Rhino.EnableRedraw(True)
+   
+	Rhino.UnselectAllObjects
+	Rhino.SelectObjects(arrObj)
+	Rhino.Command "Orient Scale=No " &strCent  &strRefpt &strCent &"Onsrf SelID " &strSphere   
+	Rhino.DeleteObject strSphere
+	'  Rhino.DeleteObject strMeshSphere
+End Sub 
+      
+'/////////////////////////////////////////////
+'\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\   
+      
+'Rhino.AddAlias "BallJoint", "! _-Runscript BallJoint"
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile

@@ -1,0 +1,40 @@
+Option Explicit
+'Script by Mitch Heynick
+'Version Sunday, 12 December, 2010
+
+'divides a subsection of an open or closed curve
+'into the specified number of intervals
+'note: will not cross a closed curve seam
+
+Private oldIntervals
+If IsEmpty(oldIntervals) Then oldIntervals=10
+
+'Call DivideSubCrv()
+Sub DivideSubCrv()
+	
+	Dim strCrv,arrPt1,arrPt2,intDivPts
+	strCrv=Rhino.GetObject("Select curve to divide",4,True)
+	If IsNull(strCrv) Then Exit sub
+	
+	arrPt1=Rhino.GetPointOnCurve(strCrv,"Pick start point of section to divide")
+	If not IsArray(arrPt1) Then Exit Sub
+	
+	arrPt2=Rhino.GetPointOnCurve(strCrv,"Pick end point of section to divide")
+	If not IsArray(arrPt2) Then Exit Sub
+	
+	intDivPts=Rhino.GetInteger("Number of intervals?",oldIntervals,3)
+	If IsNull(intDivPts) then Exit Sub
+	oldIntervals=intDivPts
+	
+	Dim dblParam0,dblParam1,strSubCrv
+	dblParam0=Rhino.CurveClosestPoint(strCrv,arrPt1)
+	dblParam1=Rhino.CurveClosestPoint(strCrv,arrPt2)
+	If dblParam0>dblParam1 Then
+		strSubCrv=Rhino.AddSubCrv (strCrv,dblParam1,dblParam0)
+	Else
+		strSubCrv=Rhino.AddSubCrv (strCrv,dblParam0,dblParam1)
+	End If	
+	Call Rhino.DivideCurve(strSubCrv,intDivPts,True)
+	Call Rhino.DeleteObject(strSubCrv)
+End Sub
+

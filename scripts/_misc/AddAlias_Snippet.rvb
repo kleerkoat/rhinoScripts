@@ -1,0 +1,3 @@
+	'add a startup script and make a command alias to run the script
+Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+Rhino.addAlias "ALIASNAME", "! _-NoEcho _-Runscript ALIASNAME"

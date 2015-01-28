@@ -1,0 +1,66 @@
+Option Explicit
+'Script written by Mitch Heynick
+'Script version March 21, 2011
+'V4 or V5
+
+'Call IsolateLayerWithSubs()
+Sub IsolateLayerWithSubs()
+
+	Dim arrAllLayers,arrOffLayers(),strChkParent,ub,i,j
+	arrAllLayers=Rhino.LayerNames
+	ub=Ubound(arrAllLayers)
+	Redim arrOffLayers (ub)
+	j=-1
+	For i=0 to ub
+		If Not Rhino.IsLayerVisible(arrAllLayers(i)) Then
+			strChkParent=Rhino.ParentLayer(arrAllLayers(i))
+			If IsNull(strChkParent) Then 'layer is a parent layer
+				j=j+1
+				arrOffLayers(j)=arrAllLayers(i)
+			End If			
+		End If
+	Next
+	If j>-1 Then
+		Redim Preserve arrOffLayers(j)
+	Else
+		Call Rhino.Print("No off parent layers found") : Exit Sub
+	End If
+
+	Dim strNewOnLayer
+	strNewOnLayer=Rhino.ListBox (arrOffLayers,"Parent layer to turn on","One layer on")
+	If IsNull(strNewOnLayer) Then Exit Sub
+	Call Rhino.CurrentLayer(strNewOnLayer)
+	
+	For i=0 to ub
+		If arrAllLayers(i)<>strNewOnLayer Then
+			TurnOffChildLayers(arrAllLayers(i))
+			Call Rhino.LayerVisible(arrAllLayers(i),False)
+		End If
+		
+	Next
+	Call Rhino.LayerVisible(strNewOnLayer,True)
+	Call TurnOnChildLayers(strNewOnLayer)		
+			
+End Sub
+
+Function TurnOffChildLayers(Layer)
+	Dim arrChildren,strChild,blnVis
+	arrChildren=Rhino.LayerChildren(Layer)
+	If IsArray(arrChildren) Then
+		For Each strChild In arrChildren
+			Call TurnOffChildLayers(strChild)
+			Call Rhino.LayerVisible(strChild,False)			
+		Next
+	End If
+End Function
+
+Function TurnOnChildLayers(Layer)
+	Dim arrChildren,strChild
+	arrChildren=Rhino.LayerChildren(Layer)
+	If IsArray(arrChildren) Then
+		For Each strChild In arrChildren
+			Call Rhino.LayerVisible(strChild,True)
+			Call TurnOnChildLayers(strChild)			
+		Next
+	End If
+End Function

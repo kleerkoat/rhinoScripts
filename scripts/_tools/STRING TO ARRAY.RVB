@@ -1,0 +1,9 @@
+Dim strDelimiter, strObjects
+	strDelimiter = ","
+	strObjects = join(arrObjs, strDelimiter)
+	For Each strObjects In arrObjs 
+		If Not Rhino.IsObjectSolid(strObjects) Then
+			Rhino.Print "Export failed, open solids found. Check for Naked Edges."
+			Exit Sub
+		End If
+	Next

@@ -1,0 +1,223 @@
+Option Explicit
+' Script originally written by G. C. Webster� (aka Guilherme Cozer Webster) in September, 2005
+' RhinoScript June 16, 2005
+' Updated to run in Rhino v4
+' Designed to extend several curves at the same time
+
+'Call ExtendMultiCrvs()
+Sub ExtendMultiCrvs()
+
+Dim arrCrv, strCrv
+Dim arrBound
+Dim strOption, arrOption(), strType, arrType()
+Dim strEnd, strStart
+Dim strFrom, arrFrom()
+Dim dblLength
+
+arrCrv = Rhino.GetObjects ("Select curves to extend", 4, True, True)
+       If IsNull (arrCrv) then
+       Exit Sub
+       End If
+
+ReDim arrType (2)
+arrType (0) = "Line"
+arrType (1) = "Arc"
+arrType (2) = "Smooth"
+
+strType = Rhino.GetString ("Select type of extension", "Smooth", arrType)
+        If IsNull (strType) then
+        Exit Sub
+        End If
+
+ReDim arrOption (1)
+arrOption (0) = "Boundary"
+arrOption (1) = "Length"
+
+strOption = Rhino.GetString ("Select extend option", "Length", arrOption)
+          If IsNull (strOption) then
+          Exit Sub
+          End If
+          
+ReDim arrFrom (2)
+arrFrom (0) = "Start"
+arrFrom (1) = "End"
+arrFrom (2) = "Both"
+
+strFrom = Rhino.GetString ("Select extend option", "Both", arrFrom)
+        If IsNull (strFrom) then
+        Exit Sub
+        End If
+
+              Select Case strOption
+                     Case "Boundary"
+                     
+                     arrBound = Rhino.GetObjects ("Select boundary objects")
+                                   If IsNull (arrBound) then
+                                   Exit Sub
+                                   End If
+                                   
+                                   Rhino.EnableRedraw (vbFalse)                                 
+
+                          For each strCrv in arrCrv
+
+                                      Select Case strFrom
+                                             Case "Start"
+
+                                                  Select Case strType
+                                                         Case "Line"
+                                                              strStart = Rhino.ExtendCurve (strCrv, 0, 0, arrBound)
+                                                                       If IsNull (strStart) then
+                                                                       Rhino.print "a curve could not be extended from start"
+                                                                       End If
+                                                         Case "Arc"
+                                                              strStart = Rhino.ExtendCurve (strCrv, 1, 0, arrBound)
+                                                                       If IsNull (strStart) then
+                                                                       Rhino.print "a curve could not be extended from start"
+                                                                       End If
+                                                         Case "Smooth"
+                                                              strStart = Rhino.ExtendCurve (strCrv, 2, 0, arrBound)
+                                                                       If IsNull (strStart) then
+                                                                       Rhino.print "a curve could not be extended from start"
+                                                                       End If
+                                                  End Select
+
+                                             Case "End"
+
+                                                  Select Case strType
+                                                         Case "Line"
+                                                              strStart = Rhino.ExtendCurve (strCrv, 0, 1, arrBound)
+                                                                       If IsNull (strStart) then
+                                                                       Rhino.print "a curve could not be extended from end"
+                                                                       End If
+                                                         Case "Arc"
+                                                              strStart = Rhino.ExtendCurve (strCrv, 1, 1, arrBound)
+                                                                       If IsNull (strStart) then
+                                                                       Rhino.print "a curve could not be extended from end"
+                                                                       End If
+                                                         Case "Smooth"
+                                                              strStart = Rhino.ExtendCurve (strCrv, 2, 1, arrBound)
+                                                                       If IsNull (strStart) then
+                                                                       Rhino.print "a curve could not be extended from end"
+                                                                       End If
+                                                  End Select
+
+                                             Case "Both"
+
+                                                  Select Case strType
+                                                         Case "Line"
+                                                              strStart = Rhino.ExtendCurve (strCrv, 0, 0, arrBound)
+                                                                       If IsNull (strStart) then
+                                                                       Rhino.print "a curve could not be extended from start"
+                                                                       End If
+                                                              strStart = Rhino.ExtendCurve (strCrv, 0, 1, arrBound)
+                                                                       If IsNull (strStart) then
+                                                                       Rhino.print "a curve could not be extended from end"
+                                                                       End If
+                                                         Case "Arc"
+                                                              strStart = Rhino.ExtendCurve (strCrv, 1, 0, arrBound)
+                                                                       If IsNull (strStart) then
+                                                                       Rhino.print "a curve could not be extended from start"
+                                                                       End If
+                                                              strStart = Rhino.ExtendCurve (strCrv, 1, 1, arrBound)
+                                                                       If IsNull (strStart) then
+                                                                       Rhino.print "a curve could not be extended from end"
+                                                                       End If
+                                                         Case "Smooth"
+                                                              strStart = Rhino.ExtendCurve (strCrv, 2, 0, arrBound)
+                                                                       If IsNull (strStart) then
+                                                                       Rhino.print "a curve could not be extended from start"
+                                                                       End If
+                                                              strStart = Rhino.ExtendCurve (strCrv, 2, 1, arrBound)
+                                                                       If IsNull (strStart) then
+                                                                       Rhino.print "a curve could not be extended from end"
+                                                                       End If
+                                                  End Select
+
+                                             End Select
+
+                                      Next
+
+                                      Rhino.EnableRedraw (vbTrue)
+
+                     Case "Length"
+
+                     dblLength = Rhino.GetReal ("Enter extension length",2.00)
+                               If IsNull (dblLength) then
+                               Exit Sub
+                               End If
+
+                             Rhino.EnableRedraw (vbFalse)
+
+                                  For each strCrv in arrCrv
+
+                                      Select Case strFrom
+                                             Case "Start"
+
+                                                  Select Case strType
+                                                         Case "Line"
+                                                              strStart = Rhino.ExtendCurveLength (strCrv, 0, 0, dblLength)
+                                                                       If IsNull (strStart) then
+                                                                       Rhino.print "a curve could not be extended from start"
+                                                                       End If
+                                                         Case "Arc"
+                                                              strStart = Rhino.ExtendCurveLength (strCrv, 1, 0, dblLength)
+                                                                       If IsNull (strStart) then
+                                                                       Rhino.print "a curve could not be extended from start"
+                                                                       End If
+                                                         Case "Smooth"
+                                                              strStart = Rhino.ExtendCurveLength (strCrv, 2, 0, dblLength)
+                                                                       If IsNull (strStart) then
+                                                                       Rhino.print "a curve could not be extended from start"
+                                                                       End If
+                                                  End Select
+
+                                             Case "End"
+                                             
+                                                  Select Case strType
+                                                         Case "Line"
+                                                              strStart = Rhino.ExtendCurveLength (strCrv, 0, 1, dblLength)
+                                                                       If IsNull (strStart) then
+                                                                       Rhino.print "a curve could not be extended from end"
+                                                                       End If
+                                                         Case "Arc"
+                                                              strStart = Rhino.ExtendCurveLength (strCrv, 1, 1, dblLength)
+                                                                       If IsNull (strStart) then
+                                                                       Rhino.print "a curve could not be extended from end"
+                                                                       End If
+                                                         Case "Smooth"
+                                                              strStart = Rhino.ExtendCurveLength (strCrv, 2, 1, dblLength)
+                                                                       If IsNull (strStart) then
+                                                                       Rhino.print "a curve could not be extended from end"
+                                                                       End If
+                                                  End Select
+
+                                             Case "Both"
+
+                                                  Select Case strType
+                                                         Case "Line"
+                                                              strStart = Rhino.ExtendCurveLength (strCrv, 0, 2, dblLength)
+                                                                       If IsNull (strStart) then
+                                                                       Rhino.print "a curve could not be extended"
+                                                                       End If
+                                                         Case "Arc"
+                                                              strStart = Rhino.ExtendCurveLength (strCrv, 1, 2, dblLength)
+                                                                       If IsNull (strStart) then
+                                                                       Rhino.print "a curve could not be extended"
+                                                                       End If
+                                                         Case "Smooth"
+                                                              strStart = Rhino.ExtendCurveLength (strCrv, 2, 2, dblLength)
+                                                                       If IsNull (strStart) then
+                                                                       Rhino.print "a curve could not be extended"
+                                                                       End If
+                                                  End Select
+
+                                             End Select
+
+                                      Next       
+
+                                      Rhino.EnableRedraw (vbTrue)
+
+                     End Select
+                     
+End Sub
+

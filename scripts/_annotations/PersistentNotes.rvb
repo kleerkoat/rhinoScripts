@@ -1,0 +1,72 @@
+Option Explicit
+'Script written by Pascal
+
+'Script version Thursday, September 08, 2011
+'Add your notes, then SetPersistentNotes , then SaveAsTemplate.
+'
+'Use the macro:
+'
+'New GetPersistentNotes
+'
+'to start a new file from a template and retrieve the notes- if there are 
+'persistent notes saved in the file they will turn up in Notes.
+'
+'RemovePersistentNotes to get rid of the document data that is holding the 
+'notes if that is needed. I made GetPersistentNotes add any current notes to 
+'the persistent ones so if you use the command in other contexts it will not 
+'nuke any existing notes.
+'
+'Dunno if that really helps in the long run, we need to handle this in Rhino 
+'but it might help for now. 
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile()
+'Rhino.AddAlias "PersistentNotesSet", "_NoEcho _-Runscript (PersistentNotesSet)"
+'Rhino.AddAlias "PersistentNotesGet", "_NoEcho _-Runscript (PersistentNotesGet)"
+'Rhino.AddAlias "PersistentNotesRemove", "_NoEcho _-Runscript (PersistentNotesRemove)"
+
+
+'Call PersistentNotesSet()
+Sub PersistentNotesSet()
+
+	
+	Dim sNotes: sNotes = Rhino.Notes()
+	If isNull(sNotes) then
+		
+		msgBox "No Notes are in this file."
+		exit sub
+	End if
+	Rhino.SetDocumentUserText "P$Notes",sNotes
+	End Sub
+
+
+Sub PersistentNotesGet()
+	
+	
+	dim temp:	temp = Rhino.Notes() 
+	
+	if isNull(temp) then temp = ""
+	
+	If not Rhino.IsDocumentUserText() then
+		Rhino.Print	"No persistent notes found"
+		Exit sub
+	End If
+	
+	Dim sNotes: sNotes = Rhino.GetDocumentUserText("P$Notes")& vbNewLine &vbNewLine
+	
+	If isNull(sNotes) then
+		Rhinho.Print	"No persistent notes found"
+		Exit sub
+	End If
+	
+	sNotes = sNotes &  temp
+	
+	Rhino.Notes(sNotes)
+	
+End Sub
+
+
+Sub PersistentNotesRemove()
+
+	Rhino.SetDocumentUsertext("P$Notes")
+	
+End Sub

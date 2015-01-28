@@ -1,0 +1,289 @@
+Option Explicit
+'Script written by Pascal
+
+'Script version 1/26/2012
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile()
+'Rhino.AddAlias "ReTrim", "_NoEcho _-Runscript (RetrimSurfaces)"
+
+'Call ReTrimSurfaces()
+
+Sub ReTrimSurfaces()
+	
+	Dim arrSrfs,strSrf, X, Failed
+	Dim aFailed(), r
+	r = 0
+
+	arrSrfs = Rhino.GetObjects("Select Surfaces to ReTrim", 8,, True)
+	
+	If Not IsArray(arrSrfs) Then Exit Sub
+	Rhino.EnableRedraw(False)
+	For Each strSrf In arrSrfs
+		X = ReTrim(strSrf)	
+		If X = False Then
+			ReDim Preserve aFailed(r)
+			aFailed(r) = strSrf
+			r = r + 1
+
+		End If
+	Next
+	
+	Rhino.UnselectAllObjects()
+	Rhino.EnableRedraw(True)
+	Dim str
+	If r > 0 Then
+		str = "Failed to correctly retrim " & r & " face."
+	Else
+		str = "Failed to correctly retrim " & r & " faces."
+	End If
+	
+	str = str & vbnewline & "The selected objects were not retrimmed."
+	
+	Rhino.UnselectAllObjects()
+	
+	If r > 0 Then
+		Rhino.SelectObjects aFailed
+		MsgBox str
+	End If
+End Sub
+
+
+Function ReTrim(sFace)
+	'Sub ReTrim()
+	Retrim = True
+	'Select the trimmed face
+	'	Dim sFace: sface = Rhino.GetObject("Select surface", 8, True, True)
+	'	If isNull(sface) Then Exit Sub
+	
+	Rhino.EnableRedraw(False)
+
+	Dim aCrvs
+	'get the outer border curves in an array
+	If Rhino.ExeVersion >= 5 Then
+		aCrvs = Rhino.DuplicateSurfaceBorder(sFace, 0)
+	Else
+		aCrvs = Rhino.DuplicateSurfaceBorder(sFace)
+	End If
+		
+	If Not isArray(aCrvs) Then
+		Rhino.EnableRedraw(True)
+		ReTrim = False
+		Exit Function
+	End If
+
+	
+	'Build a 'selID'  string to use in Rhino.Command to select the curves
+	Dim sCrvs, crv
+	For Each Crv In aCrvs
+		sCrvs = sCrvs & " _SelID " & crv
+	Next
+		
+	Dim Srf: Srf = GetUntrimmedSrf(sFace)
+	
+	If isNull(srf) Then 
+		Rhino.DeleteObjects aCrvs
+		Rhino.EnableRedraw True
+		ReTrim = False
+		Exit Function
+	
+	End If
+	
+	Rhino.UnselectAllObjects()
+	Rhino.SelectObject Srf
+	
+	're-Split the surface with the curves
+	
+	Rhino.Command "_Split" & SCrvs & " _Enter", False
+	'Exit Function
+	
+	'Verify that is worked
+	
+	If Rhino.ExeVersion >= 5 Then
+		If Rhino.LastCommandResult() <> 0 Then
+			Rhino.DeleteObjects aCrvs
+			Rhino.DeleteObject sFace
+		
+			Rhino.EnableRedraw(True)
+			Exit Function
+		End If
+	Else
+		If isNull(Rhino.LastCreatedObjects()) Then
+			Rhino.DeleteObjects aCrvs
+			Rhino.DeleteObject sFace
+			
+			Rhino.EnableRedraw(True)
+			Exit Function
+		End If
+		
+	End If
+	'delete the splitting curves
+	Rhino.DeleteObjects aCrvs
+	
+	'Collect the split output in an array
+	Dim aLast: aLast = Rhino.LastCreatedObjects()
+	
+	'	Rhino.ObjectColor aLast, vbred
+	'	Exit Function
+	Dim f
+	f = 0
+	Dim srfCnt: SrfCnt = 0
+	
+	If Not isArray(aLast) Then
+		Rhino.EnableRedraw(True)
+		ReTrim = False
+		Exit Function
+	Else 'delete any curves left over from UntrimAll
+		Dim sObj
+		For Each sObj In aLast
+			If Rhino.IsCurve(sObj) Then 
+				Rhino.DeleteObject sObj	
+			End If
+			
+			If Rhino.IsSurface(sObj) Then 
+				SrfCnt = SrfCnt + 1
+				ReDim Preserve aSplit(f)
+				aSPlit(f) = sObj
+				f = f + 1
+			End If
+		Next
+	End If
+
+	If SrfCnt < 2 Then 
+		ReTrim = False
+		Rhino.DeleteObjects aLast
+		
+		Exit Function
+	End If	
+	
+	
+	'Delete any faces that do not
+	'have the 3d test point on them.
+	Dim face 
+
+	If Not isNull(BBCompare(sFace, aSplit)) Then
+		Rhino.DeleteObject sFace
+	Else
+		ReTrim = False
+	End If
+	
+	Rhino.EnableRedraw(True)
+	For Each Face In aSplit
+		Rhino.FlashObject Face
+	Next
+	
+End Function
+
+
+Function BBCompare(sObj, aObj)
+	
+	Dim aBoxes,  n, Bound, aBB, Box, X, i, aTrims, b
+	Bound = UBound(aObj)
+	ReDim aBoxes(Ubound(aObj))
+	
+	aTrims = Rhino.DuplicateEdgeCurves(sObj)
+	
+	aBB = Rhino.BoundingBox(aTrims)
+	Rhino.DeleteObjects aTrims
+	
+	For n = 0 To Bound
+		aTrims = Rhino.DuplicateEdgeCurves(aObj(n))
+		aBoxes(n) = Rhino.BoundingBox(aTrims)
+		Rhino.DeleteObjects atrims
+	Next
+	n = 0
+	Dim Min
+	Min = 0
+	Dim del: del = -1
+	For Each box In aBoxes
+		b = 0
+		For i = 0 To 7
+			
+			If Rhino.PointCompare(aBB(i), Box(i), 10 * Rhino.UnitAbsoluteTolerance()) Then
+				b = i
+			Else
+				Rhino.DeleteObject aObj(n)
+				Del = Del + 1
+				Exit For
+			End If
+			If b > min Then
+				Min = b
+				X = n
+			End If
+			'If b = 7 Then X = n
+		Next
+		
+	
+		'If b = 7 Then Exit For
+		n = n + 1
+		
+	Next
+	
+	If Min > 2 And Del < Ubound(aObj) Then
+		BBCompare = aObj(x)
+	Else BBCompare = Null
+	End If
+	
+End Function
+
+
+Function GetUntrimmedSrf(sSrf)
+	'returns the untrimmed version of the selected surface
+	'for analytical surfaces the entire shape is returned.
+	Dim aPlane,dblRad,dblHeight
+	Dim Result
+	If Rhino.IsSphere(sSrf) Then
+		'get sphere info
+		'make a new sphere
+		
+		Dim aSphere: aSphere = Rhino.SurfaceSphere(sSrf)
+		aPlane = aSphere(0)
+		dblRad = aSphere(1)
+		Result = Rhino.AddSphere(aPlane, dblrad)
+		
+		'ElseIf Rhino.IsPlaneSurface(sSrf) Then
+		'get plane info
+		'make a new plane
+		
+	ElseIf Rhino.IsCone(sSrf) Then
+		'get cone info
+		'make a new cone
+		
+		Dim aCone: aCone = Rhino.SurfaceCone(sSrf)
+		aPlane = aCone(0)
+		dblHeight = aCone(1)
+		dblrad = aCone(2)
+		Result = Rhino.AddCone(aPlane, dblHeight, dblRad, False)
+		
+	ElseIf Rhino.IsTorus(sSrf) Then
+		'get torus info
+		'make a new torus
+		
+		Dim aTorus: aTorus = Rhino.SurfaceTorus(sSrf)
+		aPlane = aTorus(0)
+		dblrad = atorus(1)
+		Dim dblrad1: dblRad1 = aTorus(2)
+		Result = Rhino.AddTorus(aPlane, dblRad, dblRad1, aPlane(3))
+		
+	Else 
+		'get surface info
+		'make a new surface
+		
+		Dim aPtCount: aptCount = Rhino.SurfacePointCount(sSrf)
+		Dim aPts: aPts = Rhino.SurfacePoints(sSrf)
+		
+		Dim aKnotCount: aKnotCount = Rhino.SurfaceKnotCount(sSrf)
+		Dim aKnots: aKnots = Rhino.SurfaceKnots(sSrf)
+		
+		Dim aKnotsU: aKnotsU = aKnots(0)
+		Dim aKnotsV: aKnotsV = aKnots(1)
+		
+		Dim aDegree:aDegree = Rhino.SurfaceDegree(sSrf)
+		Dim aWeights:aWeights = Rhino.SurfaceWeights(sSrf)
+		
+		Result = Rhino.AddNurbsSurface(aPtCount, aPts, aKnotsU, aKnotsV, aDegree, aWeights)
+	
+	End If
+	Rhino.MatchObjectAttributes array(result), sSrf
+		
+	GetUntrimmedSrf = Result
+End Function

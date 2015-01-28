@@ -1,0 +1,36 @@
+Option Explicit
+'Script written by Don Lewis
+'Script copyrighted by Lewis Tool & Engineering llc
+
+'Call OpenCurvesRepair()
+Sub OpenCurvesRepair()
+	Dim strGroup, strObject, arrPoint1, arrPoint2
+	
+	strGroup = Rhino.GetObjects("Select Curves to Filter",4,,True,True)
+	If IsNull (strGroup) Then Exit Sub
+	
+	If IsArray (strGroup) Then
+		Call Rhino.EnableRedraw(False)
+		For Each strObject In strGroup
+			If Rhino.IsCurveClosed(strObject) Then
+				Call Rhino.ObjectColorSource(strObject,0)
+				Call Rhino.UnselectObject(strObject)
+			Else
+				If Rhino.IsCurveClosable(strObject) Then
+					Call Rhino.CloseCurve(strObject)
+				End If
+				If Not Rhino.IsCurveClosed(strObject) Then
+					Call Rhino.ObjectColor(strObject,255)
+					arrPoint1 = Rhino.CurveEndPoint(strObject)
+					Call Rhino.Command("Point " & arrPoint1(0) & "," & arrPoint1(1) & "," & arrPoint1(2) & " Enter")
+					arrPoint2 = Rhino.CurveStartPoint(strObject)
+					Call Rhino.Command("Point " & arrPoint2(0) & "," & arrPoint2(1) & "," & arrPoint2(2) & " Enter")
+				End If
+			End If
+		Next
+		Call Rhino.EnableRedraw(True)
+		Call Rhino.UnselectAllObjects
+			
+	End If
+			
+End Sub

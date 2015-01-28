@@ -1,0 +1,38 @@
+Option Explicit
+'Script written by Don Lewis
+'Script copyrighted by Lewis Tool & Engineering llc
+'Script version Tuesday, September 27, 2011 12:34:34 PM
+
+'Call DisplayModeByLayer()
+Sub DisplayModeByLayer()
+
+	Dim strLayer, arrModes, strMode, curView, arrViews, strView
+	
+	strLayer = Rhino.GetLayer("Select Layer")
+	If isNull(strLayer) Then Exit Sub
+	
+	arrModes = Rhino.ViewDisplayModes
+	
+	strMode = Rhino.ListBox(arrModes,"Select Display Mode")
+	If isNull(strMode) Then Exit Sub
+	
+	Call Rhino.ObjectsByLayer(strLayer, True)
+	
+	Call Rhino.EnableRedraw(False)
+	
+	curView = Rhino.CurrentView (,False)
+	arrViews = Rhino.ViewNames (False,0)
+	If IsArray(arrViews) Then
+		Rhino.EnableRedraw False
+		For Each strView In arrViews
+			Call Rhino.CurrentView (strView)
+			Call Rhino.Command ("SetObjectDisplayMode " & strMode,False)
+		Next
+		Rhino.CurrentView curView
+		Rhino.EnableRedraw True
+	End If
+	
+	Call Rhino.UnselectAllObjects
+	Call Rhino.EnableRedraw(True)
+	
+End Sub

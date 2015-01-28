@@ -1,0 +1,465 @@
+Option Explicit
+'Script written by <Simon Aulis Kallioinen>
+'Script copyrighted by <Simon Aulis Kallioinen>
+'Script version den 7 mars 2010 15:35:22
+'Call AdvancedSelection()
+Sub AdvancedSelection()
+	
+	Dim arrOptions, arrQuantity, arrProperty, arrType, arrOperators, strAdd, strResult, arrSelect, strRun
+	Dim arrSets(), strSave
+	
+	'Const All                      = 0
+	Const Point                    = 1
+	Const PointCloud               = 2
+	Const Curve                    = 4
+	Const Surface                  = 8
+	Const PolySurface              = 16
+	Const Mesh                     = 32
+	Const Layer                    = 64
+	Const Material                 = 128
+	Const Light                    = 256
+	Const Annotation               = 512
+	Const TextDot                  = 8192
+	
+	
+	arrSelect = Array("Add_To_Selection","Select_Within_Selection","Deselect")
+	
+	arrQuantity = array("All_objects", "Random_number_of_objects", "User_selected_objects")
+	
+	arrProperty = array("of_type", "whose_type_is_not")
+	
+	arrType = array("Any", "Point", "PointCloud", "Curve", "Surface", "PolySurface", "Mesh", "Light", "Annotation", "Block", "TextDot","Detail","Hatch","ClippingPlane")
+	
+	arrFulfills = array("and_fulfills_criteria","and_does_not_fulfill_criteria")
+	
+	Dim arrAllProp, arrProp, arrCrvProp, arrFulfills, arrSrfProp, arrPolysrfProp, arrMeshProp, arrLightProp, arrAnnotationProp, arrHatchProp
+	
+	arrAllProp = array("None","Is_Hidden","Is_Locked","Is_Not_Valid","Layer","Display_Color","Print_Color","LineType","Name","Is_In_Group")
+	
+	arrCrvProp = array("Is_Planar","Is_Closed","Is_Arc","Is_Circle","Is_Ellipse","Is_Line","Is_PolyLine","Is_PolyCurve")
+	arrCrvProp = Rhino.JoinArrays(arrAllProp, arrCrvProp)
+	arrSrfProp = array("Is_Planar","Is_Plane","Is_Cone","Is_Cylinder","Is_Sphere","Is_Torus","Is_Closed_In_One_Dir","Is_Closed_In_Both_Dir","Is_Periodic_In_One_Dir","Is_Periodic_In_Both_Dir","Is_Rational","Is_Singular","Is_Trimmed")
+	arrSrfProp = Rhino.JoinArrays(arrAllProp, arrSrfProp)
+	
+	arrPolysrfProp = array("Is_Planar","Is_Closed_Polysrf")
+	arrPolysrfProp = Rhino.JoinArrays(arrAllProp, arrPolysrfProp)	
+		
+	arrMeshProp = array("Is_Closed_Mesh","Is_Manifold")
+	arrMeshProp = Rhino.JoinArrays(arrAllProp, arrMeshProp)
+	
+	arrLightProp = array("Is_Linear_Light","Is_SpotLight","Is_Point_Light","Is_Rectangular_Light","Is_Directional_Light","Is_Enabled","Is_Referenced")
+	arrLightProp = Rhino.JoinArrays(arrAllProp, arrLightProp)
+	arrAnnotationProp = array("Is_Text","Is_Aligned_Dim","Is_Angular_Dim","Is_Diameter_Dim","Is_Linear_Dim", "Is_Ordinate_Dim", "Is_Radial_Dim","Is_Leader")
+	arrAnnotationProp = Rhino.JoinArrays(arrAllProp, arrAnnotationProp)
+		
+	arrHatchProp = array("Pattern")
+	arrHatchProp = Rhino.JoinArrays(arrAllProp, arrHatchProp)
+	
+	arrProp = arrAllProp
+	
+	strAdd = "Add_set_of_criteria" 
+	
+	Dim intA, intB, intC, intD, i, intPercentage, intSet, k, intProp, intFulfills, strCriterion, intRow
+	Dim strLayer, intDisplay_Color, intPrint_Color, arrCriteria(), strLineType, strName, varCriterion
+	
+	intSet = 0
+	
+	intA = 0
+	intB = 0
+	intC = 0
+	intD = 0
+	intProp = 0
+	intFulfills = 0
+	
+	
+	ReDim arrCriteria(0)
+	arrCriteria(0)=Null
+	
+	Do
+		arrOptions = Array(arrSelect(intA), arrQuantity(intB), arrProperty(intC), arrType(intD),arrFulfills(intFulfills),arrProp(intProp), strAdd,"RUN")
+		
+		strResult = Rhino.GetString("Process selection " ,,arrOptions)
+		
+		Select Case strResult		
+			Case arrSelect(intA)
+				strResult = Rhino.GetString("How to process selected objects" ,,arrSelect)
+				For i = 0 To ubound(arrSelect)
+					If strResult = arrSelect(i) Then
+						intA = i
+					End If
+				Next
+			Case arrQuantity(intB)
+				strResult = Rhino.GetString("Choose which objects to select/deselect" ,,arrQuantity)
+				For i = 0 To ubound(arrQuantity)
+					If strResult = arrQuantity(i) Then
+						intB = i
+					End If
+				Next
+				If intB = 1 Then
+					intPercentage = Rhino.GetInteger("Percentage to randomly select/deselect", 50,0,100)
+					arrQuantity(1) = "Randomly_" & CStr(intPercentage) & "_percent_of"
+				End If
+			
+			Case arrProperty(intC)
+				intC = (intC + 1) Mod 2
+				If intC = 1 And intProp > ubound(arrAllProp) Then
+					intProp = 0
+				End If
+			Case arrType(intD)
+				strResult = Rhino.GetString("Choose type of objects to select/deselect" ,,arrType)
+				For i = 0 To ubound(arrType)
+					If strResult = arrType(i) Then
+						If intD = i Then
+						Else
+							If intProp > ubound(arrAllProp) Then
+								intProp = 0
+							End If
+						End If
+						intD = i
+					End If
+				
+				Next
+				If intD >=9 Then
+					intProp = 0
+					arrProp = arrAllProp
+				End If
+			Case arrFulfills(intFulfills)
+				intFulfills = (intFulfills + 1) Mod 2
+			Case arrProp(intProp)
+				If intC = 1 Then
+					arrProp = arrAllProp
+				Else
+					Select Case arrType(intD)
+						Case "Any"
+							arrProp = arrAllProp
+							If intProp > ubound(arrAllProp) Then 
+								intProp = 0
+							End If
+						Case "Point"
+						Case "PointCloud" 
+						Case "Curve" 
+							arrProp = arrCrvProp
+						Case "Surface"
+							arrProp = arrSrfProp
+						Case "PolySurface"
+							arrProp = arrPolysrfProp
+						Case "Mesh"
+							arrProp = arrMeshProp
+						Case "Light"
+							arrProp = arrLightProp
+						Case "Annotation"
+							arrProp = arrAnnotationProp
+						Case "Block"
+							arrProp = arrAllProp
+						Case "TextDot"
+							arrProp = arrAllProp
+						Case "Detail"
+							arrProp = arrAllProp
+						Case "Hatch"
+							arrProp = arrHatchProp
+						Case "ClippingPlane"
+							arrProp = arrAllProp
+					End Select
+					
+					If intC = 1 And intProp > ubound(arrAllProp) Then
+						intProp = 0
+					End If
+				End If
+				
+				strCriterion = Rhino.GetString("Choose criterion" ,,arrProp)
+				For i = 0 To ubound(arrProp)
+					If strCriterion = arrProp(i) Then
+						intProp = i
+					End If
+					If strCriterion = "None" Then
+						varCriterion = ""
+					End If
+				Next				
+				Select Case strCriterion 
+					Case "Layer" 
+						varCriterion= Rhino.GetLayer("Select layer")
+					Case "Display_Color"
+						varCriterion = Rhino.GetColor()
+					Case "Print_Color"
+						varCriterion =  Rhino.GetColor()
+					Case "LineType"
+						varCriterion =  Rhino.GetString("Choose linetype",,Rhino.LinetypeNames)
+					Case "Name"
+						varCriterion = Rhino.GetString("Write name")
+					Case "Pattern"
+						varCriterion =  Rhino.GetString("Choose hatch pattern",,Rhino.HatchPatternNames)
+					'varCriterion = 
+				End Select
+					
+			Case strAdd
+				
+				If IsNull(varCriterion) Then varCriterion = ""
+				
+				ReDim Preserve arrSets(intSet)
+				arrSets(intSet) = Array(arrSelect(intA),arrQuantity(intB),arrProperty(intC),arrType(intD),arrFulfills(intFulfills),arrProp(intProp),varCriterion)
+			
+				For i = 0 To intSet
+					Rhino.Print("Set "& CStr(i+1) & ": " & arrSets(i)(0) & " " & arrSets(i)(1)& " " & arrSets(i)(2) &" "&arrSets(i)(3)&" "&arrSets(i)(4)&" "&arrSets(i)(5) & " " & arrSets(i)(6))
+				Next
+				
+				varCriterion = ""
+				intProp = 0
+				intSet = intSet + 1			
+		End Select
+		
+		If strResult = "RUN" Or strResult = "" Then
+			ReDim Preserve arrSets(intSet)
+			arrSets(intSet) = Array(arrSelect(intA),arrQuantity(intB),arrProperty(intC),arrType(intD),arrFulfills(intFulfills),arrProp(intProp),varCriterion)
+			
+			For i = 0 To intSet
+				Rhino.Print("Set "& CStr(i+1) & ": " & arrSets(i)(0) & " " & arrSets(i)(1)& " " & arrSets(i)(2) &" "&arrSets(i)(3)&" "&arrSets(i)(4)&" "&arrSets(i)(5) & " " & arrSets(i)(6))
+			Next
+			
+			If IsNull(varCriterion) Then varCriterion = ""
+					
+			Exit Do
+		End If
+	Loop
+	
+	Dim arrPreSelection, arrAddSelection, strObject, arrAllObjects, intObjectType, j, arrInvertedSelection, dblResult, intResult
+	Dim arrObjectSets()
+	
+	arrPreSelection = Rhino.SelectedObjects(True)
+	
+	Rhino.EnableRedraw(False)
+	
+	arrInvertedSelection = Rhino.InvertSelectedObjects(True)
+	
+	Rhino.UnselectAllObjects()
+	
+	If IsArray(arrPreSelection) Then
+		Rhino.SelectObjects(arrPreSelection)	
+	End If
+	
+	Dim blnSelect, arrSelectedObjects
+	
+	'SELECTION LOOP STARTS HERE
+	For i = 0 To Ubound(arrSets)
+		
+		arrSelectedObjects = Rhino.SelectedObjects()
+		
+		If arrSets(i)(0) = "Add_To_Selection" Then
+			arrAllObjects =  arrInvertedSelection
+		Else
+			arrAllObjects = Rhino.SelectedObjects()
+		End If
+		Rhino.UnselectAllObjects()	
+		
+		Select Case arrSets(i)(3)
+			Case "Point"
+				intObjectType  = 1
+			Case "PointCloud" 
+				intObjectType  = 2
+			Case "Curve"
+				intObjectType  = 4
+			Case "Surface"
+				intObjectType  = 8
+			Case "PolySurface"
+				intObjectType  = 16
+			Case "Mesh"
+				intObjectType  = 32
+			Case "Light"
+				intObjectType = 256
+			Case "Annotation"
+				intObjectType = 512
+			Case "Block"
+				intObjectType = 4096
+			Case "TextDot"
+				intObjectType = 8192
+			Case "Detail"
+				intObjectType = 32768
+			Case "Hatch"
+				intObjectType = 65536
+			Case "ClippingPlane"
+				intObjectType =	536870912
+		End Select
+		
+		'THIS LOOP SELECTS ALL OBJECTS THAT FULFILL THE CRITERIA
+		If Not isnull(arrAllObjects) Then
+		
+			For j = 0 To Ubound(arrAllObjects)
+					
+				If (Rhino.ObjectType(arrAllObjects(j)) = intObjectType And arrSets(i)(2) =  "of_type" Or _
+					Rhino.ObjectType(arrAllObjects(j)) <> intObjectType And arrSets(i)(2) <>  "of_type") Or _
+					(arrSets(i)(3) = "Any") Then
+				
+					blnSelect = False					
+					
+					Select Case arrSets(i)(5) 
+						Case "None"
+							blnSelect = True
+						Case "Is_Hidden"
+							If Rhino.IsObjectHidden(arrAllObjects(j)) Then 	blnSelect = True
+						Case "Is_Locked"
+							If Rhino.IsObjectLocked(arrAllObjects(j)) Then 	blnSelect = True
+						Case "Is_Not_Valid"
+							If Not Rhino.IsObjectValid(arrAllObjects(j)) Then 	blnSelect = True
+						Case "Layer" 
+							If Rhino.ObjectLayer(arrAllObjects(j)) = arrSets(i)(6) Then blnSelect = True
+						Case "Display_Color"
+							If Rhino.ObjectColor(arrAllObjects(j)) = arrSets(i)(6) Then blnSelect = True
+						Case "Print_Color"
+							If Rhino.ObjectPrintColor(arrAllObjects(j)) = arrSets(i)(6) Then blnSelect = True
+						Case "LineType"
+							If arrSets(i)(6) = Rhino.ObjectLineType(arrAllObjects(j)) Then blnSelect = True 
+						Case "Name"
+							If arrSets(i)(6) = Rhino.ObjectName(arrAllObjects(j)) Then blnSelect = True 
+						Case "Is_In_Group"
+							If Not IsNull(Rhino.ObjectGroups(arrAllObjects(j))) Then blnSelect = True
+						Case "Is_Planar"
+							If Rhino.IsPoint(arrAllObjects(j)) Then blnSelect = True							
+							If Rhino.IsCurve(arrAllObjects(j)) Then 
+								If Rhino.IsCurvePlanar(arrAllObjects(j)) Then 	blnSelect = True
+							End If
+							If Rhino.IsSurface(arrAllObjects(j)) Then 
+								If Rhino.IsSurfacePlanar(arrAllObjects(j)) Then 	blnSelect = True
+							End If
+							If Rhino.IsPolysurface(arrAllObjects(j)) Then 
+								If Rhino.IsPolysurfacePlanar(arrAllObjects(j)) Then 	blnSelect = True
+							End If
+						Case "Is_Arc"
+							If Rhino.IsArc(arrAllObjects(j)) Then 	blnSelect = True
+						Case "Is_Circle"
+							If Rhino.IsCirle(arrAllObjects(j)) Then 	blnSelect = True
+						Case "Is_Closed"
+							If Rhino.IsCurveClosed(arrAllObjects(j)) Then 	blnSelect = True
+						Case "Is_Ellipse"
+							If Rhino.IsEllipse(arrAllObjects(j)) Then 	blnSelect = True
+						Case "Is_Line"
+							If Rhino.IsLine(arrAllObjects(j)) Then 	blnSelect = True
+						Case "Is_PolyLine"
+							If Rhino.IsPolyline(arrAllObjects(j)) Then 	blnSelect = True
+						Case "Is_PolyCurve"
+							If Rhino.IsPolyCurve(arrAllObjects(j)) Then blnSelect = True
+						Case "Is_Plane"
+							If Rhino.IsPlaneSurface(arrAllObjects(j)) Then blnSelect = True
+						Case "Is_Cone"
+							If Rhino.IsCone(arrAllObjects(j)) Then blnSelect = True
+						Case "Is_Cylinder"
+							If Rhino.IsCylinder(arrAllObjects(j)) Then blnSelect = True
+						Case "Is_Sphere"
+							If Rhino.IsSphere(arrAllObjects(j)) Then blnSelect = True
+						Case "Is_Torus"
+							If Rhino.IsTorus(arrAllObjects(j)) Then blnSelect = True
+						Case "Is_Closed_In_One_Dir"
+							If Rhino.IsSurfaceClosed(arrAllObjects(j),0) Or Rhino.IsSurfaceClosed(arrAllObjects(j),1) Then blnSelect = True
+						Case "Is_Closed_In_Both_Dir"
+							If Rhino.IsSurfaceClosed(arrAllObjects(j),0) And Rhino.IsSurfaceClosed(arrAllObjects(j),1) Then blnSelect = True
+						Case "Is_Periodic_In_One_Dir"
+							If Rhino.IsSurfacePeriodic(arrAllObjects(j),0) Or Rhino.IsSurfacePeriodic(arrAllObjects(j),1) Then blnSelect = True
+						Case "Is_Periodic_In_Both_Dir"
+							If Rhino.IsSurfacePeriodic(arrAllObjects(j),0) And Rhino.IsSurfacePeriodic(arrAllObjects(j),1) Then blnSelect = True
+						Case "Is_Rational"
+							If Rhino.IsSurfaceRational(arrAllObjects(j)) Then blnSelect = True
+						Case "Is_Singular"
+							If Rhino.IsSurfaceSingular(arrAllObjects(j)) Then blnSelect = True
+						Case "Is_Trimmed"	
+							If Rhino.IsSurfaceTrimmed(arrAllObjects(j)) Then blnSelect = True
+						Case "Is_Closed_Polysrf"
+							If Rhino.IsPolysurfaceClosed(arrAllObjects(j)) Then blnSelect = True	
+						Case "Is_Closed_Mesh"
+							If Rhino.IsMeshClosed (arrAllObjects(j)) Then blnSelect = True	
+						Case "Is_Manifold"
+							If Rhino.IsMeshManifold(arrAllObjects(j)) Then blnSelect = True	
+						Case "Is_Linear_Light"
+							If Rhino.IsLinearLight (arrAllObjects(j)) Then blnSelect = True	
+						Case "Is_SpotLight"
+							If Rhino.IsSpotLight (arrAllObjects(j)) Then blnSelect = True	
+						Case "Is_Point_Light"
+							If Rhino.IsPointLight (arrAllObjects(j)) Then blnSelect = True	
+						Case "Is_Rectangular_Light"
+							If Rhino.IsRectangularLight (arrAllObjects(j)) Then blnSelect = True	
+						Case "Is_Directional_Light"
+							If Rhino.IsDirectionalLight (arrAllObjects(j)) Then blnSelect = True	
+						Case "Is_Enabled"
+							If Rhino.IsLightEnabled (arrAllObjects(j)) Then blnSelect = True	
+						Case "Is_Referenced"
+							If Rhino.IsLightReference (arrAllObjects(j)) Then blnSelect = True
+						Case "Is_Aligned_Dim"
+							If Rhino.IsAlignedDimension(arrAllObjects(j)) Then blnSelect = True
+						Case "Is_Angular_Dim"
+							If Rhino.IsAngularDimension(arrAllObjects(j)) Then blnSelect = True
+						Case "Is_Diameter_Dim"
+							If Rhino.IsDiameterDimension (arrAllObjects(j)) Then blnSelect = True
+						Case "Is_Linear_Dim"
+							If Rhino.IsLinearDimension (arrAllObjects(j)) Then blnSelect = True
+						Case "Is_Ordinate_Dim"
+							If Rhino.IsOrdinateDimension (arrAllObjects(j)) Then blnSelect = True
+						Case "Is_Radial_Dim"
+							If Rhino.IsRadialDimension (arrAllObjects(j)) Then blnSelect = True
+						Case "Is_Leader"
+							If Rhino.IsLeader (arrAllObjects(j)) Then blnSelect = True
+						Case "Is_Text"
+							If Rhino.IsText(arrAllObjects(j)) Then blnSelect = True
+						Case "Pattern"
+							If Rhino.HatchPattern (arrAllObjects(j)) = arrSets(i)(6) Then blnSelect = True
+					End Select
+					
+					If blnSelect And arrSets(i)(4) ="and_fulfills_criteria" Then Rhino.SelectObject(arrAllObjects(j))
+					If Not blnSelect And arrSets(i)(4) <> "and_fulfills_criteria" Then Rhino.SelectObject(arrAllObjects(j))
+				End If
+			Next	
+		End If
+	
+		'USER SELECTION OF OBJECTS THAT FULFILL CRITERIA
+		If arrSets(i)(1)="User_selected_objects" Then
+			arrAllObjects = Rhino.SelectedObjects(True)
+			Rhino.UnselectAllObjects()
+			If IsArray(arrPreSelection)Then Rhino.SelectObjects(arrPreSelection)
+			Rhino.EnableRedraw(True)
+			Call Rhino.GetObjects("Pick objects",,False,False,True,arrAllObjects)
+			Rhino.EnableRedraw(False)
+		End If
+	
+		'DESELECT RANDOMLY
+		If Left((arrSets(i)(1)),4) = "Rand" Then
+		
+			arrAllObjects = Rhino.SelectedObjects()
+			
+			dblResult = (ubound(arrAllObjects)+1) * intPercentage * 0.01
+				
+			intResult = ubound(arrAllObjects)+1 - Round(dblResult,0)
+		
+			k=0
+			Do 
+				j = CInt(rnd*ubound(arrAllObjects))
+				
+				Rhino.UnselectObject(arrAllObjects(j))
+				
+				k = k+1
+				
+				arrAllObjects = Rhino.SelectedObjects
+				If k = intResult Then
+					Exit Do
+				End If
+			Loop
+			
+		End If
+				
+		'SAVE AS SELECTION SET
+		'ReDim Preserve arrObjectSets(i)
+		'arrObjectSets(i) = Rhino.SelectedObjects()
+		
+		'Select/deselect objects		
+		arrAllObjects = Rhino.SelectedObjects(True)
+		If IsArray(arrSelectedObjects) And arrSets(i)(0) = "Deselect" Then
+			Rhino.UnselectAllObjects()
+			Rhino.SelectObjects(arrSelectedObjects)
+			If IsArray(arrAllObjects)Then
+				Rhino.UnselectObjects(arrAllObjects)
+			End If
+		End If
+		If arrSets(i)(0) = "Add_To_Selection" And Not IsNull(arrSelectedObjects) Then
+			Rhino.SelectObjects(arrSelectedObjects)
+		End If
+	Next
+	
+	Rhino.EnableRedraw(True)
+	
+End Sub
+

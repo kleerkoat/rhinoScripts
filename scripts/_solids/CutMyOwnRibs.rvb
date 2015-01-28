@@ -1,0 +1,69 @@
+Option Explicit
+
+'Script written by Dimitrie Stefanescu
+'http://dimitrie.wordpress.com
+'Contact me at: didi [at] improved [dot] ro
+'Script released under the Creative Commons Attribution-Non-Commercial-Share Alike 3.0 Licence
+
+
+'Call CutMyOwnRibs()
+Sub CutMyOwnRibs()
+	
+	Dim arrRibsX : arrRibsX = Rhino.GetObjects("Select ribs on X dir:", 8)
+	Dim arrRibsY : arrRibsY = Rhino.GetObjects("Select ribs on Y dir:", 8)
+	
+	Dim obj1, obj2, l, mid, crvDom, cil1, cil2, extn
+	Dim split1, split2, i, j
+	
+	Dim dl : dl = Array()
+	Dim k : k = -1
+	
+	Dim maxx, maxy : maxx = Ubound(arrRibsX) : maxy = Ubound(arrRibsY)
+	
+	Call Rhino.EnableRedraw(False)
+	
+	For i = 0 To Ubound(arrRibsX)
+		
+		For j = 0 To Ubound(arrRibsY)
+			
+			Call Rhino.Print("We are working now. The weather is fine. I = " & i & " out of " & maxx & " and J = " & j & " out of " & maxy & ".")
+			
+			obj1 = arrRibsX(i) : obj2 = arrRibsY(j)
+			
+			l = Rhino.IntersectBreps(obj1, obj2)
+						
+			If isArray(l) Then
+				
+				k = k + 5
+				crvDom = Rhino.CurveDomain(l(0))
+			
+				mid = Rhino.DivideCurve(l(0), 2) 
+			
+				extn = Rhino.ScaleObject(l(0), mid(1), Array(0,0,5))
+				
+				mid = Rhino.DivideCurve(l(0), 2)
+				
+				cil1 = Rhino.AddCylinder(mid(1), mid(0), 1)
+				cil2 = Rhino.AddCylinder(mid(1), mid(2), 1)
+			
+				split1 = Rhino.SplitBrep(obj1, cil1, True)
+				split2 = Rhino.SplitBrep(obj2, cil2, True)
+				
+				ReDim Preserve dl(k)
+				
+				dl(k) = cil1 : dl(k-1) = cil2 : dl(k-4) = l(0)
+				dl(k-2) = split1(1) : dl(k-3) = split2(1)
+				
+				arrRibsX(i) = split1(0)
+				arrRibsY(j) = split2(0)
+				
+			Else
+				Call Rhino.Print("Something's odd (no intersection found - probably we're on the edges). It's ok.")
+			End If
+		Next
+		
+	Next
+	
+	Call Rhino.DeleteObjects(dl)
+	Call Rhino.EnableRedraw(True)
+End Sub

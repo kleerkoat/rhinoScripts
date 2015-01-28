@@ -1,0 +1,43 @@
+Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version Thursday, May 12, 2011 7:48:42 AM
+
+'Call FindY()
+Sub FindY()
+	Dim strObject,dblX,arrStartPoint,arrEndPoint,strLine
+	Dim arrObjects,strIntersectLine,arrEndPt,arrIntersectLine,dblY
+	'Select the curve to evaluate.
+	strObject=Rhino.GetObject("Select the curve.",4)
+	If IsNull(strObject) Then Exit Sub
+	'Enter the X value.
+	dblX=Rhino.GetReal("Enter the X to evaluate.")
+	If IsNull(dblX) Then Exit Sub
+	'Define a line in the Y direction from the given X value.
+	arrStartPoint=Array(dblX,0,0)
+	arrEndPoint=Array(dblX,1,0)
+	
+	'Hide the display of operations.
+	Call Rhino.EnableRedraw(False)
+	'Draw a line in the positive Y direction.
+	strLine=Rhino.AddLine(arrStartPoint,arrEndPoint)
+	'Test to see if the line intersets the curve.  If so print the Y value.
+	Dim arrTest,arrPoint
+	arrTest=Rhino.CurveCurveIntersection(strObject,strLine)
+	If Not IsNull(arrTest) Then
+		arrPoint=arrTest(0,1)
+		Call Rhino.Print(arrPoint(1))
+		'If no intersection then extend the line to intersect the curve and print the Y value.	
+	Else
+		arrObjects=Array(strObject)
+		strIntersectLine=Rhino.ExtendCurve(strLine,0,1, arrObjects)
+		arrEndPt=Rhino.CurveEndPoint(strIntersectLine)
+		dblY=arrEndPt(1)
+		Call Rhino.Print (dblY)	
+	End If
+	'Delete the line drawn.
+	Call Rhino.DeleteObject(strLine)
+	'Enable the display.
+	Call Rhino.EnableRedraw(True)
+	
+End Sub

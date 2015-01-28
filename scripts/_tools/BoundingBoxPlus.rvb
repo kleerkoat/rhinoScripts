@@ -1,0 +1,70 @@
+'--------------------------------------------------------------
+'Command   :  bbp (Bounding Box Plus)
+'Date      :  2011/01/20
+'Version   :  1.0
+'Organization   :  Rhino+
+'--------------------------------------------------------------
+
+Sub BoundingBoxPlus
+  
+Dim strObjects, arrBox, arrPoint, intCount ,arrBoxPt(7),arrSize(2)
+
+strObjects = Rhino.GetObjects("Select objects")
+If IsNull(strObjects) Then Exit Sub
+
+r = Rhino.GetReal ("Add ",10)
+If IsNull(r) Then Exit Sub
+
+
+arrBox = Rhino.BoundingBox(strObjects)
+
+If IsArray(arrBox) Then
+
+intCount = 0
+arrPoint = arrBox(intCount)
+'Rhino.AddTextDot CStr(intCount), Array(arrPoint(0)-r,arrPoint(1)-r,arrPoint(2)-r)
+arrBoxPt(intCount) = Array(arrPoint(0)-r,arrPoint(1)-r,arrPoint(2)-r)
+
+intCount =1
+arrPoint = arrBox(intCount)
+'Rhino.AddTextDot CStr(intCount), Array(arrPoint(0)+r,arrPoint(1)-r,arrPoint(2)-r)
+arrBoxPt(intCount) = Array(arrPoint(0)+r,arrPoint(1)-r,arrPoint(2)-r)
+
+intCount =2
+arrPoint = arrBox(intCount)
+arrBoxPt(intCount) = Array(arrPoint(0)+r,arrPoint(1)+r,arrPoint(2)-r)
+
+intCount =3
+arrPoint = arrBox(intCount)
+arrBoxPt(intCount) = Array(arrPoint(0)-r,arrPoint(1)+r,arrPoint(2)-r)
+
+intCount =4
+arrPoint = arrBox(intCount)
+arrBoxPt(intCount) = Array(arrPoint(0)-r,arrPoint(1)-r,arrPoint(2)+r)
+
+intCount =5
+arrPoint = arrBox(intCount)
+arrBoxPt(intCount) = Array(arrPoint(0)+r,arrPoint(1)-r,arrPoint(2)+r)
+
+intCount =6
+arrPoint = arrBox(intCount)
+arrBoxPt(intCount) = Array(arrPoint(0)+r,arrPoint(1)+r,arrPoint(2)+r)
+
+intCount =7
+arrPoint = arrBox(intCount)
+arrBoxPt(intCount) = Array(arrPoint(0)-r,arrPoint(1)+r,arrPoint(2)+r)
+
+Rhino.AddBox arrBoxPt
+
+arrSize(0)=Rhino.Distance ( arrBoxPt(1),arrBoxPt(0))
+arrSize(1)=Rhino.Distance ( arrBoxPt(3),arrBoxPt(0))
+arrSize(2)=Rhino.Distance ( arrBoxPt(4),arrBoxPt(0))
+ 
+Rhino.print "Size = " &  Rhino.Pt2Str(arrSize, 3)
+
+
+End If
+
+End Sub
+
+'BoundingBoxPlus

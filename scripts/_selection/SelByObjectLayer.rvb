@@ -1,0 +1,51 @@
+Option Explicit
+
+Public Sub SelByObjectLayer()
+
+Dim arrPreSelect, arrLayers, arrSelect, arrPostSelect
+Dim intCount, i, intObjects, intCheck, vbCheck
+Dim strObject, strLayer, objLayer
+
+arrPreSelect = Rhino.SelectedObjects(True)
+
+If Not IsNull(arrPreSelect) Then
+	intCount = 0
+	arrSelect = Array(0)
+	For Each strObject In arrPreSelect
+		intCheck = 0
+		strLayer = Rhino.ObjectLayer(strObject)
+		For Each objLayer In arrSelect
+			If strLayer = objLayer Then
+				intCheck = 1
+				Exit For
+			End If
+		Next
+		If intCheck = 0 Then
+			ReDim Preserve arrSelect(intCount)
+			arrSelect(intCount) = strLayer
+			intCount = intCount + 1
+		End If
+	Next
+Else:
+	arrLayers = Rhino.LayerNames
+	arrSelect = Rhino.MultiListBox(arrLayers, "Layers to Select", "Layers")
+End If
+
+Rhino.EnableRedraw vbFalse
+intCount = 0
+For Each strLayer in arrSelect
+	vbCheck = Rhino.ObjectsByLayer(strLayer, vbTrue)
+	If Not IsNull(vbCheck) Then
+		intCount = intCount + 1
+	End If
+Next
+
+Rhino.EnableRedraw vbTrue
+
+arrPostSelect = Rhino.SelectedObjects(True)
+intObjects = UBound(arrPostSelect) + 1
+
+Rhino.Print CStr(intObjects) & " objects on " & CStr(intCount) & " layers added to selection."
+
+End Sub
+'SelectByObjectLayer_sr

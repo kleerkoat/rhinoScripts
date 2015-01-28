@@ -1,0 +1,116 @@
+Option Explicit
+
+'Private arrViews
+ ' arrViews = Rhino.NamedViews  
+  'Script date Thursday, September 03, 2009 
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "Isolate", "_NoEcho _-Runscript (Isolate)"
+'Rhino.AddAlias "Unisolate", "_NoEcho _-Runscript (Unisolate)"
+
+Sub Isolate
+  
+	Dim strSection, strEntry
+	Dim arrSel, arrObj, strView
+  
+	strSection = "Iso"
+
+	If Rhino.IsDocumentdata Then
+		dim arrEntry: arrEntry = Rhino.GetDocumentData (strSection)
+		If IsArray(arrEntry) Then
+			intIso = UBound(arrEntry)+1
+		End If   
+	End If
+  
+	strEntry = "Show"
+	arrSel = Rhino.GetObjects("Select objects to isolate",,,True ,True)
+	If not isarray(arrSel) then exit sub
+	
+	Rhino.EnableReDraw(False)
+	arrObj = Rhino.InvertSelectedObjects(True)
+
+	' If IsArray(arrViews) Then    'test  
+	' Rhino.Print Join(arrViews,",")
+	' End If 
+
+	If IsArray(arrObj) Then
+		strView = Rhino.CurrentView
+		Rhino.AddNamedView strView
+		Rhino.SetDocumentData "RestoreFromIsolated", "RestoreView", strView
+		Rhino.EnableRedraw(False)
+		dim strObj
+		For Each strObj In arrObj
+			Rhino.SetObjectData strObj, "Iso", "Show", "***"
+			Rhino.HideObject(strObj)
+		Next    
+	Else Exit Sub
+	End If
+    
+	Rhino.EnableRedraw(True)
+End Sub
+  
+'//////////////////////////////////////
+
+'//////////////////////////////////////
+
+Sub UnIsolate
+	Rhino.EnableReDraw(False)
+	Dim StrRestoreView
+  
+	strRestoreView = Rhino.GetDocumentData ("RestoreFromIsolated", "RestoreView" )
+	
+	If Not IsNull (strRestoreView) Then
+		Rhino.Print strRestoreView 'Test
+	End If
+	
+	dim arrViews: arrViews = Rhino.NamedViews
+	dim arrAll: arrAll = Rhino.AllObjects(, True)
+	
+	If IsArray(arrAll) Then
+		Rhino.EnableReDraw(False)
+		dim strObj, strData, blnData
+		
+		For Each strObj In arrAll
+			If Rhino.IsObjectData(strObj) Then
+				strData = Rhino.GetObjectData (strObj,"Iso", "Show")
+				If Not IsNull(strData) Then
+					blnData = Rhino.DeleteObjectData (strObj, "Iso", "Show")
+					Rhino.ShowObject strObj                 
+				End If 
+			End If 
+		Next 
+           
+		Dim ValViewname
+		valViewname = "Y"
+		Rhino.RestoreNamedView strRestoreView
+		dim strNamedView
+		
+		If IsArray(arrViews) Then
+			For Each strNamedview In arrViews
+				If strNamedview = strRestoreView Then 
+					ValViewname = "X"
+				End If
+			Next
+		End If     
+                  
+		If ValViewname ="Y" Then
+			Rhino.DeleteNamedView strRestoreView
+		End If
+	End If 
+	
+	Rhino.DeleteDocumentData "RestoreFromIsolated" 
+	Rhino.EnableReDraw(True)
+End Sub
+
+
+
+'//////////////////////////////////////////
+
+'//////////////////////////////////////////
+
+Sub Docdata
+	Arrdata = Rhino.GetDocumentData
+	If IsArray(arrdata) Then
+		Rhino.Print Join(arrData, ",")
+	End If
+End Sub

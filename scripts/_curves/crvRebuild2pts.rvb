@@ -1,0 +1,27 @@
+'--------------------------------------------------------------
+'Command   :  cv2 (curve 2 points count)
+'Date      :  2011/02/01
+'Version   :  1.0
+'Organization   :  Rhino+
+'--------------------------------------------------------------
+Sub crvRebuild2pts
+
+Dim strCurve ,strCurves
+
+strCurves = Rhino.GetObjects("Select change curve 2 pionts count",4,True,True)
+
+If IsNull(strCurves) Then Exit Sub
+
+For Each strCurve In strCurves
+  
+  If Not IsNull(strCurve) Then
+
+    Rhino.RebuildCurve strCurve, 1, 2
+
+  End If
+
+Next
+
+End Sub
+
+'crvRebuild2pts'

@@ -1,0 +1,114 @@
+Option Explicit
+'------------------------------------------------------------------------------
+' Subroutine: tabella
+' Purpose: creation of one table for lengths e It determine the proportions
+' Dario Rossi  Italy reddado@tin.it
+' This short script is presupposed to automate the dimensioning of the designs 2D,
+' creating one table in a point of the design and associating of the references.
+'------------------------------------------------------------------------------
+Sub DimTable()
+Const rhObjectCurve = 4
+Dim strObject, arrObjects,arrPoint,arrPoints,arrcenter,numconta,pointtext
+Dim strPreX, strPreY, strStartX,strStartY,strEndX,strEndY,radius,scritto,car
+' Prima Curva
+numconta=1
+DO
+scritto= inputbox ("You want that the detail of the curve is written ?-Y/N-","Dariosoft","N")
+if scritto="N" or scritto="n" then exit do
+if scritto="Y" or scritto="y" then exit do
+LOOP
+car= inputbox ("Height Character","Height Text","5")
+car=cint(car)
+pointtext=Rhino.getpoint("It selects a Point for the beginning Table")
+DO
+strObject = Rhino.GetObject("Curve selects one", rhObjectCurve)
+If IsNull(strObject) Then Exit Sub
+If Rhino.iscircle (strobject) Then
+   'it selects point center
+   arrcenter= Rhino.CircleCenterPoint(strObject)
+   Rhino.AddPoint arrcenter
+   radius=formatnumber(Rhino.CircleRadius(strObject),3,-1,0,0)
+   strPreX=FORMATNUMBER(arrcenter(0),3,-1,0,0)
+   strPreY=FORMATNUMBER(arrcenter(1),3,-1,0,0)
+   Rhino.addtext numconta, arrcenter,car
+   if scritto="y" or scritto="Y" then
+    Rhino.addtext numconta & " Center Circle X=" & strPreX & "  Y=" & strPreY & "  R=" & radius, pointtext,car
+   else 
+    Rhino.addtext numconta & " X=" & strPreX & "  Y=" & strPreY & "  R=" & radius, pointtext,car
+   end if
+   pointtext(1)=pointtext(1)-2-car
+else   
+  If Rhino.IsArc (strobject) Then
+    ' Add the first annotation
+    arrPoint = Rhino.CurveStartPoint(strObject)
+    arrcenter= Rhino.ArcCenterPoint(strObject)
+    radius=formatnumber(Rhino.ArcRadius(strObject),3,-1,0,0)
+    Rhino.AddPoint arrPoint
+    strStartX=formatnumber(arrPoint(0),3,-1,0,0)
+    strStartY=formatnumber(arrPoint(1),3,-1,0,0)
+    Rhino.AddText numconta, arrPoint,car
+    if scritto="y" or scritto="Y" then
+       Rhino.addtext numconta & " Beginning Beam X=" & strStartX & "  Y=" & strStartY, pointtext,car
+    else
+       Rhino.addtext numconta & " X=" & strStartX & "  Y=" & strStartY, pointtext,car
+    end if
+    pointtext(1)=pointtext(1)-2-car
+    numconta=numconta+1
+    ' Add the second annotation if necessary
+    If Not Rhino.IsCurveClosed(strObject) Then
+       arrPoint = Rhino.CurveEndPoint(strObject)
+       Rhino.AddPoint arrPoint
+       strEndX=formatnumber(arrPoint(0),3,-1,0,0)
+       strEndY=formatnumber(arrPoint(1),3,-1,0,0)
+       Rhino.AddText numconta, arrPoint ,car
+       if scritto="y" or scritto="Y" then
+          Rhino.addtext numconta & " End Beam X=" & strEndX & "  Y=" & strEndY, pointtext,car
+       else  
+          Rhino.addtext numconta & " X=" & strEndX & "  Y=" & strEndY, pointtext,car
+       end if
+       pointtext(1)=pointtext(1)-2-car
+       numconta=numconta+1
+       Rhino.addpoint arrcenter
+       strPreX=FORMATNUMBER(arrcenter(0), 3,-1,0,0)
+       strPreY=formatnumber(arrcenter(1),3,-1,0,0)
+       Rhino.AddText numconta, arrcenter ,car
+       if scritto="y" or scritto="Y" then
+          Rhino.addtext numconta & " Center Beam X=" & strPreX & "  Y=" & strPreY & "  R=" & radius, pointtext,car
+       else
+          Rhino.addtext numconta & " X=" & strPreX & "  Y=" & strPreY & "  R=" & radius, pointtext,car
+       end if
+       pointtext(1)=pointtext(1)-2-car
+    End If
+ Else
+  ' Add the first annotation
+  arrPoint = Rhino.CurveStartPoint(strObject)
+  Rhino.AddPoint arrPoint
+  strStartX=formatnumber(arrPoint(0),3,-1,0,0)
+  strStartY=formatnumber(arrPoint(1),3,-1,0,0)
+  Rhino.AddText numconta, arrPoint,car
+  if scritto="y" or scritto="Y" then
+     Rhino.addtext numconta & " Beginning Line X=" & strStartX & "  Y=" & strStartY, pointtext,car
+  else 
+     Rhino.addtext numconta & " X=" & strStartX & "  Y=" & strStartY, pointtext,car
+  end if
+  pointtext(1)=pointtext(1)-2-car
+  numconta=numconta+1
+  ' Add the second annotation if necessary
+  If Not Rhino.IsCurveClosed(strObject) Then
+     arrPoint = Rhino.CurveEndPoint(strObject)
+     Rhino.AddPoint arrPoint
+     strEndX=formatnumber(arrPoint(0),3,-1,0,0)
+     strEndY=formatnumber(arrPoint(1),3,-1,0,0)
+     Rhino.AddText numconta, arrPoint ,car
+     if scritto="y" or scritto="Y" then
+        Rhino.addtext numconta & " End Line X=" & strEndX & "  Y=" & strEndY, pointtext,car
+     else  
+        Rhino.addtext numconta & " X=" & strEndX & "  Y=" & strEndY, pointtext,car
+     end if
+     pointtext(1)=pointtext(1)-2-car
+  End If 
+ end if
+End If
+numconta=numconta+1
+LOOP
+End Sub

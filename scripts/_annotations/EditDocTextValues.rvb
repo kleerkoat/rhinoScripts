@@ -1,0 +1,42 @@
+Option Explicit
+'Script written by Pascal
+' RMA
+'Script version Tuesday, January 31, 2012
+
+'Rhino.AddStartUpScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "EditDocTextValues", "_NoEcho _-Runscript (EditDocTextValues)"
+
+'call EditDocTextValues()
+
+Sub EditDocTextValues()
+
+	Dim aDocKeys, aDocval
+	Dim i
+	Dim aDocText: aDoctext = Rhino.GetDocumentUserText()
+	If isArray(aDoctext) Then
+		
+	
+		ReDim aDocKeys(Ubound(aDocText))
+		ReDim aDocVal(Ubound(aDocText))
+		For i = 0 To ubound(aDockeys)
+			aDockeys(i) = aDoctext(i)
+			aDocVal(i) = Rhino.GetDocumentUsertext(aDocText(i))
+		Next
+		
+	Else
+		
+		MsgBox "No Document User Text found"
+		Exit Sub
+	End If
+		
+	Dim aList: aList = Rhino.PropertyListBox(aDockeys, aDocval, "Set Document User text.", "Document User Text")
+		
+		If Not isArray(aList) Then Exit Sub
+	
+	For i = 0 To UBound(aList)
+		Rhino.SetDocumentUserText aDockeys(i), aList(i)
+	Next
+	
+		
+End Sub
+

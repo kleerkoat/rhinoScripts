@@ -1,0 +1,236 @@
+' ****************************** RhinoScript.org ******************************
+'
+'   Object Arranger, version 1.1
+'
+'   by Hanno Stehling, published May 20, 2008
+'
+'
+'   A very basic nesting tool.
+'   Until now it cannot even rotate objects, but it produces fairly useful results and is very easy to use.
+'
+'
+'
+'
+'   This RhinoScript Tool has been downloaded from RhinoScript.org.
+'
+'   Rhino versions: Rhino 4
+'   In order to run it you need the following libraries: "Array Library" (version 1.2) by Hanno Stehling.
+'
+'   LICENSE INFORMATION:
+'   This script is published under the GNU General Public License, version 3
+'   or any later version, and thus comes WITHOUT ANY WARRANTY. You can get
+'   the complete license text here: www.rhinoscript.org/gpl
+'
+' ****************************** RhinoScript.org ******************************
+
+
+
+' Object Arranger - Version 1.1
+' ---------------------------------------
+' Hanno Stehling | post@hanno-stehling.de
+
+Option Explicit
+Setlocale "en-us"
+
+Dim show_footprints : show_footprints = False
+Dim allow_islands : allow_islands = False ' if true then objects can be placed i.e. in the center of a closed curve
+Dim granularity : granularity = 5 ' distance between test points (too large values can lead to bad results, too small values can lead to extensive processing times or even a rhino crash)
+
+
+
+' subroutine to recursively clear islands on a object's footprint
+Sub clear_islands(ByRef islands, ByVal footprint, ByVal u, ByVal v)
+	
+	islands(u, v) = False
+	If u > 0 Then
+		If islands(u - 1, v) And Not footprint(u - 1, v) Then clear_islands islands, footprint, u - 1, v
+	End If
+	If u < ubound(footprint, 1) Then
+		If islands(u + 1, v) And Not footprint(u + 1, v) Then clear_islands islands, footprint, u + 1, v
+	End If
+	If v > 0 Then
+		If islands(u, v - 1) And Not footprint(u, v - 1) Then clear_islands islands, footprint, u, v - 1
+	End If
+	If v < ubound(footprint, 2) Then
+		If islands(u, v + 1) And Not footprint(u, v + 1) Then clear_islands islands, footprint, u, v + 1
+	End If
+	
+End Sub
+
+
+
+' main routine
+Sub main()
+	
+	Dim obj, obj2, obj_raw, obj_group, groups, box, boxes, objtype, footprints, p, p2, size, maxsize, sheets, found, positions, islands, sheetsize, realsheetsize
+	Dim testpoints : testpoints = array(array(0.5, 0.5), array(0.104, 0.104), array(0.896, 0.104), array(0.896, 0.896), array(0.104, 0.896)) ' one center point and one near each corner
+	Dim i, j, k, u, v, uu, vv
+	
+	rhino.printex ""
+	rhino.printex "Object Arranger - Version 1.0"
+	rhino.printex "============================="
+
+	' get sheet size & objects, sort by groups
+	realsheetsize = array(rhino.getinteger("Width of target sheet", , 1), rhino.getinteger("Height of target sheet", , 1))
+	sheetsize = array(int(realsheetsize(0) / granularity), int(realsheetsize(1) / granularity))
+	obj_raw = rhino.GetObjects("Select planar objects to arrange (objects that should stay together must be grouped)", 0, True) ' all objects, group selection
+	rhino.printex "Sorting objects..."
+	obj = array()
+	Do While ubound(obj_raw) > -1
+		obj_group = array(array_pop(obj_raw))
+		groups = rhino.ObjectGroups(obj_group(0))
+		If isarray(groups) Then
+			For i = 0 To ubound(groups)
+				obj2 = rhino.ObjectsByGroup(groups(i))
+				For j = 0 To ubound(obj2)
+					k = array_search(obj2(j), obj_raw)
+					If k > -1 Then array_push obj_group, array_extract(obj_raw, k)
+				Next
+			Next
+		End If
+		array_push obj, obj_group
+	Loop
+	
+	' get bounding boxes, check for size & planarity
+	rhino.printex "Checking objects..."
+	ReDim boxes(ubound(obj))
+	For i = 0 To ubound(obj)
+		box = rhino.boundingbox(obj(i))
+		For j = 0 To ubound(box)
+			If box(j)(2) <> 0 Then Exit For
+		Next
+		If j <= ubound(box) Then
+			rhino.printex "WARNING: Ignoring a non-planar object"
+			obj(i) = Null
+			boxes(i) = Null
+		else
+			boxes(i) = array(array(int(box(0)(0)), int(box(0)(1))), array(int(box(2)(0)) + 1, int(box(2)(1)) + 1))
+			If boxes(i)(1)(0) - boxes(i)(0)(0) > realsheetsize(0) Or boxes(i)(1)(1) - boxes(i)(0)(1) > realsheetsize(1) Then
+				rhino.printex "WARNING: Ignoring a too large object"
+				obj(i) = Null
+				boxes(i) = Null
+			End If
+		End If
+	Next
+	array_clean obj, Null
+	array_clean boxes, Null
+	
+	' get footprints
+	ReDim footprints(ubound(obj))
+	ReDim size(ubound(obj))
+	For i = 0 To ubound(obj)
+		rhino.printex "Generating footprint " & i + 1 & " of " & ubound(obj) + 1
+		footprints(i) = array_fill2(int((boxes(i)(1)(0) - boxes(i)(0)(0)) / granularity), int((boxes(i)(1)(1) - boxes(i)(0)(1)) / granularity), False)
+		size(i) = 0
+		For j = 0 To ubound(obj(i))
+			objtype = rhino.ObjectType(obj(i)(j))
+			If objtype = 4 Or objtype = 8 Or objtype = 16 Then
+				For u = 0 To ubound(footprints(i), 1)
+					For v = 0 To ubound(footprints(i), 2)
+						For k = 0 To ubound(testpoints)
+							p = array(boxes(i)(0)(0) + (u + testpoints(k)(0)) * granularity, boxes(i)(0)(1) + (v + testpoints(k)(1)) * granularity, 0)
+							If objtype = 4 Then
+								p = rhino.evaluatecurve(obj(i)(j), rhino.CurveClosestPoint(obj(i)(j), p))
+							Else
+								p = array_shift(rhino.brepClosestPoint(obj(i)(j), p))
+							End If
+							p(0) = int((p(0) - boxes(i)(0)(0)) / granularity)
+							p(1) = int((p(1) - boxes(i)(0)(1)) / granularity)
+							If Not footprints(i)(p(0), p(1)) Then
+								footprints(i)(p(0), p(1)) = True
+								size(i) = size(i) + 1
+							End If
+						Next
+					Next
+				Next
+			Else
+				rhino.printex "WARNING: Ignoring an object of type " & objtype & " for footprint calculation"
+			End If
+		Next
+		
+		If Not allow_islands Then
+			islands = array_fill2(ubound(footprints(i), 1), ubound(footprints(i), 2), True)
+			For u = 0 To ubound(footprints(i), 1)
+				For v = 0 To ubound(footprints(i), 2)
+					If u = 0 Or u = ubound(footprints(i), 1) Or v = 0 Or v = ubound(footprints(i), 2) Then
+						If islands(u, v) And Not footprints(i)(u, v) Then
+							clear_islands islands, footprints(i), u, v
+						End If
+					End If
+				Next
+			Next
+			For u = 0 To ubound(footprints(i), 1)
+				For v = 0 To ubound(footprints(i), 2)
+					If islands(u, v) Then
+						footprints(i)(u, v) = True
+						size(i) = size(i) + 1
+					End If
+				Next
+			Next
+		End If
+		
+		If show_footprints Then
+			For u = 0 To ubound(footprints(i), 1)
+				For v = 0 To ubound(footprints(i), 2)
+					If footprints(i)(u, v) Then rhino.addpoint array(boxes(i)(0)(0) + (u + 0.5) * granularity, boxes(i)(0)(1) + (v + 0.5) * granularity, 0)
+				Next
+			Next
+		End If
+	Next
+	
+	' arrange objects
+	rhino.printex "Arranging objects..."
+	ReDim positions(ubound(obj))
+	sheets = array(array_fill2(sheetsize(0) - 1, sheetsize(1) - 1, False))
+	For i = 0 To ubound(obj)
+		j = array_max(size)
+		size(j) = -1
+		For k = 0 To ubound(sheets)
+			For u = 0 To sheetsize(0) - 1
+				For v = 0 To sheetsize(1) - 1
+					If u + ubound(footprints(j), 1) < sheetsize(0) And v + ubound(footprints(j), 2) < sheetsize(1) Then
+						found = True
+						For uu = 0 To ubound(footprints(j), 1)
+							For vv = 0 To ubound(footprints(j), 2)
+								If sheets(k)(u + uu, v + vv) And footprints(j)(uu, vv) Then
+									found = False
+									Exit For
+								End If
+							Next
+							If Not found Then Exit For
+						Next
+					End If
+					If found Then Exit For
+				Next
+				If found Then Exit For
+			Next
+			If found Then Exit For
+		Next
+		If Not found Then
+			array_push sheets, array_fill2(sheetsize(0) - 1, sheetsize(1) - 1, False)
+			u = 0
+			v = 0
+		End If
+		For uu = 0 To ubound(footprints(j), 1)
+			For vv = 0 To ubound(footprints(j), 2)
+				If footprints(j)(uu, vv) Then sheets(k)(u + uu, v + vv) = True
+			Next
+		Next
+		positions(j) = array(k, u, v)
+	Next
+	
+	' draw sheets, move objects to new location
+	For i = 0 To ubound(sheets)
+		rhino.addpolyline array(array(i * 2 * sheetsize(0) * granularity, 0, 0), array(i * 2 * sheetsize(0) * granularity + realsheetsize(0), 0, 0), array(i * 2 * sheetsize(0) * granularity + realsheetsize(0), realsheetsize(1), 0), array(i * sheetsize(0) * 2 * granularity, realsheetsize(1), 0), array(i * sheetsize(0) * 2 * granularity, 0, 0))
+	Next
+	For i = 0 To ubound(obj)
+		rhino.moveobjects obj(i), boxes(i)(0), array((positions(i)(0) * sheetsize(0) * 2 + positions(i)(1)) * granularity, positions(i)(2) * granularity)
+	Next
+	
+	rhino.PrintEx "Finished."
+	
+End Sub
+
+
+
+Call main()

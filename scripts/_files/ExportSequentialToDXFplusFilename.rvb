@@ -1,0 +1,72 @@
+	Option Explicit
+
+'Version 6 September 2012
+'version 7 sept 2012, commented out locking portions, added current working directory, and prompt box for suffix
+
+'Private oldLockSet
+'If IsEmpty(oldLockSet) Then oldLockSet = False
+
+'Call ExportSequentialToDXFplusFilename()
+Sub ExportSequentialToDXFplusFilename
+	
+	Dim strMsg,strFoldPath,strBaseName,intSeqNo,strSeqNo,blnLock,arrObjs,strFilePath,strCurrentDir,arrObjects, strObject
+	
+	arrObjects = Rhino.VisibleObjects
+	If IsArray(arrObjects) Then
+		For Each strObject In arrObjects
+			If Rhino.IsObjectValid(strObject) Then
+				'Rhino.Print "The object is valid."
+			Else
+				Rhino.Command "_NoEcho _SelbadObjects"
+				Rhino.MessageBox "Bad objects found. Export canceled."
+				Exit Sub				
+			End If
+		Next
+	End If
+	
+	
+	'Dim arrLock : ReDim arrLock(-1)
+	strMsg = "Choose a folder for the exported files"
+
+	strBaseName = Rhino.DocumentName()
+	If IsNull(strBaseName) Then
+		strBaseName = Rhino.StringBox("Enter a base file name",, "Document not saved yet!")
+	Else
+		strBaseName = left(strBaseName, Len(strBaseName) - 4)
+	End If	
+	
+	If IsNull(strBaseName) Then Exit Sub
+	If Trim(strBaseName) = "" Then Exit Sub
+	
+	strCurrentDir = Rhino.DocumentPath()
+		
+	strFoldPath = Rhino.BrowseForFolder(strCurrentDir, strMsg, "Sequential DXF Export")
+	If IsNull(strFoldPath) Then Exit Sub	
+	
+	intSeqNo = Rhino.IntegerBox("Starting number for file suffix:", 0, "", 0)
+	If IsNull(intSeqNo) Then Exit Sub
+	
+	'blnLock = Rhino.GetBoolean("Lock objects after export?", Array("Lock", "No", "Yes"), Array(oldLockSet))
+	'If Not IsArray(blnLock) Then Exit Sub
+	'oldLockSet = blnLock(0)
+		
+	Do
+		arrObjs = Rhino.GetObjects("Select geometry to export and Enter when done",,,, True)
+		If Not IsArray(arrObjs) Then Exit Do
+		
+		strSeqNo = Cstr(intSeqNo)
+		If Len(strSeqNo) = 1 Then strSeqNo = "0" & strSeqNo		
+		
+		strFilePath = chr(34) & strFoldPath & strBaseName & "-" & strSeqNo & ".dxf" & chr(34)
+		Call Rhino.Command("_-Export " & strFilePath & " _Enter")
+		'		If blnLock(0) Then
+		'			arrLock = Rhino.JoinArrays(arrLock, arrObjs)
+		'			Call Rhino.LockObjects(arrObjs)
+		'		End If
+		intSeqNo = intSeqNo + 1
+	Loop
+
+	'	If blnLock(0) Then
+	'		If Ubound(arrLock) > -1 Then Call Rhino.UnlockObjects(arrLock)
+	'	End If
+End Sub

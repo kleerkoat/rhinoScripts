@@ -1,0 +1,94 @@
+Option Explicit
+
+'Allows the user to project curves onto target objects
+'using a user defined directions instead of the CPlane normal
+
+Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "ProjectDir", "! _NoEcho _-Runscript ProjectDir"
+'Rhino.AddAlias "ProjectView", "! _NoEcho _-Runscript ProjectView"
+'call ProjectDir()
+
+Sub ProjectDir()
+	
+	Project(0)
+End Sub
+
+sub ProjectView()
+	Project(1)
+
+End sub
+
+Sub Project(pdir)
+	
+	Dim strDir, arrPts, arrProj, arrTarget, strObject, CrntPLane, View, arrSel
+	Dim A 
+	A = True
+	
+	StrDir=vbNull
+	crntPLane = Rhino.ViewCplane
+	view = Rhino.CurrentView
+	arrProj=Rhino.GetObjects("Select curves and points to project", 1+4, True, True )
+	
+	If Not IsArray(arrProj) Then
+		Exit Sub 
+	End If
+	
+	arrTarget=Rhino.GetObjects("Select surfaces or polysurfaces to project onto", 8+16+32, True, True)
+
+	If Not IsArray(arrTarget) Then Exit Sub 
+	
+	
+	Dim Pt1, Pt2
+	
+	If pdir = 0 then
+		arrPts= Rhino.GetPoints(True, , "First direction point", "Second direction point",2) 
+		pt1=arrPts(0)
+		pt2=arrPts(1)
+            
+  
+		If Not IsArray(arrPts) Then Exit Sub
+
+		Rhino.EnableRedraw(False)
+		Dim vec, plane
+	
+		vec = Rhino.VectorCreate(Pt2,Pt1)
+	
+		plane = Rhino.PlaneFromNormal(Pt1,vec)
+		Rhino.ViewCPlane View,Plane
+	Else
+		plane = Rhino.ViewCameraPlane(View)
+		Rhino.ViewCPlane View,Plane
+	End if
+	
+	Rhino.UnSelectAllObjects()
+	Rhino.SelectObjects(arrProj)
+	Rhino.CurrentView View
+		
+		
+		
+	dim temp, sCmd
+	sCmd = "_Project "
+	
+	For Each strObject In arrTarget
+		
+		sCmd = sCmd &  "_SelID " &  CStr(strObject)
+		
+	next
+	
+	sCmd = sCmd & "_Enter _Enter"
+		
+	Rhino.Command sCmd, false
+	
+	
+	If Rhino.LastCommandResult = 0 Then
+		temp = Rhino.SelectedObjects()
+		Rhino.ViewCPlane View,CrntPlane
+	end if
+	
+						
+	Rhino.EnableRedraw(True)
+              
+
+End Sub
+    
+'ProjectDir

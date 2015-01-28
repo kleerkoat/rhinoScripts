@@ -1,0 +1,29 @@
+﻿Option Explicit
+
+Call Main()
+Sub Main()
+	
+	Dim strObject:: strObject=Rhino.GetObject("Pick the object you wish to move.")
+	If IsNull(strObject) Then Exit Sub
+	
+	Dim arrPointMove:: arrPointMove=Rhino.GetPoint("Pick a point on the object you wish to move.")
+	If IsNull(arrPointMove) Then Exit Sub
+	
+	Dim arrPointRelativeTo:: arrPointRelativeTo=Rhino.GetPoint("Pick a point on the object you wish to move relative to.")
+	If IsNull(arrPointRelativeTo) Then Exit Sub
+	
+	Dim arrVector:: arrVector=Rhino.VectorCreate(arrPointRelativeTo, arrPointMove)
+	Dim dblDistance:: dblDistance=Rhino.VectorLength(arrVector)
+	Call Rhino.Print("The point to point distance is " & dblDistance &".")
+	Dim dblChangeDistance:: dblChangeDistance=Rhino.GetReal("Enter the distance to move.")
+	If IsNull(dblChangeDistance) Then Exit Sub
+	
+	Dim arruVector:: arruVector=Rhino.VectorUnitize(arrVector)
+	arrVector=Array(arruVector(0)*dblChangeDistance,arruVector(1)*dblChangeDistance,arruVector(2)*dblChangeDistance)
+	Dim dblDistanceNew:: dblDistanceNew=dblDistance-Rhino.VectorLength(arrVector)
+	Call Rhino.Print("The new point to point distnace is " & dblDistanceNew &".")
+	
+	Dim arrXform:: arrXform=Rhino.XformTranslation(arrVector)
+	Call Rhino.TransformObject(strObject, arrXform)
+
+End Sub

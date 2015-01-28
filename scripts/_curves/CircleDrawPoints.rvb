@@ -1,0 +1,23 @@
+﻿Option Explicit
+'Script written by Ryan Gilmore
+'Script version Thursday, June 07, 2012 10:00:33 AM
+
+'Call CircleDrawPoints()
+Sub CircleDrawPoints()
+	Dim arrPoints, arrCircle
+
+	arrPoints = Rhino.GetPoints("Select points")
+
+	If IsArray(arrPoints) Then
+
+		arrCircle = Rhino.CircleFromPoints(arrPoints)
+
+		If IsArray(arrCircle) Then
+
+			Rhino.AddCircle arrCircle(0), arrCircle(1)
+
+		End If
+
+	End If
+
+End Sub

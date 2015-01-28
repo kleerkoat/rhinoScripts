@@ -1,0 +1,62 @@
+'Polar Array 3D
+'
+'Here is some code to do a 3D polar array. The code is fairly self-explanatory, 
+'follow the prompts and you can’t go wrong. As far as how the code works, you 
+'essentially define a vector and incrementally rotate and duplicate about that 
+'vector within a loop.
+
+
+Call Main()  
+Sub Main()  
+  
+    Dim arrObjects,arrCenterPoint,arrAxisPoint,axisVec,intNumberOfObjects,dblAngleToFillDegrees  
+      
+    arrObjects = rhino.GetObjects("select objects for 3D Polar Array")  
+    If isNull(arrObjects) Then Exit Sub  
+      
+    arrCenterPoint = rhino.GetPoint("select axis origin of 3D Polar Array")  
+    If isNull(arrCenterPoint) Then Exit Sub  
+      
+      
+    arrAxisPoint = rhino.GetPoint("select axis terminus of 3D Polar Array")  
+    If isNull(arrAxisPoint) Then Exit Sub  
+      
+    axisVec = rhino.VectorCreate(arrAxisPoint,arrCenterPoint)  
+      
+    intNumberOfObjects = rhino.GetInteger("Specify the number of items in array",,1)  
+    If isNull(intNumberOfObjects) Then Exit Sub  
+      
+    dblAngleToFillDegrees = rhino.GetReal("Specify angle to fill",360.0,0)  
+      
+    Call arrayPolar3d(arrObjects,arrCenterPoint,axisVec,intNumberOfObjects,dblAngleToFillDegrees)  
+  
+      
+End Sub  
+  
+Sub arrayPolar3d(arrObjects,arrCenterPoint,axisVec,intNumberOfObjects,dblAngleToFillDegrees)  
+  
+    Dim stepAngle,i  
+      
+    If dblAngleToFillDegrees = 360 Then  
+          
+        stepAngle = dblAngleToFillDegrees/(intNumberOfObjects+1)  
+          
+        For i = 1 To intNumberOfObjects  
+              
+            Call rhino.RotateObjects(arrObjects,arrCenterPoint,i*stepAngle,axisVec,True)  
+              
+        Next  
+      
+    Else  
+      
+        stepAngle = dblAngleToFillDegrees/intNumberOfObjects  
+          
+        For i = 1 To intNumberOfObjects  
+          
+            Call rhino.RotateObjects(arrObjects,arrCenterPoint,i*stepAngle,axisVec,True)  
+          
+        Next  
+          
+    End If  
+      
+End Sub  

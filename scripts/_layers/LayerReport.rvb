@@ -1,0 +1,11 @@
+Option Explicit
+
+'Call LayerReport()
+Sub LayerReport()
+	Dim strObject,x
+	strObject = Rhino.GetObject("Select object for layer report",0,True)
+	If strObject <> vbNull Then
+		Rhino.print  "Object is on layer: " & Rhino.ObjectLayer(strObject)
+		Rhino.StatusBarMessage Rhino.ObjectLayer(strObject)
+	End If
+End Sub

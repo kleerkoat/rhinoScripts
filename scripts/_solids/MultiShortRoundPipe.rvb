@@ -1,0 +1,121 @@
+Option Explicit
+'Script by Mitch Heynick
+'Version Sunday, 13 June, 2010
+'Revised 5 March 2011 - fixed non-English language bug
+
+'Pipes multiple curves with round ends
+'Length of pipe *including round ends* matches length of input curve
+
+Private dblOldSRad 
+If IsEmpty(dblOldSRad)Then
+	dblOldSRad = 1.0
+End If
+
+Private dblOldERad 
+If IsEmpty(dblOldERad)Then
+	dblOldERad = 1.0
+End If
+
+
+'Call MultiShortRoundPipe()
+Sub MultiShortRoundPipe()
+	
+	Dim arrCrvs,strCrv,dblSRad,dblERad,dblTol
+	dblTol=Rhino.UnitAbsoluteTolerance
+	
+	arrCrvs=Rhino.GetObjects("Select open curves to pipe",4,,True)
+	If Not IsArray(arrCrvs) Then Exit Sub
+	
+	dblSRad=Rhino.GetReal("Start radius?",dblOldSRad,0.0)
+	If not IsNumeric(dblSRad) or dblSRad<=0 Then Exit Sub
+	dblOldSRad=dblSRad
+		
+	dblERad=Rhino.GetReal("End radius?",dblOldERad,0.0)
+	If not IsNumeric(dblERad) or dblERad<=0 Then Exit Sub
+	dblOldERad=dblERad
+	
+	Call Rhino.EnableRedraw(False)
+	For each strCrv in arrCrvs
+		If Not Rhino.IsCurveClosed(strcrv) Then
+			If Rhino.CurveLength(strCrv)>dblSRad+dblERad+dblTol then
+				Call ShortRoundPipe(strCrv,dblSRad,dblERad)	
+			End If		
+		End If
+	
+	Next
+	Call Rhino.EnableRedraw(True)
+End Sub
+
+Sub ShortRoundPipe(strCrv,dblSRad,dblERad)
+	
+	Dim arrCSP,arrCEP,strSSph,strESph
+	arrCSP=Rhino.CurveStartPoint(strCrv)
+	arrCEP=Rhino.CurveEndPoint(strCrv)
+	
+	'add spheres the same radius as cap to each end
+	strSSph=Rhino.AddSphere(arrCSP,dblSRad)
+	strESph=Rhino.AddSphere(arrCEP,dblERad)
+	
+	Dim arrSIntPt,arrEIntPt,dblSIntParam,dblEIntParam	
+	' intersect spheres with curve
+	arrSIntPt=FindIntersectionPoint(strcrv,strSSph)
+	arrEIntPt=FindIntersectionPoint(strcrv,strESph)
+	Call Rhino.DeleteObjects(Array(strSSph,strESph))
+	
+	If Not IsArray(arrSIntPt) or Not IsArray(arrEIntPt) Then Exit Sub
+
+	dblSIntParam=Rhino.CurveClosestPoint(strCrv,arrSIntPt)
+	dblEIntParam=Rhino.CurveClosestPoint(strCrv,arrEIntPt)
+	
+	' means that intersections overlap
+	If dblSIntParam>dblEIntParam Then Exit sub
+	
+	Dim arrCrvParts
+	
+	arrCrvParts=Rhino.SplitCurve(strcrv,Array(dblSIntParam,dblEIntParam),False)
+	If Not IsArray(arrCrvParts) Then Exit Sub	
+	
+	If Ubound(arrCrvParts)=2 Then		
+		Dim arrMidCrv(),crv,i : i=-1
+		For each crv in arrCrvParts
+			If Not Rhino.IsPointOnCurve(crv,arrCSP) And Not Rhino.IsPointOnCurve(crv,arrCEP) Then
+				i=i+1
+				Redim arrMidCrv(i)
+				arrMidCrv(i)=crv
+			End If			
+		Next
+		If i<>0 Then
+			Call Rhino.DeleteObjects(arrCrvParts)
+			Exit Sub
+		End If
+		Dim strPC,strComm
+		strPC=arrMidCrv(0)
+		strcomm="_-Pipe _SelID "&strPC&" _Thick=_No _Cap=_Round _ShapeBlending=_Local"		
+		strComm=strcomm&" _Radius "&dblSRad&" _Radius "&dblERad&" _Enter _Enter"
+		Call Rhino.Command(strComm,False)
+		Call Rhino.DeleteObjects(arrCrvParts)			
+	End If
+	
+End Sub
+
+Function FindIntersectionPoint(strcrv,strSrf)
+	' returns the coordinates of the intersection point of curve/surface
+	' if multiple intersection points found, returns Null
+	FindIntersectionPoint=Null
+	
+	Dim arrInt,arrIntCoords,UB
+	arrInt=Rhino.CurveBrepIntersect(strcrv,strSrf)
+	On Error Resume Next
+	UB=Ubound(arrInt)	
+	If Err.Number <> 0 Then Exit Function
+	If UB>0 Then
+		Call Rhino.DeleteObjects(arrInt)
+		Exit function
+	End If
+	
+	If Rhino.IsPoint(arrInt(0)) Then
+		arrIntCoords=Rhino.PointCoordinates(arrInt(0))
+		Call Rhino.DeleteObject(arrInt(0))
+		FindIntersectionPoint=arrIntCoords		
+	End If	
+End Function

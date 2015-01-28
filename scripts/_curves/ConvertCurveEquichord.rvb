@@ -1,0 +1,54 @@
+Option Explicit
+' Convert a Curve to a specified Number of equichordal line segments
+' 3DE - Jess Maertterer - 23.10.2009
+
+'ConvertCurveEquichord()
+Sub ConvertCurveEquichord()
+  
+  Dim sCrv
+  sCrv = Rhino.GetObject ("Select Curve to divide", 4, true)
+  If IsNull(sCrv) Then Exit Sub
+  
+  Dim iSeg
+  iSeg = Rhino.GetInteger ("Number of equidistant segments", 5, 2)
+  If IsNull(iSeg) Then Exit Sub
+  
+  Dim dDist : dDist = Rhino.CurveLength(sCrv)/iSeg
+  Dim dTol : dTol = Rhino.UnitAbsoluteTolerance()/2
+  Dim dTooShort : dTooShort = 0
+  Dim dTooLong : dTooLong = Rhino.CurveLength(sCrv)
+  Dim aCrvEnd : aCrvEnd = Rhino.CurveEndPoint(sCrv)
+  Dim aParam, aPt
+  
+  Rhino.Prompt "Dividing Curve... Press ESC to cancel"
+  Do 
+    aParam = Rhino.DivideCurveEquidistant (sCrv, dDist, false,false)
+    If ubound(aParam) = iSeg Then
+      aPt = Rhino.EvaluateCurve(sCrv,aParam(ubound(aParam)))
+      If Rhino.Distance(aPt,aCrvEnd)< dTol Then Exit Do
+      dTooShort = dDist
+    Else
+      If ubound(aParam) < iSeg Then
+        dTooLong = dDist
+      Else 
+        dTooShort = dDist
+      End If
+    End If
+    
+    If (dTooLong-dTooShort) < 0.000000001 Then 
+      Rhino.Print "No Solution with "&iSeg&" equidistant Segments!"
+      Exit Sub
+    End If
+    
+    dDist = dTooShort + (dTooLong-dTooShort)/3
+    Rhino.StatusBarMessage (dDist)
+  Loop
+  
+  Dim arrPoints
+  arrPoints = Rhino.DivideCurveEquidistant (sCrv, dDist, false,true)
+  arrPoints(ubound(arrPoints))= aCrvEnd
+  Rhino.SelectObject (Rhino.AddPolyline(arrPoints))
+  Rhino.Print iSeg &" Segments at Distance: " & dDist
+    
+End Sub
+

@@ -1,0 +1,160 @@
+﻿Option Explicit
+'Script written by Pascal
+'Script version Wednesday, November 11, 2009 
+
+Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+Rhino.AddAlias "BoxFramer", "_NoEcho _-Runscript (BoxFramer)"
+
+Private Oldth
+
+If isEmpty(oldth) Then
+	Oldth = 1.0
+End If
+
+'Call BoxFramer()
+Sub BoxFramer()
+
+	Dim sBox: sBox = Rhino.GetObject("Select a box",16,True)
+	If isNull(sBox) Then Exit Sub
+	
+	Dim aBox
+	If Rhino.IsBox(sBox) Then 
+		aBox=Rhino.BoxPoints(sBox)
+	Else Exit Sub
+
+	End If
+	
+	Dim dblTh: dblTh = Rhino.GetReal("Frame thickness",oldTh,100*Rhino.UnitAbsoluteTolerance)
+
+	Rhino.EnableRedraw(False)
+	
+	If isNull(dblTh) Then Exit Sub
+	OldTh = dblTh
+	
+	Dim XBox, YBox,ZBox
+	
+	
+		
+	'		Dim temp: temp = getBox(aBox,dblth,2)
+'		Dim i
+'		
+'		For i = 0 To 7
+'			Rhino.AddTextDot i,temp(i)
+'		Next
+'	
+	Xbox = Rhino.AddBox(getBox(aBox,dblth,0))
+	YBox = Rhino.AddBox(getBox(aBox,dblth,1))
+	ZBox = Rhino.AddBox(getBox(aBox,dblth,2))
+	
+	
+	Dim BoolBox: BoolBox = Rhino.BooleanUnion(array(XBox,YBox,ZBox),True)(0)
+	
+	If isNull(BoolBox) Then 
+		Rhino.DeleteObjects array(XBox,YBox,ZBox)(0)
+		Rhino.EnableRedraw(True)
+		Exit Sub
+	End If
+	
+	Rhino.BooleanDifference array(sBox), array(Boolbox), True
+	Rhino.EnableRedraw(True)
+	
+End Sub
+
+Function GetBox(aBox,dblth,intDir)
+	
+	Dim Vec0, vec1,Vec2, Rev0,rev1, rev2, Temp
+	
+	Vec0 = Rhino.VectorScale( Rhino.VectorUnitize( Rhino.VectorCreate(aBox(1), aBox(0))),dblTh)
+	Vec1 = Rhino.VectorScale( Rhino.VectorUnitize( Rhino.VectorCreate(aBox(3), aBox(0))),dblTh)
+	Vec2 = Rhino.VectorScale( Rhino.VectorUnitize( Rhino.VectorCreate(aBox(4), aBox(0))),dblTh)
+	Rev0 = Rhino.VectorReverse(Vec0)
+	Rev1 = Rhino.VectorReverse(Vec1)
+	Rev2 = Rhino.VectorReverse(Vec2)
+	
+	Dim arr(7)
+	
+	If intDir = 0 Then
+	
+		temp = Rhino.PointAdd(aBox(0),Rev1)
+		arr(0) = Rhino.PointAdd(temp,Rhino.VectorAdd(vec0,vec2))
+		
+		temp = Rhino.PointAdd(aBox(1),Rev1)
+		arr(1) = Rhino.PointAdd(temp,Rhino.VectorAdd(rev0,vec2))
+		
+		temp = Rhino.PointAdd(aBox(2),Vec1)
+		arr(2) = Rhino.PointAdd(temp,Rhino.VectorAdd(rev0,vec2))
+		
+		temp = Rhino.PointAdd(aBox(3),Vec1)
+		arr(3) = Rhino.PointAdd(temp,Rhino.VectorAdd(Vec0,Vec2))
+		
+		temp = Rhino.PointAdd(aBox(4),Rev1)
+		arr(4) = Rhino.PointAdd(temp,Rhino.VectorAdd(rev2,vec0))
+		
+		temp = Rhino.PointAdd(aBox(5),Rev1)
+		arr(5) = Rhino.PointAdd(temp,Rhino.VectorAdd(rev0,Rev2))
+		
+		temp = Rhino.PointAdd(aBox(6),Vec1)
+		arr(6) = Rhino.PointAdd(temp,Rhino.VectorAdd(rev0,Rev2))
+		
+		temp = Rhino.PointAdd(aBox(7),Vec1)
+		arr(7) = Rhino.PointAdd(temp,Rhino.VectorAdd(vec0,rev2))
+		
+	ElseIf intDir = 1 Then
+		
+		temp = Rhino.PointAdd(aBox(0),Rev0)
+		arr(0) = Rhino.PointAdd(temp,Rhino.VectorAdd(vec1,vec2))
+		
+		temp = Rhino.PointAdd(aBox(1),Vec0)
+		arr(1) = Rhino.PointAdd(temp,Rhino.VectorAdd(vec1,vec2))
+		
+		temp = Rhino.PointAdd(aBox(2),Vec0)
+		arr(2) = Rhino.PointAdd(temp,Rhino.VectorAdd(Rev1,vec2))
+		
+		temp = Rhino.PointAdd(aBox(3),Rev0)
+		arr(3) = Rhino.PointAdd(temp,Rhino.VectorAdd(Rev1,Vec2))
+		
+		temp = Rhino.PointAdd(aBox(4),Rev0)
+		arr(4) = Rhino.PointAdd(temp,Rhino.VectorAdd(rev2,vec1))
+		
+		temp = Rhino.PointAdd(aBox(5),Vec0)
+		arr(5) = Rhino.PointAdd(temp,Rhino.VectorAdd(Vec1,Rev2))
+		
+		temp = Rhino.PointAdd(aBox(6),Vec0)
+		arr(6) = Rhino.PointAdd(temp,Rhino.VectorAdd(rev1,Rev2))
+		
+		temp = Rhino.PointAdd(aBox(7),Rev0)
+		arr(7) = Rhino.PointAdd(temp,Rhino.VectorAdd(rev1,rev2))
+		
+	Else
+		
+		temp = Rhino.PointAdd(aBox(0),Rev2)
+		arr(0) = Rhino.PointAdd(temp,Rhino.VectorAdd(vec0,vec1))
+		
+		temp = Rhino.PointAdd(aBox(1),Rev2)
+		arr(1) = Rhino.PointAdd(temp,Rhino.VectorAdd(rev0,vec1))
+		
+		temp = Rhino.PointAdd(aBox(2),rev2)
+		arr(2) = Rhino.PointAdd(temp,Rhino.VectorAdd(rev0,rev1))
+		
+		temp = Rhino.PointAdd(aBox(3),rev2)
+		arr(3) = Rhino.PointAdd(temp,Rhino.VectorAdd(Vec0,rev1))
+		
+		
+		temp = Rhino.PointAdd(aBox(4),vec2)
+		arr(4) = Rhino.PointAdd(temp,Rhino.VectorAdd(vec1,vec0))
+		
+		temp = Rhino.PointAdd(aBox(5),vec2)
+		arr(5) = Rhino.PointAdd(temp,Rhino.VectorAdd(rev0,vec1))
+		
+		temp = Rhino.PointAdd(aBox(6),Vec2)
+		arr(6) = Rhino.PointAdd(temp,Rhino.VectorAdd(rev0,Rev1))
+		
+		temp = Rhino.PointAdd(aBox(7),Vec2)
+		arr(7) = Rhino.PointAdd(temp,Rhino.VectorAdd(vec0,rev1))
+		
+		
+	End If
+	
+
+	getBox = arr
+End Function

@@ -1,0 +1,42 @@
+ Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version den 14 december 2008 19:00:58
+'Call LayerCombinationSave()
+Sub LayerCombinationSave()
+	Dim arrLayers, strLayer, strCombName, strValue, arrResults, blnOverwrite
+	arrLayers = Rhino.LayerNames (False)
+	
+	strCombName = Rhino.GetString("Name of Layer Combination?")
+	blnOverwrite = False
+	
+	If IsNull (strCombName) Then Exit Sub
+	
+	'SAVE COMBINATION NAME
+		
+	Call	Rhino.SetDocumentData("LayerCombinationNames", strCombName, strCombName)
+	
+	If Not IsNull(Rhino.GetDocumentData("LayerCombination " & strCombName)) Then
+		arrResults = Rhino.GetBoolean("Overwrite?", Array("OverwriteCombination", "No", "Yes"), Array(True))
+		blnOverwrite = arrResults(0)
+	Else
+	End If
+	
+	
+	For Each strLayer In arrLayers
+		
+		strValue = "Visible: " & CStr(Rhino.IsLayerVisible(strLayer)) & "|Locked: " & _
+			CStr(Rhino.IsLayerLocked(strLayer)) & "|Current: " & CStr(Rhino.IsLayerCurrent(strLayer))& _
+			"|Order: " & CStr(Rhino.LayerOrder (strLayer))
+		
+		
+		If Not IsNull(Rhino.GetDocumentData("LayerCombination " & strCombName)) Then
+			If blnOverwrite Then 
+				Call	Rhino.DeleteDocumentData ("LayerCombination " & strCombName, strLayer)
+			End If
+		End If
+		
+		Call	Rhino.SetDocumentData("LayerCombination " & strCombName, strLayer, strValue)
+	Next
+	
+End Sub

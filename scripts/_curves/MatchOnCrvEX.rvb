@@ -1,0 +1,222 @@
+Option Explicit
+'Script written by Pascal
+
+'Script version Thursday, April 28, 2011 
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile()
+'Rhino.AddAlias "MatchOnCrvEx", "_NoEcho _-Runscript (MatchOnCrvEx)"
+
+Private OldCon
+If isEmpty(OldCon) Then
+	OldCon = "Tangency"
+End If
+
+'Call MatchOnCrvEx()
+
+
+Sub MatchOnCrvEx()
+
+	Dim aCrv: aCrv = Rhino.GetCurveObject("Select open curve near the end to match.", False, False)
+	If Not isArray(aCrv) Then Exit Sub
+	
+	Dim sCrv: sCrv = aCrv(0)
+	
+	If Rhino.ObjectGripsOn(sCrv) Then Rhino.EnableObjectGrips sCrv, False
+	
+	If Rhino.isCurveClosed(sCrv) Then 
+		Msgbox "Closed curves cannot be matched."
+		Exit Sub
+	End If
+	
+	Dim intEnd:	intEnd = GetCrvEnd(sCrv, aCrv(4))
+	
+	Dim starg: starg = Rhino.GetObject("Select target curve.", 4, False, False)
+	If isNull(sTarg) Then Exit Sub
+	
+	Dim Flip: Flip = False
+	If intEnd = 1 Then
+		Flip = True
+	End If
+	Dim aEnd
+	
+	If intEnd = 0 Then
+		aEnd = Rhino.CurveStartPoint(sCrv)
+	Else
+		aEnd = Rhino.CurveEndPoint(sCrv)
+	End If
+		
+	Dim aPick: aPick = Rhino.GetPointOnCurve(STarg, "Set target point.")
+	If isNull(aPick) Then Exit Sub
+	Dim TempPt: tempPt = Rhino.AddPoint(aPick)
+	Dim Tol: Tol = Rhino.UnitAbsoluteTolerance()
+	
+
+	
+	Dim sCon: sCon = Rhino.GetString("Continuity?", OldCon, array("Position", "Tangency", "Curvature"))
+	If isNull(sCon) Then Exit Sub
+	Dim idx
+	If lcase(sCon) = "position" Then 
+		sCon = "Position"
+		idx = 0
+	ElseIf lCase(sCon) = "tangency" Then
+		sCon = "Tangency"
+		idx = 1
+	ElseIf lcase(sCon) = "curvature" Then
+		sCon = "Curvature"
+		idx = 2
+	Else 
+		Exit Sub
+	End If
+	
+	OldCon = sCon
+	Dim PtLoc
+	PtLoc = Rhino.CurvePoints(scrv)
+	If Rhino.PointCompare(aPick, Rhino.CurveStartPoint(sTarg), Tol)Then 
+		
+		Rhino.Command "_-Match SelID " & sCrv & " _SelID " & sTarg & " _Mode=_" & sCon & " _AverageCurves=_No _Enter", False 
+	
+		Marker = Rhino.AddTextDot("G" & idx - 1, PtLoc(idx))
+		AdjustPt sCrv, marker, idx, PtLoc
+		Exit Sub
+	ElseIf Rhino.PointCompare(aPick, Rhino.CurveEndPoint(sTarg), Tol) Then 
+		Rhino.ReverseCurve sTarg
+		Rhino.Command "_-Match SelID " & sCrv & " _SelID " & sTarg & " _Mode=_" & sCon & " _AverageCurves=_No _Enter", False 
+		Marker = Rhino.AddTextDot("G" & idx - 1, PtLoc(idx))
+		AdjustPt sCrv, marker, idx, ptLoc
+		Rhino.ReverseCurve sTarg
+		Exit Sub
+	End If
+	
+	Dim t: t = Rhino.CurveClosestPoint(sTarg, aPick)
+	Dim aTest: aTest = Rhino.EvaluateCurve(starg, t)
+
+	Dim sCopy: sCopy = Rhino.CopyObject(sTarg)
+	Dim aSplit: aSplit = Rhino.SplitCurve(sCopy, t)
+	
+	Dim Newtarg, Newtarg2 
+	newTarg = aSplit(0)
+	If Rhino.PointCompare(Rhino.CurveEndPoint(NewTarg), aPick, Rhino.UnitAbsoluteTolerance()) Then Rhino.ReverseCurve NewTarg
+	newtarg2 = aSplit(1)
+	If Rhino.PointCompare(Rhino.CurveEndPoint(NewTarg2), aPick, Rhino.UnitAbsoluteTolerance()) Then Rhino.ReverseCurve NewTarg2
+	
+	
+	If Flip = True Then Rhino.ReverseCurve sCrv
+	
+	Dim CopyCrv:CopyCrv = Rhino.CopyObject(sCrv)
+	Rhino.MatchObjectAttributes CopyCrv, sCrv
+
+	Rhino.EnableRedraw False
+	
+	PtLoc = Rhino.CurvePoints(scrv)
+	
+	Rhino.Command "_-Match SelID " & sCrv & " _SelID " & NewTarg & " _Mode=_" & sCon & " _AverageCurves=_No _Enter", False 
+	
+	Rhino.EnableRedraw True
+	Dim Marker
+	If sCon <> "Position" Then
+		Dim sRev: sRev = Rhino.GetString("Flip?", "No", array("Yes", "No"))
+	
+		If isNull(sRev) Or lCase(sRev) = "no" Then 
+			Rhino.DeleteObjects Array(NewTarg, Newtarg2, copyCrv, tempPt)
+			Marker = Rhino.AddTextDot("G" & idx - 1, PtLoc(idx))
+		ElseIf lCase(sRev) = "yes" Then
+			Rhino.EnableRedraw False
+			PtLoc = Rhino.CurvePoints(CopyCrv)
+			Rhino.DeleteObject sCrv
+			Marker = Rhino.AddTextDot("G" & idx - 1, PtLoc(idx))
+			Rhino.Command "_-Match SelID " & CopyCrv & " _SelID " & NewTarg2 & " _Mode=_" & sCon & " _AverageCurves=_No _Enter", False 
+			Rhino.DeleteObjects Array(NewTarg, Newtarg2, tempPt)
+		
+			sCrv = copyCrv
+		End If
+		
+	Else 
+		Rhino.DeleteObjects Array(NewTarg, Newtarg2, copyCrv, tempPt)
+		If Flip = True Then Rhino.ReverseCurve SCrv
+	End If
+	
+	
+	AdjustPt sCrv, marker, idx, PtLoc
+	
+	If Flip = True Then Rhino.ReverseCurve sCrv
+	
+	
+End Sub
+
+
+Sub AdjustPt(sCrv, marker, idx, PtLoc)
+	
+	Dim MPtLoc: mptLoc = Rhino.CurvePoints(sCrv)
+	
+	Dim i, tag, tempPt
+	Rhino.EnableObjectGrips scrv
+	
+	For i = 0 To Rhino.CurvePointCount(sCrv)
+		
+		If i <> idx Then 
+			Rhino.SelectObjectGrip scrv, i
+			Rhino.Command "_HidePt _Enter"
+			
+		Else
+			tag = Rhino.AddTextDot("G" & idx, rhino.ObjectGripLocation(sCrv, i))
+			
+		End If
+		
+	Next
+	
+	Rhino.EnableRedraw True
+
+	
+	Rhino.SelectObjectGrip sCrv, idx
+	
+	tempPt = averagePoints(array(mptLoc(idx), ptLoc(idx)))
+	Rhino.ObjectGripLocation sCrv, idx, tempPt
+	
+	
+	Rhino.Command "_Move " & Rhino.Pt2Str(tempPt,, True) & "_AlongLine " & Rhino.Pt2Str(mptLoc(idx),, True) & Rhino.Pt2Str(PtLoc(idx),, True)
+	Rhino.EnableObjectGrips sCrv, False
+	Rhino.DeleteObject marker
+	Rhino.DeleteObject tag
+	
+End Sub
+
+
+Function AveragePoints(aPts)
+	'Finds the average coordinates of an array
+	'of points.
+
+	Dim X, Y, Z
+	Dim i
+	
+	X = 0
+	Y = 0
+	Z = 0
+
+	For i=0 To UBound(aPts)
+			
+		'add all the X values
+		X = X + aPts(i)(0)
+	
+		'add all th Y values
+		Y = Y + aPts(i)(1)			
+	
+		'add all the Z values
+		Z = Z + apts(i)(2)
+	Next
+	
+	'Divide by the number of points to
+	'get the average  for each
+	'create the output array from the 3 averages
+	AveragePoints = array(X / (UBound(aPts) + 1), Y / (UBound(aPts) + 1), Z / (UBound(aPts) + 1))
+
+End Function
+
+Function GetCrvEnd(crv, t)
+	'0 = Start, 1 = End
+	Dim Dom: dom = Rhino.CurveDomain(crv)
+	If Abs(t - dom(0)) > Abs(t - dom(1)) Then
+		GetCrvEnd = 1
+	Else
+		GetCrvEnd = 0
+	End If
+End Function

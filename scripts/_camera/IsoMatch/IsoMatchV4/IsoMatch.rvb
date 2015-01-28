@@ -1,0 +1,320 @@
+'script by: Thomas Anagnostou (updated March/15/09)
+'For RhinoV4
+option explicit
+
+sub isomatch()
+dim ptx(1)    	    		'Start\End points of first input line
+dim pty(1)	    			'Start\End points of second input line
+dim pt0(1)	    			'Intersection point of the input lines
+dim a1,a2,b1,b2    		'For the line equations
+dim obj(1)	    			'For the user input
+dim str1(20)	    		'String repository
+dim count		    		'Misc counter
+dim pi		    			'pi=atn(1)*4
+dim radangle(1)    		'angle container var
+dim cmrXYZ	   			'cartesian coordinates of camera line
+dim var(3)
+dim paramX(1)
+dim cmr(1)   	    		'Holds camera\target (Target is the first point cmr(0) )
+dim cmrStartAngle       
+dim Theview	    			'Holds the name of the perspective view found
+dim UsrMenuPick         'User preference (preset vs custom line pick)
+dim UsrXYangle (1)      'User angles for XY axis
+dim DefaultXYangles(1)  'Preset XY angles
+Dim UsrCameraRot        'User selected rotation of the final camera viewpoint
+dim zpoz		    			'User preferance for +\- Z axis
+dim cameraLineId(1)		'Holds the camera line and the text dot object IDs
+dim scale					'scales the length of the cameraline
+dim epsilon
+dim opt
+dim curview
+
+epsilon=Rhino.UnitAbsoluteTolerance
+pi=atn(1)*4
+const version	=20060906
+str1(0)="first line for the X-axis "
+str1(1)="second line for the Y-axis "
+str1(2)="Script not successful "
+str1(3)="Script completed successfully "
+str1(4)=array("Positive","Negative","Auto")
+str1(5)="No Prespective or Isometric view was found "
+str1(6)="No Isometric view is possibble from this input "
+str1(7)="(Too small angle between XY axis. No Parallel view possible when XYangle<=90 degrees) "
+str1(8)="(Lines are parallel) "
+str1(9)=array("Yes", "No")
+str1(10)="(Curves not co-planar)"
+str1(11)="(Curved picked from different Views) "
+str1(12)="(Curve pick was not on a planar view) "
+str1(13)="(View pick was not a planar Top view) "
+str1(14)="Script aborted. (Please update RhinoScript to Version <"
+str1(15)="> or higher)"
+str1(16)=array("PresetValues", "CustomPick")
+str1(17)="Degrees for X-axis"
+str1(18)="Degrees for Y-axis"
+str1(19)="Improper Main Menu preferance"
+scale=10
+
+'Version check
+If (clng(Rhino.Version) < clng(version)) then
+	Rhino.print str1(14) & version & str1(15)
+	exit sub
+end if
+
+'Main Menu
+usrMenuPick=rhino.getstring ("Main Menu",str1(16)(1),str1(16))
+if(lcase(left(usrMenuPick,1))<>lcase(left(str1(16)(0),1)) and lcase(left(usrMenuPick,1))<>lcase(left(str1(16)(1),1))) then 
+   rhino.print str1(2)&" ("&str1(19)&")" &usrmenupick
+   exit sub
+end if
+
+'User numeric input for X, Y axis degrees
+if (lcase(left(usrMenuPick,1))=lcase(left(str1(16)(0),1)))then
+   DefaultXYangles(0)=30
+   DefaultXYangles(1)=30
+   usrXYangle(0)=rhino.getreal("Select X-axis angle",DefaultXYangles(0),0,90)
+   if (isnumeric (usrXYangle(0))=vbfalse) then exit sub
+   usrXYangle(1)=rhino.getreal("Select Y-axis angle",DefaultXYangles(1),0,90)
+   if (isnumeric (usrXYangle(1))=vbfalse) then exit sub
+   Rhino.print "X-axis will be at "&usrXYangle(0)&" degrees and Y-axis will be at " &usrXYangle(1)&" degrees from horizontal"
+
+   'load the starting and ending curve points into the arrays ptx (first line) and pty (second line)
+   ptx(0)=array(0,0,0) 'Origin
+   ptx(1)=array(cos(pi/180*usrXYangle(0)),sin(pi/180*usrXYangle(0)),0)
+   pty(0)=array(0,0,0) 'Origin
+   pty(1)=array(cos(pi/180*(180-usrXYangle(1))),sin(pi/180*(180-usrXYangle(1))),0)
+
+'user custom line input
+elseif (lcase(left(usrMenuPick,1))=lcase(left(str1(16)(1),1)))then
+   for count=0 to 1 '2 picks
+      obj(count)=rhino.getobject ("Select "&str1(count),4) 'object pick
+
+      if (isplanview(rhino.currentview)<>1) then 'check for planar view
+         rhino.print str1(2)&str1(13)
+         exit sub
+      end if
+      'if count=1 then 'check view pick consistency
+      '   if curview<>rhino.currentview then
+      '   	 rhino.print str1(2)&str1(11)
+      '   	 exit sub
+      '	 end if
+      'end if
+      if (isnull (obj(count))) then 'check for enough objects
+   	  rhino.print str1(2)&" (No "&str1(count)&" selected)"
+   	  exit sub
+      elseif (Rhino.CurvePointCount(obj(count))>2) then
+   	  rhino.print str1(2)&" (Curve picked was not linear: point count="&Rhino.CurvePointCount(obj(count))&")"
+   	  exit sub
+      end if
+
+      curview=rhino.currentview
+   next
+   
+   'Check identical pick
+   if (obj(0)=obj(1)) then
+	  rhino.print str1(2)&" (Same line was picked twice)"
+	  exit sub
+   end if
+   
+   'load the starting and ending curve points into the arrays ptx (first line) and pty (second line)
+   ptx(0)=Rhino.CurveStartPoint(obj(0))
+   ptx(1)=Rhino.CurveendPoint(obj(0))
+   pty(0)=Rhino.CurveStartPoint(obj(1))
+   pty(1)=Rhino.CurveendPoint(obj(1))
+else
+   exit sub
+end if
+
+zpoz=rhino.getstring ("Select Z-axis direction","Auto",str1(4))
+select case lcase(left(zpoz,1)) 'just check the first letter
+       case "p" :zpoz="p"
+       case "n" :zpoz="n"
+       case "a" :zpoz="a"
+       case else :zpoz="a"
+end select
+
+'Camera Rotation
+usrCameraRot=rhino.getreal ("Camera Rotation (degrees clockwise)",0,-360,360)
+if (isnumeric (usrCameraRot)=vbfalse) then exit sub
+
+'show cameraline
+opt=rhino.getstring ("Show cameraline ?","No",str1(9))
+select case lcase(left(opt,1))
+       case "y" :opt="y"
+       case "n" :opt="n"
+       case else :opt="n"
+end select
+'end user input
+
+'Check planar
+count=0
+if (abs(ptx(0)(0)+ptx(1)(0)+pty(0)(0)+pty(1)(0)-4*ptx(0)(0))<epsilon) then count=count+1
+if (abs(ptx(0)(1)+ptx(1)(1)+pty(0)(1)+pty(1)(1)-4*ptx(0)(1))<epsilon) then count=count+1
+if (abs(ptx(0)(2)+ptx(1)(2)+pty(0)(2)+pty(1)(2)-4*ptx(0)(2))<epsilon) then count=count+1
+if count=0 then
+   rhino.print str1(2)&str1(10)
+   exit sub
+end if
+
+'make sure the second X point (in each array) is the furthest one.
+if (ptx(0)(0)>ptx(1)(0)) then swap ptx(0),ptx(1)
+if (pty(0)(0)>pty(1)(0)) then swap pty(0),pty(1)
+
+'general equation for slope: a=(y2-y1)/(x2-x1)
+'general equation of line: Y=a*X + b
+
+'Check for lines coinciding with the X or Y axis
+if (abs(ptx(1)(0)-ptx(0)(0))<epsilon or abs(ptx(1)(1)-ptx(0)(1))<epsilon or abs(pty(1)(0)-pty(0)(0))<epsilon or abs(pty(1)(1)-pty(0)(1))<epsilon) then
+   rhino.print str1(6)
+   exit sub
+end if
+
+'First line
+a1=(ptx(1)(1)-ptx(0)(1))/(ptx(1)(0)-ptx(0)(0)) 'slope of the first line
+b1=ptx(0)(1)-a1*ptx(0)(0)
+
+'Second line
+a2=(pty(1)(1)-pty(0)(1))/(pty(1)(0)-pty(0)(0)) 'slope of the second line
+b2=pty(0)(1)-a2*pty(0)(0)
+
+'check for parallel condition
+If (a1=a2) then
+   rhino.print str1(2)&str1(8)
+   exit sub
+end if
+
+'intersection point
+pt0(0)=array((b2-b1)/(a1-a2),0,0) 'solving for X
+pt0(0)(1)=a1*pt0(0)(0)+b1 'solving for Y
+
+'Test condition (angle between the two lines X-Y should be more than 90)
+'In this instance, radangle holds the angle of each input line relative to horizontal
+radangle(0)=atn(a1)
+radangle(1)=atn(a2)
+if radangle(0)<0 then radangle(0)=radangle(0)+pi
+if radangle(1)<0 then radangle(1)=radangle(1)+pi
+if (abs(radangle(1)-radangle(0))<=(pi/2)) then
+   rhino.print str1(2) & str1(7)
+   exit sub
+end if
+
+'x1^2=-w1*w2*y1/y2 - y1^2
+var(0)=(ptx(1)(0)-ptx(0)(0)) 'w1
+var(1)=(pty(1)(0)-pty(0)(0)) 'w2
+var(2)=(ptx(1)(1)-ptx(0)(1)) 'y1
+var(3)=(pty(1)(1)-pty(0)(1)) 'y2
+paramX(0)=-var(0)*var(1)*var(2)/var(3)-var(2)^2
+if (paramX(0)<0) then
+   rhino.print str1(6)
+   exit sub
+end if
+paramX(0)=sqr(paramX(0)) 'x1
+'x2=y2*x1/y1
+paramX(1)=var(3)*(paramX(0))/var(2) 'Solve for x2
+
+'In this instance "radangle" holds polar coordinates for the cameraline
+if (zpoz="a" or (zpoz="p" and a1>0) or (zpoz="n" and a1<0)) then
+   	'l=atn(y1/x1), th=atn(w1/(sqr(y1^2+x1^2))) (in this case atn will cancel out)
+	radangle(0)=(var(2)/paramX(0)) 'l
+	radangle(1)=(var(0)/(sqr(var(2)^2+paramX(0)^2))) 'th
+	cmr(0)=ptx(0)
+else
+    	'l=atn(y2/x2), th=atn(w2/(sqr(y2^2+x2^2))) (in this case atn will cancel out)
+    	radangle(0)=-(var(3)/paramX(1)) 'l
+	radangle(1)=(var(1)/(sqr(var(3)^2+paramX(1)^2))) 'th
+	cmr(0)=pty(0)
+end if
+'v, h=v*tan(th), [k=sqr(h^2+v^2), z=k*tan(l)]
+cmrXYZ=array(scale,scale*(radangle(1)),(radangle(0))*sqr(scale^2+(scale*(radangle(1)))^2))
+'-w1, -x1, -y1
+cmr(1)=array(cmr(0)(0)-cmrXYZ(0),cmr(0)(1)-cmrXYZ(1),cmr(0)(2)+cmrXYZ(2))
+
+'Apply camera rotation
+'cmrXYZ=X length, Y length, 0, hypotenuse
+cmrXYZ=Array((cmr(1)(1)-cmr(0)(1)),(cmr(1)(0)-cmr(0)(0)),0,sqr((cmr(1)(1)-cmr(0)(1))^2+(cmr(1)(0)-cmr(0)(0))^2))
+cmrStartAngle=atn(abs(cmrXYZ(0))/abs(cmrXYZ(1)))*180/pi
+if (cmrXYZ(0)<0 and cmrXYZ(1)>0) then cmrStartAngle=cmrStartAngle+90
+if (cmrXYZ(0)<0 and cmrXYZ(1)<0) then cmrStartAngle=cmrStartAngle+180
+if (cmrXYZ(0)>0 and cmrXYZ(1)<0) then cmrStartAngle=cmrStartAngle+270
+Rhino.print "Starting camera ange ="&cmrStartAngle
+cmr(1)(0)=cmr(0)(0)+cmrXYZ(3)*cos(pi/180*(cmrStartAngle-usrCameraRot))
+cmr(1)(1)=cmr(0)(1)+cmrXYZ(3)*sin(pi/180*(cmrStartAngle-usrCameraRot))
+
+'add cameraline and anotation dot
+if opt="y" then
+   cameraLineId(0)=rhino.addline (cmr(0),cmr(1)) 'Start point is target, end point is camera
+   cameraLineId(1)=rhino.addtextdot ("Camera",cmr(1))
+end if
+
+'Adjust Camera\Target
+Theview=activatePersp()
+if theview="" then
+   rhino.print str1(2)&" (No Prespective or Isometric view was found)"
+   exit sub
+end if
+rhino.viewcameratarget theview,cmr(1),cmr(0)
+'End adjust camera\target
+
+rhino.print str1(3)
+end sub
+
+function activatePersp()
+dim viewports
+dim PtC
+dim PtT
+dim count
+dim epsilon
+
+epsilon=Rhino.UnitAbsoluteTolerance
+viewports=Rhino.ViewNames
+
+if isarray(viewports) then
+	for count=0 to ubound(viewports) 'check which viewport is perspective/parallel
+	'rhino.print rhino.isviewperspective (viewports(count))
+		if (isplanview(viewports(count))=0 and rhino.isviewperspective (viewports(count))=vbtrue) then
+		   activatepersp=viewports(count)
+             rhino.viewprojection viewports(count),1 'make sure viewport is parallel
+             exit function
+          elseif (isplanview(viewports(count))=0 and rhino.isviewperspective (viewports(count))=vbfalse) then
+			activatepersp=viewports(count)
+			exit function
+		end if
+	next
+activatepersp=""
+end if
+end function
+
+function isplanview(thisview)
+dim PtC
+dim PtT
+dim epsilon
+dim count
+dim xyz
+
+xyz=array(1,1,1)
+epsilon=Rhino.UnitAbsoluteTolerance
+ptC=rhino.viewcamera (thisview)
+ptT=rhino.viewtarget (thisview)
+count=0
+if (abs(ptc(0)-ptT(0))<epsilon) then xyz(0)=0 else xyz(0)=sgn(ptc(0)-ptT(0))
+if (abs(ptc(1)-ptT(1))<epsilon) then xyz(1)=0 else xyz(1)=sgn(ptc(1)-ptT(1))
+if (abs(ptc(2)-ptT(2))<epsilon) then xyz(2)=0 else xyz(2)=sgn(ptc(2)-ptT(2))
+
+count=abs(xyz(0))+abs(xyz(1))+abs(xyz(2))
+'rhino.print XYZ(0)&" "&XYZ(1)&" "&XYZ(2)
+if (count=1 and xyz(2)=1) then
+   isplanview=1
+elseif (count>=2) then
+    isplanview=0
+else
+    isplanview=-1
+end if
+end function
+
+sub swap(x,y)
+dim temp
+temp=y
+y=x
+x=temp
+end sub
+
+isomatch

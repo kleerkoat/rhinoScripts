@@ -1,0 +1,170 @@
+Option Explicit
+'Script written by Pascal
+'Script version Monday, May 18, 2009 
+'offsetting curves is a planar operation and it often makes little sense if the curve is not planar. (That said, offsets of this curve are somewhat more under control in V5 than in V4.)
+
+'It looks like these curves are projected to a surface, possibly? If the surface exists, and is oriented in a way that makes sense for this, I'd offset the surface, then Pull the curves to the offset.
+
+'Another (approximate) possibility is to Pipe the curve and then extract the topmost isocurve (Quad or Int osnap)...
+
+'Yet another approximate solution involves a script and a pipe- you pipe the 
+'curve to the desired offset and then run the attached RidgeLine script to 
+'extract the topmost line. Use a lot of sample points- 100 maybe. Obviously, 
+'now that I see it, the pipe and ridgeline can be bundled into an approximate 
+'offsetter tool for 3d curves that might work at least some of the time, I'll 
+'look into that.
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "RidgeLine", "_NoEcho _-Runscript (RidgeLine)"
+
+Private OldSamp, OldDir
+
+If isEmpty(OldDir) Then
+	OldDir = "WorldZ"
+End If
+
+
+If IsEmpty(OldSamp) Then
+	OldSamp = 25
+End If
+
+'Call RidgeLine()
+Sub RidgeLine()
+	
+	Dim sSrf: sSrf = Rhino.GetObject("Select a surface",8,True)
+	If isNull(SSrf) Then Exit Sub
+	
+	Dim inc, Samp
+	Samp = Rhino.GetInteger("Samples along ridge",OldSamp,4)
+	If Not isNumeric(samp) Then Exit Sub
+	
+	OldSamp = Samp
+	
+	Rhino.EnableRedraw(False)
+	Dim aDomU: aDomU = Rhino.SurfaceDomain(sSrf,0)
+	Dim aDomV: aDomV = Rhino.SurfaceDomain(sSrf,1)
+	Dim HalfDom: HalfDom = HalfDomainSrf(sSrf)
+	Dim aIsoU: aIsoU = Rhino.ExtractIsoCurve(sSrf,HalfDom,0)(0)
+	Dim aIsoV: aIsoV = Rhino.ExtractIsoCurve(sSrf,HalfDom,1)(0)
+	
+	Dim aDom0, aDom1, aTestDom, intDir
+	
+	If Rhino.CurveLength(aIsoU)> Rhino.CurveLength(aIsoV) Then
+		intDir = 0
+	Else 
+		intDir = 1
+	End If
+
+	Rhino.DeleteObject aIsoU
+	Rhino.DeleteObject aIsoV
+	
+	If intDir = 0 Then
+		inc = abs((aDomU(1)- aDomU(0))/Samp)
+	Else
+		inc = abs((aDomV(1)- AdomV(0))/Samp)
+	End If
+	
+	Dim i, apts(), temp
+	Dim aBB: aBB = Rhino.BoundingBox(sSrf)
+	Dim sPlane: sPlane = Rhino.AddSrfPt(array(aBB(4), aBB(5), aBB(6), aBB(7)))
+	Rhino.MoveObject sPlane, array(0,0,0), array(0,0,100)
+	For i = 0 To Samp
+		
+		If intDir =0 Then
+			aTestDom = array(aDomU(0)+(i*inc),aDomV(0))
+			temp = 1
+		Else
+			aTestDom = array(aDomU(0),aDomV(0)+ (i*inc))
+			temp = 0
+		End If
+		
+		Dim SCrv: SCrv = Rhino.ExtractIsoCurve(sSrf,aTestDom,temp)(0)
+	
+		
+		ReDim Preserve aPts(i)
+		aPts(i) = highPt(sCrv, sPlane)
+	
+	Next
+	Dim sRidge
+	
+	If isUpperBound(aPts) Then sRidge = Rhino.AddInterpCurve (aPts,3,0)
+	
+	Rhino.DeleteObject sPlane
+	Rhino.UnselectAllObjects
+	If Not isNull(sRidge) Then Rhino.SelectObject sRidge
+	'Rhino.AddPoints apts
+	Rhino.EnableRedraw(True)
+	
+End Sub
+
+Function HighPt(sCrv,sPlane)
+	Rhino.ObjectColor sCrv ,vbred
+	
+	Dim Flat: Flat = Rhino.ProjectCurvetoSurface(sCrv, sPlane,array(0,0,1))(0)
+	
+	Dim apt: apt = Rhino.CurveMidPoint(sCrv)
+	
+	Dim n: n = 0
+	Dim i, testCrv, atest
+	
+	For i = 0 To 33
+		
+		If n = 0 Then
+			testCrv = Flat
+			n = n + 1
+		Else testCrv = SCrv
+			n = 0
+		End If
+	
+		aTest = Rhino.EvaluateCurve(testCrv,Rhino.CurveClosestPoint(testCrv,apt))
+		
+		apt = aTest
+		
+	Next
+	
+	Rhino.DeleteObject sCrv
+	Rhino.DeleteObject Flat
+
+	HighPt = aPt
+	
+End Function
+
+Function FlattenCurve(sCrv,sPlane)
+	
+	Dim aBB: aBB = Rhino.BoundingBox(sCrv)
+	
+	Dim dist: dist = Rhino.Distance(aBB(0), aBB(6))
+	Dim plane: plane = WorldXYPlane
+	Plane(0) = aBB(4)
+	Dim planeSrf: PlaneSrf = Rhino.AddPlanesurface(Plane,Dist,dist)
+	FlattenCurve = Rhino.ProjectCurveToSurface(sCrv, planeSrf)(0)
+	Rhino.DeleteObject planeSrf
+	
+End Function
+
+Function IsUpperBound(ByRef arr)
+
+	IsUpperBound = False
+
+	If IsArray(arr) Then
+
+		On Error Resume Next
+
+		UBound arr
+
+		If Err.Number = 0 Then IsUpperBound = True
+
+	End If
+
+End Function
+
+Function HalfDomainSrf(sSrf)
+
+	Dim aDomU: aDomU = Rhino.SurfaceDomain(sSrf,0)
+	Dim aDomV: aDomV = Rhino.SurfaceDomain(sSrf,1)
+	Dim halfU:HalfU = aDomU(0)+((aDomU(1)-aDomU(0))/2)
+	Dim HalfV:HalfV = aDomV(0)+((aDomV(1)-aDomV(0))/2)
+	
+	HalfDomainSrf = array(Halfu,HalfV)
+	
+End Function

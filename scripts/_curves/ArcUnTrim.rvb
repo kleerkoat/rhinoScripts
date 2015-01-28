@@ -1,0 +1,27 @@
+'--------------------------------------------------------------
+'Command   :  ntra (Non Trim Arc)
+'Date      :  2011/01/20
+'Version   :  1.0
+'Organization   :  Rhino+
+'--------------------------------------------------------------
+
+Sub ArcUnTrim
+
+Dim strObject, arrFirst, arrSecond, arrThird
+
+strObject = Rhino.GetObject("Select arc")
+
+If Rhino.IsArc(strObject) Then
+
+  arrFirst  = Rhino.CurveStartPoint(strObject)
+  arrSecond = Rhino.CurveMidPoint(strObject)
+  arrThird  = Rhino.CurveEndPoint(strObject)
+
+  Rhino.AddCircle3Pt arrFirst, arrSecond, arrThird
+  Rhino.DeleteObject strObject
+  
+End If
+
+End Sub
+
+'ArcUnTrim

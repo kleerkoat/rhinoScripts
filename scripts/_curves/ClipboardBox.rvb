@@ -1,0 +1,31 @@
+Option Explicit
+'Script written by Pascal
+' RMA
+'Script version Friday, June 08, 2012
+
+'Rhino.AddStartUpScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "ClipBoardBox", "_NoEcho _-Runscript (ClipBoardBox)"
+
+'Call ClipBoardBox()
+Sub ClipBoardBox()
+	
+	
+	Dim sClip: sClip = Rhino.ClipboardText()
+	If isNull(sClip) Then
+		rhino.Print "No text found on the clipboard."
+		Exit Sub
+	End If
+	
+	Dim aDims: aDims = Split(lcase(sClip), "x")
+	
+	If UBound(aDims) <> 2 Then Exit Sub
+	Dim i, str
+	
+	For i = 0 To 2
+		
+		str = str & ltrim(rtrim(aDims(i)) & " ")
+	Next
+	
+	Rhino.Command "_Box w0,0,0 " & str
+	
+End Sub

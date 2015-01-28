@@ -1,0 +1,10 @@
+'--------------------------------------------------------------
+'Command   :  rocp (Rotate cplane)
+'Date      :  2011/02/08
+'Version   :  alfa
+'Organization   :  Rhino+
+'--------------------------------------------------------------
+
+Sub CPlaneRotate()
+Rhino.Command "!NoEcho _CPlane _3Point Enter v 0,1,0"
+End Sub

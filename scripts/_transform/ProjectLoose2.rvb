@@ -1,0 +1,155 @@
+﻿Option Explicit
+
+'Script written by Pascal
+
+'Script version Friday, July 11, 2008
+
+Sub ProjectCrvLoose
+	
+	ProjPt(0)
+	
+End Sub
+
+Sub PullCrvLoose
+	
+	ProjPt(1)
+	
+End Sub
+
+Sub ProjPt(Style)
+	
+	Dim all: aLl = Rhino.NormalObjects
+	Dim sAll, i, aOn()
+	i = 0
+	
+	Dim temp: temp = Rhino.GetObject("Select curve to project", 4,True)
+	If isNull(temp) Then Exit Sub
+		
+	If Style = 0 Then
+		Dim sTarg: sTarg = Rhino.GetObject("Select target surface or polysurface",8 +16)
+	Else 
+		sTarg = Rhino.GetObject("Select target surface",8)
+	End If
+	
+	If isNull(sTarg) Then Exit Sub
+	Rhino.Enableredraw(False)
+	
+	For Each sAll In All
+		
+		If Rhino.ObjectGripsOn(sAll) Then
+			ReDim Preserve aOn(i)
+			aOn(i) = sAll
+			i = i + 1
+			Rhino.EnableObjectGrips sAll,False
+		End If
+		
+	Next
+	
+	Dim aLock: aLock = Rhino.ObjectsByType(1)
+	
+	If isArray(aLock) Then
+	Rhino.LockObjects(aLock)
+	End If
+	
+	Dim sCrv: sCrv = Rhino.CopyObject(temp)
+	Rhino.SelectObject sCrv
+	
+	Rhino.Command "_EditPtOn ", False
+		
+	Rhino.Command "_SelPt ", False
+	
+	Dim aGrips:aGrips = Rhino.SelectedObjectGrips(sCrv)
+	
+	If Not isArray(aGrips) Then
+		
+		Cleanup aLock, aOn, sCrv
+		Exit Sub
+		
+	End If
+	
+	Dim aDir: aDir = Rhino.ViewCPlane(Rhino.CurrentView)(3)
+	Dim Grip, aPt, aTarg(), n
+	n = 0
+	
+	Rhino.EnableRedraw(False)
+	
+	For Each Grip In aGrips
+		
+		Apt = Rhino.ObjectGripLocation(sCrv,Grip)
+		If Style = 0 Then
+			temp = Rhino.ProjectPointToSurface(aPt,sTarg, aDir)
+			If Not isNull(temp) Then
+				ReDim Preserve atarg(n)
+				aTarg(n) = temp
+				n = n +1
+			End If
+			
+		Else
+			temp = Rhino.PullPoints(sTarg,array(aPt))
+			If Not isNull(temp) Then
+				ReDim Preserve atarg(n)
+				aTarg(n) = temp
+				n = n +1
+			End If
+		End If
+
+	Next
+	
+	If n-1 = uBound(aGrips) Then
+		
+		For i= 0 To UBound(aGrips)
+			Rhino.ObjectGripLocation sCrv, agrips(i), aTarg(i)(0)
+		Next
+	Else 
+		
+		MsgBox "Projection misses or partly misses the target."
+		cleanup aLock, aOn, sCrv
+		Exit Sub
+	End If
+	
+	Rhino.Command "_PointsOff "	, False
+	
+	rhino.EnableRedraw
+	
+End Sub
+
+Rhino.AddStartUpScript Rhino.LastLoadedScriptFile
+Rhino.AddAlias "PullCrvLoose", "_NoEcho _-RunScript (PullCrvLoose)"
+Rhino.AddAlias "ProjectCrvLoose", "_NoEcho _-RunScript (ProjectCrvLoose)"
+
+Function IsUpperBound(ByRef arr)
+
+	IsUpperBound = False
+
+	If IsArray(arr) Then
+
+		On Error Resume Next
+
+		UBound arr
+
+		If Err.Number = 0 Then IsUpperBound = True
+
+	End If
+
+End Function
+
+Sub Cleanup(aLock, aOn, sCrv)
+		
+	Rhino.Command "_PointsOff "	, False
+	
+	If isArray(aLock) Then
+		Rhino.UnlockObjects aLock
+	End If
+	
+	Dim sOn
+	
+	If isUpperBound(aOn) Then
+		For Each sOn In aOn
+			Rhino.EnableObjectgrips sOn,True
+		Next
+	End If
+	
+	Rhino.DeleteObject sCrv
+	Rhino.EnableRedraw
+	
+End Sub

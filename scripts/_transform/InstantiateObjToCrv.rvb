@@ -1,0 +1,41 @@
+Option Explicit
+'------------------------------------------------------------------------------
+' object instantiation on curve (orientate + scale's objects)	
+' Author: Rob Stuart-Smith | 2008 | www.kokkugia.com
+'InstantiateObjToCrv
+'purpose: any object located and orientated on the origin will be copied to match a curve's location, orientation and scale
+'------------------------------------------------------------------------------
+
+Call InstantiateObjToCrv()
+Sub InstantiateObjToCrv()
+
+	Dim arrObj,strObj, arrPt1, arrPt2, arrPt3
+	Dim arrNewPlane, arrReference
+	Dim strStartObj, strNewObj
+	Dim arrStartPt1, arrStartPt2, arrStartPt3
+	Dim dblDist
+	
+	arrObj = Rhino.GetObjects ("pick curves to instantiate on" )
+	strStartObj = Rhino.GetObject ("pick object to instantiate" )
+	'-------Get Object's Vectors---------------
+	arrStartPt1 = Array(0,0,0)
+	arrStartPt2 = Array(1,0,0)
+	arrStartPt3 = Array(0,0,1)
+	arrReference = 	Array(arrStartPt1, arrStartPt2, arrStartPt3) 
+
+	Rhino.EnableRedraw False
+	For Each strObj In arrObj
+		'-------Get curve's Vectors---------------
+		arrPt1 = Rhino.CurveStartPoint (strObj)
+		arrPt2 = Rhino.CurveMidPoint (strObj)
+		arrPt3 = Array(arrPt2(0), arrPt2(1), (arrPt2(2)+1))
+		arrNewPlane = Array(arrPt1, arrPt2, arrPt3)
+		'instantiate object on curve----------------------------
+		Rhino.OrientObject strStartObj, arrReference, arrNewPlane, 1
+		strNewObj = Rhino.FirstObject	
+		dblDist = Rhino.CurveLength(strObj) 
+		Rhino.ScaleObject strNewObj, arrPt1, Array(dblDist, dblDist, dblDist) 
+	Next
+	Rhino.EnableRedraw True
+	
+End Sub

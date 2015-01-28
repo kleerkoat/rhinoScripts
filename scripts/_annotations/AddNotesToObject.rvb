@@ -1,0 +1,35 @@
+' script for Rhinoceros - add/edit notes to/from object
+Option Explicit
+
+Sub AddOrEditNotesOnObject()
+Dim StrObject, intCount, strValue, strText
+
+StrObject = Rhino.GetObject("Select object to add or edit notes", ,vbTrue, vbTrue)
+If IsNull(StrObject) Then Exit Sub
+
+' check if the object got notes , edit
+If Rhino.IsObjectData (strObject) Then
+	strValue = Rhino.GetObjectData(strObject, "ObjectNotes", "Text")
+	If Not IsNull(strValue) Then
+		strText = Rhino.EditBox(strValue,"Enter some notes to add to this object:","Object notes")
+			If Not IsNull(strText) Then
+				' add this test to the object
+				Rhino.SetObjectData strObject, "ObjectNotes", "Text", strText
+				Rhino.Print "Added notes to object"
+			Else
+				Rhino.Print "Nothing changed."
+			End If
+	End If
+Else
+	strText = Rhino.EditBox( ,"Enter some notes to add to this object:","Object notes")
+	If Not IsNull(strText) Then
+		' add this test to the object
+		Rhino.SetObjectData strObject, "ObjectNotes", "Text", strText
+		Rhino.Print "Added notes to object."
+	Else
+		Rhino.Print "Nothing changed."
+	End If
+End If
+
+End Sub
+'AddNotesToObject

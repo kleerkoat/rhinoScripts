@@ -1,0 +1,17 @@
+﻿Option Explicit
+'Script written by Roland M 3dsynergyNospam@aol.com
+' copied from newsgroup and made into this script
+'Script version Tuesday, October 28, 2008 12:37:58 PM
+
+Call TextDotToPoint()
+Sub TextDotToPoint()
+	Dim arrPoints
+	arrPoints = Rhino.GetPointCoordinates ("Select points")
+	If IsArray(arrPoints) Then
+		For Each arrPt In arrPoints
+			Rhino.Print Rhino.Pt2Str(arrPt)
+			Rhino.AddTextDot Rhino.Pt2Str(arrPt, 3), arrPt
+			Rhino.StatusBarMessage Rhino.Pt2Str(arrPt, 3)
+		Next
+	End If
+End Sub

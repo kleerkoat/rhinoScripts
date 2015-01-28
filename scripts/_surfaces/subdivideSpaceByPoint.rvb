@@ -1,0 +1,92 @@
+Option Explicit
+'
+' Description:
+' This script recursively subdivides space into smaller and smaller entities
+' based on the condition that a reference point is inside the current space
+'
+' Author: Tobias Schwinn - http://www.tobesch.de
+'
+' Last modified: 01 July 2008
+
+'Call SubdivideSpaceByPoint()
+Sub SubdivideSpaceByPoint()
+	
+	' set the number of generations
+	Dim numGenenerations: numGenenerations = Rhino.GetInteger("Number of recursions", 5, 1, 10)
+	If isNull(numGenenerations) Then Exit Sub
+	
+	' Select a cube
+	Const rhObjectMesh = 32
+	Const rhObjectPolySurface = 16
+	Dim strObject: strObject = Rhino.GetObject("Select a cube", rhObjectMesh + rhObjectPolySurface)
+	If isNull(strObject) Then Exit Sub
+	
+	' Select reference points
+	Const rhObjectPoint = 1
+	Dim arrPoints: arrPoints = Rhino.GetObjects("Select reference points inside the cube", rhObjectPoint)
+	If isNull(arrPoints) Then Exit Sub
+	
+	' subdivide the cube
+	Call subdivideCube(strObject, arrPoints,  numGenenerations)
+	
+	Call Rhino.Messagebox("Done!")
+
+End Sub
+
+Sub subdivideCube(strObject, arrPoints, numGenenerations)
+	
+	Dim numGen: numGen = numGenenerations - 1
+	Dim dblScale(2): dblScale(0) = 0.5: dblScale(1) = 0.5: dblScale(2) = 0.5
+	'Dim lngColor: lngColor = randomColor()
+	
+	Dim i
+	For i = 0 To 7
+		
+		' scale the cube by half
+		Dim strNewObject: strNewObject = Rhino.ScaleObject(strObject, Array(0, 0, 0), dblScale, True)
+		
+		' assign a random color to strNewObject
+		'Call Rhino.ObjectColor (strNewObject, lngColor)
+		
+		' get the bounding box of strObject
+		Dim arrBox: arrBox = Rhino.BoundingBox(strObject)
+		
+		' get the bounding box of strObject
+		Dim arrNewBox: arrNewBox = Rhino.BoundingBox(strNewObject)
+		
+		' move strNewObject from the nth corner point to the nth corner point of strObject
+		Call Rhino.MoveObject(strNewObject, arrNewBox(i), arrBox(i))
+		
+		' check if one of the points is inside the current cube
+		Dim blnCheck: blnCheck = False
+		Dim strPoint
+		For Each strPoint In arrPoints
+			If Rhino.IsObjectInBox(strPoint, Rhino.BoundingBox(strNewObject), True) Then
+				blnCheck = True
+				Exit For
+			End If
+		Next
+		
+		If numGen > 0 And blnCheck = True Then
+			Call subdivideCube(strNewObject, arrPoints, numGen)
+		Else
+			'Exit Sub
+		End If
+		
+	Next
+	
+	Call Rhino.HideObject(strObject)
+
+End Sub
+
+Private Function randomColor()
+	
+	Randomize
+	
+	Dim randomR: randomR = Int((255 - 0 + 1) * rnd() + 0)
+	Dim randomG: randomG = Int((255 - 0 + 1) * rnd() + 0)
+	Dim randomB: randomB = Int((255 - 0 + 1) * rnd() + 0)
+	
+	randomColor = RGB(randomR, randomG, randomB)
+	
+End Function

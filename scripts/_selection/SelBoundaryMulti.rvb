@@ -1,0 +1,114 @@
+Option Explicit
+'Script by Mitch Heynick
+'Version 12 September, 2011
+'Rhino V5 only
+'Bboundary curves can be preselected
+'Nested boundary curves will not be selected
+
+Private oldSelMode
+If IsEmpty(oldSelMode) then oldSelMode="Window"
+	
+'Call SelBoundaryMulti()
+Sub SelBoundaryMulti()
+
+	Dim msg,arrCrvs,arrOpts,strOpt,match,i	
+	msg="Select closed curves as selection boundaries, Nested boundary curves will not be selected!"
+	arrCrvs=Rhino.GetObjects(msg,4,,True)
+	If Not IsArray(arrCrvs) Then Exit Sub
+	
+	arrOpts=Array("Window","Crossing","InvertWindow","InvertCrossing")
+	strOpt=Rhino.GetString("Selection mode?",oldSelMode,arrOpts)
+	
+	match=False
+	For i=0 to 3
+		If strOpt=arrOpts(i) Then match=True : Exit For		
+	Next
+	If not match Then Exit Sub	
+	oldSelMode=strOpt
+	
+	Dim arrColl,strCrv,arrSelObjs,strComm,arrBB
+	arrBB=Rhino.BoundingBox(arrCrvs)
+	If IsArray(arrBB) Then Call Rhino.ZoomBoundingBox(arrBB)	
+	Call Rhino.EnableRedraw(False)
+	
+	arrColl=Array()
+	strComm="_Selboundary _SelectionMode="&strOpt&" _SelID "
+	
+	For each strCrv in arrCrvs
+		Call Rhino.UnselectAllObjects
+		If Rhino.IsCurveClosed(strCrv) Then
+			Call Rhino.Command(strComm&strCrv,False)
+			Call Rhino.UnselectObject(strCrv)
+			arrSelObjs=Rhino.SelectedObjects(True)
+			If IsArray(arrSelObjs) Then
+				arrColl=Rhino.JoinArrays(arrColl,arrSelObjs)				
+			End If			
+		End If
+	Next
+		
+	If Ubound(arrColl)>-1 Then 
+		arrColl=Rhino.CullDuplicateStrings(arrColl,False)
+		Call Rhino.SelectObjects(arrColl)
+		'reporting to command line
+		Call ReportSelectedObjects(arrColl)		
+	End If	
+	Call Rhino.UnselectObjects(arrCrvs)
+	Call Rhino.EnableRedraw(True)
+End Sub
+
+Sub ReportSelectedObjects(objs)
+	Dim obj,typ,pts,ptc,crv,srf,ps,msh,lts,ann,blk,dot,hat
+	For each obj in objs
+		typ=Rhino.ObjectType(obj)
+		Select Case typ
+			Case 1 : pts=pts+1
+			Case 2 : ptc=ptc+1
+			Case 4 : crv=crv+1
+			Case 8 : srf=srf+1
+			Case 16 : ps=ps+1
+			Case 32 : msh=msh+1
+			Case 256 : lts=lts+1
+			Case 512 : ann=ann+1
+			Case 4096 : blk=blk+1
+			Case 8192 : dot=dot+1
+			Case 65536 hat=hat+1
+		End Select
+	Next
+	
+	Dim rep
+	If pts Then rep=rep&Cstr(pts)&" point"
+	If pts>1 Then rep=rep&"s"
+	If pts Then rep=rep&","
+	If ptc Then rep=rep&" "&Cstr(ptc)&" point cloud"
+	If ptc>1 Then rep=rep&"s"
+	If ptc Then rep=rep&","
+	If crv Then rep=rep&" "&Cstr(crv)&" curve"
+	If crv>1 Then rep=rep&"s"
+	If crv Then rep=rep&","
+	If srf Then rep=rep&" "&Cstr(srf)&" surface"
+	If srf>1 Then rep=rep&"s"
+	If srf Then rep=rep&","
+	If ps Then rep=rep&" "&Cstr(ps)&" polysurface"
+	If ps>1 Then rep=rep&"s"
+	If ps Then rep=rep&","
+	If msh Then rep=rep&" "&Cstr(msh)&" mesh"
+	If msh>1 Then rep=rep&"s"
+	If msh Then rep=rep&","
+	If lts Then rep=rep&" "&Cstr(lts)&" light"
+	If lts>1 Then rep=rep&"s"
+	If lts Then rep=rep&","
+	If ann Then rep=rep&" "&Cstr(ann)&" annotation"
+	If ann>1 Then rep=rep&"s"
+	If ann Then rep=rep&","
+	If blk Then rep=rep&" "&Cstr(blk)&" block instance"
+	If blk>1 Then rep=rep&"s"
+	If blk Then rep=rep&","
+	If dot Then rep=rep&" "&Cstr(dot)&" text dot"
+	If dot>1 Then rep=rep&"s"
+	If dot Then rep=rep&","
+	If hat Then rep=rep&" "&Cstr(hat)&" hatch"
+	If hat>1 Then rep=rep&"s"
+	If hat Then rep=rep&","
+	rep=Left(rep,(len(rep)-1))&" added to selection"
+	Call Rhino.Print(rep)
+End Sub

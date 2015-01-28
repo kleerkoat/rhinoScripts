@@ -1,0 +1,29 @@
+﻿Option Explicit
+'Script  by Mitch Heynick
+'Version Monday, 30 April, 2012
+
+Call MoveObjPointToCPlane0Plane()
+Sub MoveObjPointToCPlane0Plane()
+	
+	Dim str1,str2,strObj,plane,arrPickPt,xForm,projPt
+	str1 = "Select object to move in active CPlane Z"
+	str2 = "Pick point on the object which will be at CPlane Z0"
+		
+	strObj = Rhino.GetObject(str1, 4 + 8 + 16 + 32, True, True)
+	If IsNull(strObj) Then Exit Sub
+
+	plane = Rhino.ViewCPlane()	
+	If Rhino.IsCurve(strObj) Then
+		arrPickPt = Rhino.GetPointOnCurve(strObj, str2)
+	ElseIf Rhino.IsBrep(strObj) Then
+		arrPickPt = Rhino.GetPointOnSurface(strObj, str2)
+	Else
+		arrPickPt = Rhino.GetPointOnMesh(strObj, str2)
+	End If
+	If Not IsArray(arrPickPt) Then Exit Sub
+		
+	xForm = Rhino.XformPlanarProjection(plane)
+	projPt = Rhino.PointTransform(arrPickPt, xForm)	
+	Call Rhino.MoveObject(strObj, arrPickPt, projPt)	
+End Sub
+

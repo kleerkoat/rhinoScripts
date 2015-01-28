@@ -1,0 +1,60 @@
+Option Explicit
+'Script written by Mitch
+'Input from Mike Houlder, Pascal Golay, Dale Fugier
+'Version Sunday, 25 September, 2011
+
+'Call OffsetPointsAlongCrv()
+Sub OffsetPointsStepAlongCrv()
+	
+	Dim strCrv,initialPt,nextDist,arrNewPt,offsetPtObj
+	Dim str1,str2,strUndo
+	
+	strCrv = Rhino.GetObject("Select curve for point offset", 4, True)
+	If IsNull(strCrv) Then Exit Sub
+	
+	initialPt = Rhino.GetPointOnCurve(strCrv, "Place initial point on curve")
+	If Not IsArray(initialPt) Then Exit Sub
+	Call Rhino.AddPoint(initialPt)
+	
+	Do	
+		nextDist = Rhino.GetReal("Distance to next offset point")
+		If IsNull(nextDist) Then Exit Do
+	
+		arrNewPt = GetNextPointAlongCrv(strCrv, initialPt, nextDist)
+		If Not IsArray(arrNewPt) Then
+			Call Rhino.Print("Unable to place next point, check distance")
+		Else
+			offsetPtObj = Rhino.AddPoint(arrNewPt)
+			Call Rhino.SelectObject(offsetPtObj)
+			str1 = "Continue" : str2 = "Undo"
+			strUndo = Rhino.GetString("Continue with next point?", str1, Array(str2))			
+			If IsNull(strUndo) Then Exit Do
+
+			'in case user enters a number accidentally, the script won't quit
+			If IsNumeric(strUndo) Or strUndo = str1 Then
+				initialPt = arrNewPt
+			ElseIf strUndo = str2 Then
+				Call Rhino.DeleteObject(offsetPtObj)
+			Else 
+				Exit Sub
+			End If			
+		End If	
+	Loop
+
+	
+End Sub
+
+Private Function GetNextPointAlongCrv(crv, pt, dist)
+	'outputs next point coordinate if successful, or Null if not
+	GetNextPointAlongCrv = Null
+	Dim crvDom,totLen,tParam,partLen,arrNxtPt
+	crvDom = Rhino.CurveDomain(crv)
+	totLen = Rhino.CurveLength(crv)
+	tParam = Rhino.CurveClosestPoint(crv, pt)
+	partLen = Rhino.CurveLength(crv,, Array(crvDom(0), tParam))
+  
+	If (partLen + dist < totLen) And (partLen + dist >= 0) Then
+		arrNxtPt = Rhino.CurveArcLengthPoint(crv, partLen + dist, True)		
+	End If
+	If IsArray(arrNxtPt) Then GetNextPointAlongCrv = arrNxtPt
+End Function

@@ -1,0 +1,36 @@
+Option Explicit
+
+'Call AddBlendCurve()
+Sub AddBlendCurve()
+
+	Dim arrCurves(1), arrParams(1), arrRevs(1), arrCont(1)
+
+	Dim arrDomain0, arrDomain1
+
+	arrCurves(0) = Rhino.AddLine(Array(0,0,0), Array(0,9,0))
+
+	arrDomain0 = Rhino.CurveDomain(arrCurves(0))  
+        'was arrDomain = Rhino.CurveDomain(arrCurves(0))
+
+	arrParams(0) = arrDomain0(1)
+
+	arrRevs(0) = False
+
+	arrCont(0) = 2
+
+	arrCurves(1) = Rhino.AddLine(Array(1,10,0), Array(10,10,0))
+
+	arrDomain1 = Rhino.CurveDomain(arrCurves(1))
+        'was arrDomain = Rhino.CurveDomain(arrCurves(1))
+
+	arrParams(1) = arrDomain1(0)
+
+	arrRevs(1) = True
+
+	arrCont(1) = 2
+
+	
+  Rhino.BlendCurve arrCurves, arrParams, arrRevs, arrCont
+  'was----Rhino.addBlendCurve arrCurves, arrParams, arrRevs, arrCont
+	
+End Sub

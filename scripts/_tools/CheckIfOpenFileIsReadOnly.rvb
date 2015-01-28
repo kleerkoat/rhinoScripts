@@ -1,0 +1,42 @@
+Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version Saturday, February 04, 2012 10:42:13 PM
+
+Call CheckIfOpenFileIsReadOnly()
+Sub CheckIfOpenFileIsReadOnly()
+	'	Dim filename,objFSO,objFile
+	'
+	'	filename = Rhino.DocumentPath & Rhino.DocumentName
+	'	
+	'	Set objFSO = CreateObject("Scripting.FileSystemObject")
+	'	Set objFile = objFSO.GetFile(filename)
+	'	
+	'	If objFile.Attributes And 1 Then
+	'		Call Rhino.Print("This file is read-only")
+	'	Else
+	'		Call Rhino.Print("This file is read-write")
+	'	End If
+	'	
+	'	Set objFile = Nothing
+	'	Set objFSO = Nothing 
+	
+	Dim filename,objFSO,objFile,strFileStatus
+
+	filename = Rhino.DocumentPath & Rhino.DocumentName
+	
+	Set objFSO = CreateObject("Scripting.FileSystemObject")
+	Set objFile = objFSO.GetFile(filename)
+	
+	If objFile.Attributes And 1 Then
+		strFileStatus = "True"
+	Else
+		strFileStatus = "False"
+	End If
+	
+	Set objFile = Nothing
+	Set objFSO = Nothing 
+	
+	Rhino.MessageBox strFileStatus
+	
+End Sub

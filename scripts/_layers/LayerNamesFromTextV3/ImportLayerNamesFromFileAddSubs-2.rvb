@@ -1,0 +1,67 @@
+Option Explicit
+'Script by Mitch Heynick
+'Version Friday, 18 June, 2010
+
+' this version uses Rhino.ReadTextFile and adds sublayers using a subroutine
+
+Call ImportLayerNamesFromFileAddSubs()
+Sub ImportLayerNamesFromFileAddSubs()
+	
+	Dim strPath
+	' Calls a browse box for the file you want to open
+	strPath = Rhino.OpenFileName("File with layer names to import", "Text files (*.txt)|*.txt")
+	' exits script gracefully if file path is not specified
+	If IsNull(strPath) Then Exit Sub
+	
+	'create an array of suffixes (as many as you want)
+	'we will use this below
+	Dim arrSuffixes
+	arrSuffixes=Array("RT","LG","OMG","LOL","ROTFL")
+	' note each string must be enclosed in quotes
+	
+	Dim arrLayerNames
+	' will read in the file and put all the lines in it into an array of strings
+	arrLayerNames=Rhino.ReadTextfile(strPath,True,True)
+	' arrLayerNames should now look like this:
+	' (name0,name1,name2,name3,name4,.......) 
+	'with as many entries (indexes) as non-blank lines in the file
+	
+	' exit gracefully if something goes wrong
+	If Not IsArray(arrLayerNames) Then Exit Sub
+	
+	Dim strLayerName	
+	' start a loop that will add a layer for each entry in arrLayerNames
+	For each strLayerName in arrLayerNames
+		
+		' checks for existence of layer name in file,
+		' if layer does not exist, add it - by default a parent layer
+		If not Rhino.IsLayer(strLayerName) Then
+			Call Rhino.AddLayer(strLayerName)
+		End If
+		
+		'OK, parent layer is there - now:			
+		'feed the parent layer and the array of suffixes to our subroutine below
+		Call AddSubLayersWithSuffix(strLayerName,arrSuffixes)
+	Next	
+	
+End Sub
+
+
+'the subroutine below will:
+'add a suffix to a layer name, then
+'check for the existence of the sublayer, then
+'if does not exist, add the sublayer to the parent layer
+
+Sub AddSubLayersWithSuffix(strLayerName,arrSuffixes)
+	
+	Dim strSuffix,strSubLayerName
+	For each strSuffix in arrSuffixes
+		
+		' add the suffix with a dash by "concatenation"
+		strSubLayerName=strLayerName&"-"&strSuffix
+		If not Rhino.IsLayer(strSubLayerName) Then
+			' the additional argument creates it as a sublayer of parent layer
+			Call Rhino.AddLayer(strSubLayerName,,,,strLayerName)
+		End If		
+	Next	
+End Sub

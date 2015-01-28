@@ -1,0 +1,88 @@
+Option Explicit
+'Script written by Pascal
+' RMA
+'Script version Thursday, November 17, 2011
+'Rhino.AddStartUpScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "ShowSelectedOnCurrentLayer", "_NoEcho _-Runscript (ShowSelectedOnCurrentLayer)"
+
+'Call ShowSelectedOnCurrentLayer()
+Sub ShowSelectedOnCurrentLayer()
+	
+	Dim aObj: aObj = Rhino.SelectedObjects()
+	If isArray(aObj) Then
+		Dim aSel: aSel = ObjectLayers(aObj)
+	
+	
+		If Ubound(aSel) = 0 Then 
+			Rhino.CurrentLayer aSel(0)
+		Else
+			Dim aTemp: atemp = Rhino.JoinArrays(array("Just keep the current Current current."), aSel)
+			Dim temp: 	temp = Rhino.ListBox(aTemp, "Multiple objects selected - set current layer:", "Show selected per current layer.")
+			If isNull(temp) Then Exit Sub
+			If Rhino.IsLayer(temp) Then Rhino.CurrentLayer temp
+		End If
+	End If
+	
+	Dim alay: aLay = Rhino.LayerNames
+	Dim sCrnt: sCrnt = Rhino.CurrentLayer()
+	
+	Rhino.EnableRedraw False
+	Dim slayer, aOn(), aLocked(), aOff()
+	Dim 	o, L, f
+	o = 0
+	L = 0
+	f = 0
+	
+	For Each slayer In alay
+		If Rhino.LayerVisible(slayer) Then
+			ReDim Preserve aOn(o)
+			aOn(o) = slayer
+			o = o + 1
+			
+			If Rhino.LayerLocked(slayer) Then
+				
+				ReDim Preserve aLock(L)
+				aLock(L) = slayer
+				L = L + 1
+				Rhino.layerVisible slayer, False
+			End If
+		End If
+		
+		If slayer <> sCrnt Then Rhino.LayerVisible slayer, False
+		
+		
+	Next
+	Rhino.EnableRedraw True
+	
+	Rhino.command "_ShowSelected"
+	
+	Rhino.EnableRedraw False
+	
+	If o > 0 Then
+		For Each sLayer In aOn
+			Rhino.LayerVisible sLayer, True
+		Next
+	End If
+	
+	If L > 0 Then
+		For Each sLayer In aLocked
+			Rhino.LayerLocked sLayer, True
+		Next
+	End If
+	Rhino.EnableRedraw True
+
+	
+End Sub
+
+Function ObjectLayers(aObj)
+	Dim sObj, aLayers(), n
+	n = 0
+	For Each sObj In aObj
+		ReDim Preserve aLayers(n)
+		aLayers(n) = Rhino.ObjectLayer(sObj)
+		n = n + 1
+	Next
+	
+	ObjectLayers = rhino.CullDuplicateStrings(alayers)
+	
+End Function

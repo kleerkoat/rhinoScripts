@@ -1,0 +1,47 @@
+Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version Thursday, February 03, 2011
+
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "SilhouetteEyePt","_-Runscript (SilhouetteEyePt)"
+
+Call SilhouetteEyePt()
+Sub SilhouetteEyePt()
+
+	Dim aObj: aObj = Rhino.GetObjects("Select objects for Silhouette",4+8+16,,True)
+	If not isArray(aObj) then exit sub
+	
+	Dim aPt: aPt = Rhino.GetPoint("Set eye point")
+	If not isArray(aPt) then exit sub
+	
+	dim SPt: Spt = Rhino.AddPoint(aPt)
+	
+	dim crntView: crntView = Rhino.CurrentView()
+	dim lens: lens = Rhino.ViewCameraLens(crntView)
+	dim proj: proj = Rhino.ViewProjection(crntView)
+	
+	dim aDir(1)
+	aDir(0) = apt
+	aDir(1) = Rhino.GetPoint("Set view direction.",aPt)
+	If not isArray(aDir(1)) then exit sub
+	
+	Dim sCrntView: sCrntView = Rhino.AddNamedView("crntView",Rhino.CurrentView())
+	
+	Rhino.EnableRedraw False
+	
+	Rhino.ViewProjection , 1
+	Rhino.ViewCameraTarget , apt,Rhino.PointAdd(apt, Rhino.VectorUnitize(Rhino.VectorCreate(aDir(1), aDir(0))))
+	
+	'if proj = 2 then Rhino.ViewCameraLens Rhino.CurrentView(),lens
+	
+	Rhino.SelectObjects aObj
+	
+	Rhino.Command "_Silhouette"
+	
+	Rhino.RestoreNamedView sCrntView, crntView, true
+	Rhino.DeleteObject sPt
+	Rhino.EnableRedraw True
+	
+End Sub

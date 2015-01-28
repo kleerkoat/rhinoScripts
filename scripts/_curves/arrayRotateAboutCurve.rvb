@@ -1,0 +1,74 @@
+Option Explicit'Script written by David Mans http://www.neoarchaic.net
+    'Script copyrighted by core.form-ula under Creative Commons
+    'Script version Tuesday, September 09, 2008 2:59:56 PM
+
+'Call arrayRotateAboutCurve()
+     
+Sub arrayRotateAboutCurve()
+     
+	Call arrayRotateAboutCurve()
+     
+End Sub
+     
+Function arrayRotateAboutCurve()
+     
+	arrayRotateAboutCurve = Null
+     
+	Dim i,j, objects,angle, originPln, steps, curve, pt(2), dom, crvFrame, rotFrame
+     
+	objects = Rhino.GetObjects("Select Objects To Array and Rotate")
+     
+	If isNull(objects) Then Exit Function
+     
+	pt(0) = Rhino.GetPoint("Select Origin Point of Objects to Array")
+     
+	If isNull(pt(0)) Then Exit Function
+     
+	pt(2) = Rhino.GetPoint("Select Point for X Axis of Objects to Array")
+     
+	If isNull(pt(2)) Then Exit Function
+     
+	pt(1) = Rhino.GetPoint("Select Point for Y Axis of Objects to Array")
+     
+	If isNull(pt(1)) Then Exit Function
+     
+	originPln = Rhino.PlaneFitFromPoints(pt)
+     
+	curve = Rhino.GetObject("Select Curve",4)
+     
+	If isNull(curve) Then Exit Function
+     
+	steps = Rhino.GetReal("Count",10)
+     
+	If isNull(steps) Then Exit Function
+     
+	angle = Rhino.GetReal("Rotational Increment", 15)
+     
+	If isNull(angle) Then Exit Function
+     
+	Call Rhino.EnableRedraw(False)
+     
+	Call rhino.SelectObject(curve)
+     
+	Call rhino.Command("reparameterize 0 1")
+     
+	Call rhino.UnselectAllObjects()
+     
+	dom = Rhino.CurveDomain(curve)(1)
+     
+	For i = 0 To steps Step 1
+     
+		crvFrame = Rhino.CurvePerpFrame(curve,(dom/steps)*i)
+     
+		rotFrame = Rhino.RotatePlane(crvFrame,angle*i,crvFrame(3))
+     
+		For j = 0 To uBound(objects) Step 1
+     
+			Call Rhino.OrientObject(objects(j),pt,array(rotFrame(0),Rhino.PointAdd(rotFrame(0),rotFrame(1)),Rhino.PointAdd(rotFrame(0),rotFrame(3))),1)
+     
+		Next
+     
+	Next
+     
+	Call Rhino.EnableRedraw(True)
+End Function

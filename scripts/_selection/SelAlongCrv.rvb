@@ -1,0 +1,69 @@
+Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version Friday, September 10, 2010
+
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "SelAlongCrv","_-Runscript (SelAlongCrv)"
+
+
+'Call SelAlongCrv()
+Sub SelAlongCrv()
+	
+	Dim aSel: aSel = Rhino.SelectedObjects()
+	
+	Dim sCrv: sCrv = Rhino.GetObject("Select curve",4,true)
+	If isNull(sCrv) then exit sub
+	Rhino.UnselectAllObjects()
+	
+
+	dim sCopy: sCopy = Rhino.CopyObject(sCrv)
+	
+	Rhino.SelectObject(sCopy)
+	Rhino.Command "_SubCrv"
+	If Rhino.LastCommandResult() <> 0 then
+		Rhino.DeleteObject sCopy
+		Exit sub
+	End If
+	
+	Dim sSub: sSub = Rhino.LastCreatedObjects()(0)
+	If isNull(sSub) then
+		Rhino.DeleteObject sCopy
+		Exit sub	
+	End If
+	
+	Rhino.EnableRedraw(false)
+	
+	Rhino.UnselectAllObjects()
+	Rhino.SelectObject sSub
+	Rhino.EnableRedraw(true)
+	
+	Rhino.Command "_Offset _BothSides=_Yes _Cap=Round _ThroughPoint"
+	
+	If Rhino.LastCommandResult() <> 0 then
+		Rhino.DeleteObject sSub
+		Rhino.EnableRedraw(true)
+		Exit sub
+	End If
+	
+	Rhino.EnableRedraw(false)
+	
+	Dim sOff: sOff = Rhino.LastCreatedObjects()(0)
+	If isNull(sOff) then
+		Rhino.DeleteObject sSub
+		Rhino.EnableRedraw(true)
+		Exit sub	
+	End If
+
+	Rhino.UnselectAllObjects()
+	Rhino.DeleteObject sSub
+	Rhino.Command "_SelBoundary _SelectionMode=_Window SelId " & sOff
+	Rhino.DeleteObject sOff
+	Rhino.UnselectObject sCrv
+	If isArray(aSel) then Rhino.SelectObjects aSel
+	
+	Rhino.EnableRedraw(true)
+	
+	
+End Sub

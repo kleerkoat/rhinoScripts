@@ -1,0 +1,37 @@
+Option Explicit
+'Script written by Mitch
+'Version 23 October, 2011
+
+'Call SelLayerEx()
+Sub SelLayerEx()
+
+	Dim arrObjs,arrLayers(),strLayer,arrLObjs,i,count
+	arrObjs=Rhino.SelectedObjects
+	If not IsArray(arrObjs) Then
+		arrObjs=Rhino.GetObjects("Select objects with target layers")
+		If not IsArray(arrObjs) Then Exit sub		
+	End If
+	Redim arrLayers(Ubound(arrObjs))
+	For i=0 to UBound(arrObjs)
+		arrLayers(i)=Rhino.ObjectLayer(arrObjs(i))		
+	Next
+	If i>0 Then Call Rhino.CullDuplicateStrings(arrLayers)
+	
+	Call Rhino.EnableRedraw(False)
+	count=0
+	For each strLayer in arrLayers
+		arrLObjs=Rhino.ObjectsByLayer(strLayer,True)
+		For i=0 to Ubound(arrLObjs)
+			If Rhino.IsObjectSelectable(arrLObjs(i)) Then count=count+1
+		Next
+	Next
+	Call Rhino.EnableRedraw(True)
+	If count=1 Then 
+		Call Rhino.Print("No additional selectable objects found on layer")
+	Else
+		Dim lCount,num : num="layer"
+		lCount=(Ubound(arrLayers)+1)
+		If lCount>1 then num="layers"
+		Call Rhino.Print(count&" objects on "&lCount&" "&num&" selected")
+	End If
+End Sub

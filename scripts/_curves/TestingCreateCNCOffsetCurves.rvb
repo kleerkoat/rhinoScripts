@@ -1,0 +1,746 @@
+﻿Option Explicit
+'Script written by David Rutten
+'Script copyrighted by Prat-SA
+'Version 2.01
+
+Dim startTime
+'Dim w_Shell
+'Dim regLocation
+
+Sub CreateCNCOffSetCurves()
+	
+
+	
+
+	
+	
+	
+		
+
+	
+	'Set w_Shell = CreateObject("Wscript.Shell")
+	'regLocation = "HKCU\software\CNC_Cutting_Script\Message"
+	startTime = Time
+
+	'Rhino.Command "-_LoadScript " & Chr(34) & "V:\RESSOURCES - DESSIN\BIBLIOTHEQUE RHINOCEROS\Scripts\VectorMath.rvb" & Chr(34), vbFalse
+	
+	'Looks for existing CNC patterns
+	Rhino.Prompt "Parsing CNC path structures..."
+	Dim allEdges
+	allEdges = AllCNCCurves
+	If IsNull(allEdges) Then
+		Rhino.Print "No valid membrane patterns could be salvaged from the document..."
+		Call CloseDownScript()
+		Exit Sub
+	End If
+	
+	
+	
+	'Create overlays 
+	Dim Offsets(),OverlayMarkers,TickMarkers,selEdges,Overlay(),i,OverlayRegions
+	
+	ReDim Offsets(0)
+	Offsets(0) 		= "Nothing"
+	OverlayMarkers	= Array("Nothing")
+	TickMarkers 	= Array("Nothing")
+
+	selEdges = Rhino.GetObjects("Select pattern edges to process...", 4, vbFalse, vbTrue, vbTrue, allEdges)
+	If IsNull(selEdges) Then Exit Sub
+	
+	'Replace the overlay curves with deg.3 curves that have a specific number of edit points to be used as marker datum. 
+	Rhino.EnableRedraw vbFalse
+	Rhino.Prompt "Overlaying pattern edges... please hang on"
+	ReDim Overlay(UBound(selEdges))
+	For i = 0 To UBound(selEdges)
+		Overlay(i) = ReplaceCurve(selEdges(i), 30)
+		If IsNull(Overlay(i)) Then
+			Overlay(i) = "Nothing"
+			Rhino.Print "Pattern curve proved to be invalid geometry {" & selEdges(i) & "}"
+		End If
+	Next
+	Rhino.ObjectColor Overlay, RGB(200,0,0)
+	Rhino.ObjectName Overlay, "CNC Overlay curve"
+	
+	
+	'Create closed loops using the overlay curves.
+	Rhino.Prompt "Creating closed loops... please hang on"
+	OverlayRegions = CreateClosedCNCLoops(Overlay, RGB(0,120,0))
+	If IsNull(OverlayRegions) Then
+		Rhino.Print "No closed loops could be constructed from the selected curves."
+		Rhino.DeleteObjects Overlay
+		Rhino.EnableRedraw vbTrue
+		Call CloseDownScript()
+		Exit Sub
+	End If
+	Rhino.EnableRedraw vbTrue
+	
+	
+	'Create CNC offsets.
+	'Get offset values. 
+	Dim EdgeCableOffset, WeldOffset
+	Dim MarkerInterval, MarkerLength
+	Dim strResult
+	
+	EdgeCableOffset = Rhino.GetSettings(Rhino.InstallFolder & "CNC.ini", "Offset settings", "EdgeCableOffset")
+	If IsNull(EdgeCableOffset) Then EdgeCableOffset = 70 Else EdgeCableOffset = CDbl(EdgeCableOffset)
+	WeldOffset = Rhino.GetSettings(Rhino.InstallFolder & "CNC.ini", "Offset settings", "WeldOffset")
+	If IsNull(WeldOffset) Then WeldOffset = 25 Else WeldOffset = CDbl(WeldOffset)
+	MarkerInterval = Rhino.GetSettings(Rhino.InstallFolder & "CNC.ini", "Offset settings", "MarkerInterval")
+	If IsNull(MarkerInterval) Then MarkerInterval = 200 Else MarkerInterval = CDbl(MarkerInterval)
+	MarkerLength = Rhino.GetSettings(Rhino.InstallFolder & "CNC.ini", "Offset settings", "MarkerLength")
+	If IsNull(MarkerLength) Then MarkerLength = 20 Else MarkerLength = CDbl(MarkerLength)
+
+	Dim arrOptions(5)
+	Do
+		arrOptions(0) = "CableOffset_" & EdgeCableOffset
+		arrOptions(1) = "WeldOffset_" & WeldOffset
+		arrOptions(2) = "MarkerInterval_" & MarkerInterval
+		arrOptions(3) = "MarkerSize_" & MarkerLength
+		arrOptions(4) = "Accept"
+		arrOptions(5) = "Quit"
+		strResult = Rhino.GetString("CNC-cutting path settings...", "Accept", arrOptions)
+		If IsNull(strResult) Then strResult = "Quit"
+		Select Case UCase(Left(strResult, 1))
+			Case "C"
+				strResult = Rhino.GetInteger("Specify a new edge cable offset...", EdgeCableOffset, 0)
+				If Not IsNull(strResult) Then EdgeCableOffset = strResult
+			Case "W"
+				strResult = Rhino.GetInteger("Specify a new weld offset...", WeldOffset, 0)
+				If Not IsNull(strResult) Then WeldOffset = strResult
+			Case "M"
+				If UCase(Mid(strResult, 7, 1)) = "I" Then
+					strResult = Rhino.GetInteger("Specify a new maximum marker interval...", MarkerInterval, 1)
+					If Not IsNull(strResult) Then MarkerInterval = strResult
+					Else
+						strResult = Rhino.GetInteger("Specify a new marker linesize...", MarkerLength, 1)
+					If Not IsNull(strResult) Then MarkerLength = strResult
+				End If
+			Case "A"
+				Exit Do
+			Case "Q"
+				Rhino.DeleteObjects OverlayRegions
+				Rhino.DeleteObjects Overlay
+				Call CloseDownScript()
+				Exit Sub
+		End Select
+	Loop
+
+	
+	'Save offset values
+	Rhino.EnableRedraw vbFalse
+	
+	''SpoolMessage "STARTLOADER"
+	'Rhino.Command "-_Run " & Chr(34) & "V:\RESSOURCES - DESSIN\BIBLIOTHEQUE RHINOCEROS\Scripts\Loader\Loader.exe" & Chr(34), vbFalse
+	
+	Rhino.SaveSettings Rhino.InstallFolder & "CNC.ini", "Offset settings", "EdgeCableOffset", CStr(EdgeCableOffset)
+	Rhino.SaveSettings Rhino.InstallFolder & "CNC.ini", "Offset settings", "WeldOffset", CStr(WeldOffset)
+	Rhino.SaveSettings Rhino.InstallFolder & "CNC.ini", "Offset settings", "MarkerInterval", CStr(MarkerInterval)
+	Rhino.SaveSettings Rhino.InstallFolder & "CNC.ini", "Offset settings", "MarkerLength", CStr(MarkerLength)
+
+	''SpoolMessage'SpoolMessage "Creating offset geometry..."
+	If Not Rhino.IsLayer("CNC-Offsets") Then Rhino.AddLayer "CNC-Offsets", RGB(70,90,255)
+	If Not Rhino.IsLayer("CNC-Markers") Then Rhino.AddLayer "CNC-Markers", RGB(255,255,255)
+	
+	
+	'Offsets
+	Rhino.CurrentLayer "CNC-Offsets"
+
+	
+	Dim throughPt
+	For i = 0 To UBound(Overlay)
+		'SpoolMessage i+1 & " curves offsetted..."
+
+		Select Case UCase(Rhino.ObjectLayer(selEdges(i)))
+			Case "EDGE-CABLES"
+				throughPt = GetCurveOffsetPoint(Overlay(i), EdgeCableOffset, 0.5, vbTrue)
+				If Not IsPtInsideCurveCollection(throughPt, OverlayRegions) Then
+					throughPt = GetCurveOffsetPoint(Overlay(i), EdgeCableOffset, 0.5, vbFalse)
+				End If
+				ReDim Preserve Offsets(UBound(Offsets)+1)
+				Offsets(UBound(Offsets)) = OffsetCurve(Overlay(i), throughPt, Rhino.CurveLength(Overlay(i))/4)
+				Rhino.FirstObject(True) 'Added this line to get object selected.
+
+			
+			Case "TOP-WELDED EDGES"
+				throughPt = GetCurveOffsetPoint(Overlay(i), WeldOffset, 0.5, vbTrue)
+				If IsPtInsideCurveCollection(throughPt, OverlayRegions) Then
+					throughPt = GetCurveOffsetPoint(Overlay(i), WeldOffset, 0.5, vbFalse)
+				End If
+				ReDim Preserve Offsets(UBound(Offsets)+1)
+				Offsets(UBound(Offsets)) = OffsetCurve(Overlay(i), throughPt, Rhino.CurveLength(Overlay(i))/4)
+				Rhino.FirstObject(True) 'Added this line to get object selected.
+			
+			Case "BOTTOM-WELDED EDGES"
+				throughPt = GetCurveOffsetPoint(Overlay(i), WeldOffset, 0.5, vbTrue)
+				If IsPtInsideCurveCollection(throughPt, OverlayRegions) Then
+					throughPt = GetCurveOffsetPoint(Overlay(i), WeldOffset, 0.5, vbFalse)
+				End If
+				ReDim Preserve Offsets(UBound(Offsets)+1)
+				Offsets(UBound(Offsets)) = OffsetCurve(Overlay(i), throughPt, Rhino.CurveLength(Overlay(i))/4)
+				Rhino.FirstObject(True) 'Added this line to get object selected.
+			
+			Case "NULL-EDGES"
+				throughPt = GetCurveOffsetPoint(Overlay(i), 0, 0.5, vbTrue)
+				ReDim Preserve Offsets(UBound(Offsets)+1)
+				Offsets(UBound(Offsets)) = Rhino.CopyObject(Overlay(i))
+				Offsets(UBound(Offsets)) = Rhino.ExtendCurveLength(Offsets(UBound(Offsets)), 0, 2, Rhino.CurveLength(Overlay(i))/4)
+				Rhino.FirstObject(True) 'Added this line to get object selected.
+				
+			Case Else
+				Rhino.Print "Error in Select Case {ON_LAYER}"
+		End Select
+	
+	Next
+	
+	
+
+	
+	 
+	'Rhino.UnselectAllObjects
+	'Rhino.SelectObjects Offsets
+	Dim strBoolean, expRegEdges, CBEdgeParent
+	
+	strBoolean = "-_CurveBoolean _DeleteInput=Yes _CombineRegions=No"
+	For i = 0 To UBound(OverlayRegions)
+		'SpoolMessage "Finding 'insides'... " & i+1
+		expRegEdges = Rhino.ExplodeCurves(OverlayRegions(i), vbFalse)
+		If Not IsNull(expRegEdges) Then
+			CBEdgeParent = FindClosestCurve(expRegEdges(0), Overlay, 3)
+			Rhino.DeleteObjects expRegEdges
+
+			Select Case UCase(Rhino.ObjectLayer(CBEdgeParent))
+				Case "EDGE-CABLES"
+					throughPt = GetCurveOffsetPoint(CBEdgeParent, 1.2*EdgeCableOffset, 0.5, vbTrue)
+					If Not IsPtInsideCurveCollection(throughPt, OverlayRegions) Then
+						throughPt = GetCurveOffsetPoint(CBEdgeParent, 1.2*EdgeCableOffset, 0.5, vbFalse)
+					End If
+				Case "NULL-EDGES"
+					throughPt = GetCurveOffsetPoint(CBEdgeParent, 0.5*WeldOffset, 0.5, vbTrue)
+					If Not IsPtInsideCurveCollection(throughPt, OverlayRegions) Then
+						throughPt = GetCurveOffsetPoint(CBEdgeParent, 0.5*WeldOffset, 0.5, vbFalse)
+					End If
+				Case Else
+					throughPt = Rhino.DivideCurve(CBEdgeParent, 2)(1)
+			End Select
+	
+			strBoolean = strBoolean & " w" & Rhino.Pt2Str(throughPt,1)
+		End If
+	Next
+	'SpoolMessage "Finding offsetted patterns..."
+	strBoolean = strBoolean & " _Enter"
+	'SpoolMessage "Parsing closed loops in patterns..."
+	Rhino.Command strBoolean, vbFalse
+
+	
+	Dim CBRegions, CBEdges
+	
+	CBRegions = Rhino.SelectedObjects
+	If Not IsArray(CBRegions) Then
+		Rhino.Print "No pattern offset regions could be found..."
+		Rhino.ShowObjects selEdges
+		Rhino.ShowObjects OverlayRegions
+		Rhino.DeleteObjects OverlayRegions
+		Rhino.DeleteObjects Overlay
+		Rhino.EnableRedraw vbTrue
+		Call CloseDownScript()
+		Exit Sub
+	End If
+
+	CBEdges = Rhino.ExplodeCurves(CBRegions, vbFalse)
+	If IsNull(CBEdges) Then
+		Rhino.Print "Pattern offset regions proved to be unexplodable."
+		Rhino.ShowObjects selEdges
+		Rhino.ShowObjects OverlayRegions
+		Rhino.DeleteObjects OverlayRegions
+		Rhino.DeleteObjects Overlay
+		Rhino.EnableRedraw vbTrue
+		Call CloseDownScript()
+		Exit Sub
+	End If
+	
+	
+	'Markers 
+
+	Dim MarkerSide,tempMarkers
+	
+	Rhino.CurrentLayer "CNC-Markers"
+	For i = 0 To UBound(CBEdges)
+		'SpoolMessage "Adding marker geometry... " & i+1
+
+		CBEdgeParent = FindClosestCurve(CBEdges(i), Overlay, 3)
+		If Not IsNull(CBEdgeParent) Then
+			Select Case UCase(Rhino.ObjectLayer(CBEdgeParent))
+				Case "EDGE-CABLES"
+					'Edge cables do not require markings
+					Rhino.ObjectColor CBEdges(i), RGB(145,255,255)
+				Case "TOP-WELDED EDGES"
+					throughPt = GetCurveOffsetPoint(CBEdgeParent, 2*WeldOffset, 0.5, vbTrue)
+					MarkerSide = -10
+					If Not IsPtInsideCurveCollection(throughPt, OverlayRegions) Then
+						MarkerSide = 10
+					End If
+					tempMarkers = AddWeldingMarkers(CBEdgeParent, MarkerInterval, WeldOffset, WeldOffset-MarkerLength, MarkerSide)
+					If Not IsNull(tempMarkers) Then tickMarkers = JoinArrays(tickMarkers, tempMarkers)
+				Case "BOTTOM-WELDED EDGES"
+					throughPt = GetCurveOffsetPoint(CBEdgeParent, WeldOffset, 0.5, vbTrue)
+					If Not IsPtInsideCurveCollection(throughPt, OverlayRegions) Then
+						throughPt = GetCurveOffsetPoint(CBEdgeParent, WeldOffset, 0.5, vbFalse)
+					End If
+					tempMarkers = OffsetCurve(CBEdgeParent, throughPt, Rhino.CurveLength(CBEdgeParent)/4)
+					If Not IsNull(tempMarkers) Then
+						Rhino.ObjectName tempMarkers, "Top welded pattern projection"
+						OverlayMarkers = JoinArrays(OverlayMarkers, Array(tempMarkers))
+					End If
+
+					throughPt = GetCurveOffsetPoint(CBEdgeParent, WeldOffset, 0.5, vbTrue)
+					MarkerSide = -10
+					If IsPtInsideCurveCollection(throughPt, OverlayRegions) Then
+						MarkerSide = 10
+					End If
+					tempMarkers = AddWeldingMarkers(CBEdgeParent, MarkerInterval, WeldOffset+MarkerLength, WeldOffset, MarkerSide)
+					If Not IsNull(tempMarkers) Then TickMarkers = JoinArrays(TickMarkers, tempMarkers)
+				Case "NULL-EDGES"
+					'Null-edges do not require markings
+					Rhino.ObjectColor CBEdges(i),  RGB(0,155,0)
+				Case Else
+					Rhino.Print "Error on Select Case {ON_LAYER}(2)"
+			End Select
+		End If
+	Next
+
+	'SpoolMessage "Removing external projected top-edge geometry"
+	If IsArray(OverlayMarkers) Then tempMarkers = TrimCurvesByBorders(OverlayMarkers, CBRegions, vbTrue, vbTrue)
+	OverlayMarkers = Array("Nothing")
+	If Not IsNull(tempMarkers) Then
+		OverlayMarkers = JoinArrays(OverlayMarkers, tempMarkers)
+	End If
+	
+	'SpoolMessage "Removing external interval marker geometry"
+	If IsArray(TickMarkers) Then tempMarkers = TrimCurvesByBorders(TickMarkers, CBRegions, vbTrue, vbFalse)
+	TickMarkers = Array("Nothing")
+	If Not IsNull(tempMarkers) Then
+		TickMarkers = JoinArrays(TickMarkers, tempMarkers)
+	End If
+	'Rhino.SelectObjects(TickMarkers)
+	Rhino.ShowObjects selEdges
+	Rhino.ShowObjects OverlayRegions
+	Rhino.DeleteObjects CBRegions
+	Rhino.DeleteObjects OverlayRegions
+	Rhino.DeleteObjects Overlay
+	Rhino.UnSelectAllObjects
+	Call CloseDownScript()
+	Rhino.EnableRedraw vbTrue
+End Sub
+CreateCNCOffsetCurves
+
+Function CloseDownScript()
+	'SpoolMessage "QUITLOADER"
+	Rhino.Print "CNC-offsetting algorithm completed. Recorded runtime from " & startTime & " to " & Time
+	ClosedownScript = vbTrue
+End Function
+
+Function AddWeldingMarkers(idAxis, maxInterval, MarkerStart, MarkerEnd, offDir)
+	'This function will add a series of markerlines to the document based
+	'on a curve in the world-XY plane (IDCURVE). Markerlength is a result of the arguments
+	'MARKERSTART and MARKEREND. OFFDIR is a numeric value indicating the side to
+	'offset to. MAXINTERVAL controls the exact distance between the markers.
+	'Marker lines are symmetric around the curve midpoint.
+	AddWeldingMarkers = Null
+	Dim copAxis, extLength
+	Dim ptS, ptE
+	Dim crvL, divPt, i
+	Dim vecT, vecV
+	Dim idMarkers()
+
+	copAxis = Rhino.CopyObject(idAxis)
+	If IsNull(copAxis) Then Exit Function
+	crvL = Rhino.CurveLength(copAxis)
+	extLength = (2*maxInterval * (Fix(crvL/(2*maxInterval))+1) - crvL) / 2
+	copAxis = Rhino.ExtendCurveLength(copAxis, 0, 2, extLength)
+	If IsNull(copAxis) Then Exit Function
+	divPt = Rhino.DivideCurveLength(copAxis, maxInterval, vbFalse)
+	If IsNull(divPt) Then Exit Function
+
+	For i = 0 To UBound(divPt)
+		
+		
+		Dim vecO
+		
+		'Get offset point direction from curve datum.
+		vecT=Rhino.CurveTangent(copAxis,Rhino.CurveClosestPoint(copAxis, divPt(i)))
+		If IsNull(vecT) Then Rhino.Print "Error in curve tangent vector": Exit Function
+		
+		vecV=vecT
+		vecV(2)=vecV(2)+offDir
+		vecO=Rhino.VectorCrossProduct(vecT,vecV)
+		If IsNull(vecO) Then Rhino.Print "Error in cross product vector": Exit Function
+		
+		'Get the offset point on one side of the curve.
+		vecO=Rhino.VectorScale(vecO,MarkerStart )
+		ptS=Rhino.PointAdd(divPt(i),vecO)
+		
+		vecO=Rhino.VectorCrossProduct(vecT,vecV)
+		If IsNull(vecO) Then Rhino.Print "Error in cross product vector": Exit Function
+		
+		'Reverse the offset direction.
+		vecO=Rhino.VectorReverse(vecO)
+		
+		'Get the offset point on the other side of the curve.
+		vecO=Rhino.VectorScale(vecO,MarkerEnd )
+		ptE=Rhino.PointAdd(divPt(i),vecO)
+		
+		'Create the array of marker lines and add to the drawing.
+		ReDim Preserve idMarkers(i)
+		
+		idMarkers(i) = Rhino.AddLine(ptS, ptE)
+		
+		If IsNull(idMarkers(i)) Then idMarkers(i) = "Nothing"
+	Next
+	Rhino.DeleteObject copAxis
+	
+	'Return
+	AddWeldingMarkers = idMarkers
+	
+	
+End Function
+
+Function FindClosestCurve(idProof, arrCompare, intSamples)
+	'This function will attempt to find the closest matching curve
+	'to an existing curve (idProof) from a collection of existing
+	'curves (arrCompare)
+	'intSample controls the number of samples to test. It must be at least 2
+	'The first and last sample (idProof ending points) are not given special attention.
+	'Beware that high samplecounts process significantly slower.
+	FindClosestCurve = NULL
+	Dim arrMatch(), i, j
+	Dim D, ptSamples
+	Dim minIndex, minVal
+
+	minIndex = Null
+	minVal = 1000000
+	intSamples = CInt(intSamples)
+	If intSamples < 2 Then intSamples = 2
+
+	ptSamples = Rhino.DivideCurve(idProof, intSamples-1)
+	If IsNull(ptSamples) Then Exit Function
+	ReDim arrMatch(UBound(arrCompare))
+
+	For i = 0 To UBound(arrCompare)
+		arrMatch(i) = 0
+		For j = 0 To UBound(ptSamples)
+			D = Rhino.Distance(ptSamples(j), Rhino.EvaluateCurve(arrCompare(i), Rhino.CurveClosestPoint(arrCompare(i), ptSamples(j))))
+			arrMatch(i) = arrMatch(i)+D
+		Next
+		If arrMatch(i) < minVal Then
+			minIndex = i
+			minVal = arrMatch(i)
+		End If
+	Next
+	If IsNull(minIndex) Then Exit Function
+	'	Rhino.AddLeader Array(Rhino.DivideCurve(arrCompare(minIndex),2)(1), _
+	'						  Rhino.DivideCurve(idProof, 2)(1))
+	FindClosestCurve = arrCompare(minIndex)
+End Function
+
+Function OffsetCurve(strCurve, throughPt, extLength)
+	'This function offsets a curve using only the greville polygon. Thus the
+	'resulting curve is identical to the original curve in data-depth.
+	'Offsetting works only in the world-XY plane. A THROUGHPT is required.
+	'The shortest distance between this point ant the curve is the offset distance
+	'the EXTLENGTH argument controls the length of lines to be added at the
+	'offsetted curve ends. Negative values are not allowed. 0 will result in
+	'no extensions.
+	OffsetCurve = Null
+	
+	
+	Dim intCurvePts(),paramClosestPt,cTan,ptClosestPt,dblDistance,arrEditParams,arrEditPts,i,tanPt,vecV,vecO,offPt,posTip
+	
+	
+	'Find the point on the curve closest to the test point.
+	paramClosestPt=Rhino.CurveClosestPoint(strCurve, throughPt)
+	ptClosestPt=Rhino.EvaluateCurve(strCurve,paramClosestPt)
+	
+	'Get the distance between the test point and the closest point on the curve.
+	dblDistance=Rhino.Distance(ptClosestPt,throughPt)
+	
+	'Get the direction from the closest point on the curve to the offset point.
+	cTan=Rhino.CurveTangent(strCurve,paramClosestPt)
+	If IsNull(cTan) Then Rhino.Print "Error in curve tangent vector": Exit Function
+	vecV=cTan
+	vecV(2)=vecV(2)+1
+	vecO=Rhino.VectorCrossProduct(cTan,vecV)
+	vecO=Rhino.VectorScale(vecO,dblDistance )
+	offPt=Rhino.PointAdd(ptClosestPt,vecO)
+	If Rhino.Distance(throughPt,offPt)<Rhino.UnitAbsoluteTolerance()Then
+		posTip=1
+	Else
+		posTip=-1
+	End If
+	'Get the curve parameters.
+	arrEditParams=Rhino.CurveEditPoints(strCurve,True)
+	If IsNull(arrEditParams) Then Rhino.Print "Error in greville data": Exit Function
+	'Get the curve edit points.
+	arrEditPts=Rhino.CurveEditPoints(strCurve)
+	
+	'Create the array of offset curve points
+	ReDim intCurvePts(Ubound(arrEditParams))
+	
+	For i=0 To Ubound(arrEditParams)
+		
+		'Get offset point direction from curve datum.
+		cTan=Rhino.CurveTangent(strCurve,arrEditParams(i))
+		If IsNull(cTan) Then Rhino.Print "Error in curve tangent vector": Exit Function
+		vecV=cTan
+		vecV(2)=vecV(2)+posTip
+		vecO=Rhino.VectorCrossProduct(cTan,vecV)
+		If IsNull(vecO) Then Rhino.Print "Error in cross product vector": Exit Function
+		
+		'Get the offset point.
+		vecO=Rhino.VectorScale(vecO,dblDistance )
+		offPt=Rhino.PointAdd(arrEditPts(i),vecO)
+		
+		'Add the point to the offset curve array.
+		intCurvePts(i)=offPt
+
+	Next
+	
+	'Add the offset curve object to the drawing.
+	Dim offCurve
+	offCurve=Rhino.AddInterpCurve(intCurvePts)
+	If IsNull(offCurve) Then Rhino.Print "Error in offset curve": Exit Function
+	
+	'Extend the curve if indicated.
+	Dim vecT, extLine(1)
+	
+	If extLength = 0 Then
+		OffsetCurve = offCurve
+		Exit Function
+	End If
+		
+	vecT = Rhino.CurveTangent(offCurve, Rhino.CurveDomain(offCurve)(0))
+	vecT = Rhino.VectorReverse(vecT)
+	vecT = Rhino.VectorScale(vecT, extLength)
+	vecT=Rhino.PointAdd(Rhino.CurveStartPoint(offCurve),vecT)
+	extLine(0) = Rhino.AddLine(vecT,Rhino.CurveStartPoint(offCurve))
+	
+	vecT = Rhino.CurveTangent(offCurve, Rhino.CurveDomain(offCurve)(1))
+	vecT = Rhino.VectorScale(vecT, extLength)
+	vecT=Rhino.PointAdd(Rhino.CurveEndPoint(offCurve),vecT)
+	extLine(1) = Rhino.AddLine(vecT, Rhino.CurveEndPoint(offCurve))
+	
+	offCurve = Rhino.JoinCurves(Array(offCurve, extLine(0), extLine(1)), vbTrue)
+	
+	'Return.
+	OffsetCurve = offCurve	
+	
+End Function	
+
+Function ReplaceCurve(strCurve, samCount)
+	'This function will analyze a an existing curve and replace it with a smooth
+	'degree=3 curve if it isn;t already. It will create a new curve using SAMCOUNT
+	'samples to overlay the original one.
+	ReplaceCurve = Null
+	Dim divPt, polCP, newID
+	If Rhino.IsPolyCurve(strCurve) Or Rhino.CurveDegree(strCurve)<>3 Then
+		divPt = Rhino.DivideCurve(strCurve, samCount)
+		If IsNull(divPt) Then Exit Function
+		polCP = Rhino.CurvePoints(strCurve)
+		If IsNull(polCP) Then Exit Function
+		'newID = Rhino.AddInterpCurve(divPt, 3, 1, polCP(1), polCP(UBound(polCP)-1))
+		newID = Rhino.AddInterpCurve(divPt, 3)
+	Else
+		newID = Rhino.CopyObject(strCurve)
+	End If
+	Rhino.ObjectLayer newID, Rhino.ObjectLayer(strCurve)
+	Rhino.SetObjectData newID, "CNCCuttingScript", "Parent", strCurve
+	ReplaceCurve = newID
+End Function
+
+Function GetCurveOffsetPoint(strCurve, dblDistance, dblRatio, blnSide)
+	'This function returns a 3d point a specific distance (DBLDISTANCE)
+	'from a curve (STRCURVE) to a specific side (BLNSIDE) using the
+	'vectormath class (this has to be loaded into RhinoScript engine prior
+	'to running this function.
+	'DBLRATIO controls the t-parameter on the curve to sample.
+	'0=CurveStartPoint 1=CurveEndPoint. Only values between 0 and 1
+	'are allowed. This function is used to create a throughPT argument
+	'for the OffsetCurve function.
+	GetCurveOffsetPoint = Null
+	Dim curDomain, datum, crvEval, datPt, datTan, datTEval, dblHeight
+	Dim vecT, vecV, vecO
+
+	'Set offset side.
+	If blnSide Then dblHeight = 1 Else dblHeight = -1
+	
+	'Get curve data.
+	curDomain = Rhino.CurveDomain(strCurve)
+	datum=curDomain(0)+((curDomain(1)-curDomain(0))*dblRatio)
+	crvEval=Rhino.CurveEvaluate(strCurve,datum,0)
+	datPt=crvEval(0)
+	
+	'Get offset point direction from curve datum.
+	datTan = Rhino.CurveTangent(strCurve, curDomain(0)+(curDomain(1)-curDomain(0))*dblRatio)
+	If IsNull(datTan) Then Exit Function
+	vecT=datTan
+	vecV=vecT
+	vecV(2)=vecV(2)+dblHeight
+	vecO=Rhino.VectorCrossProduct(vecT,vecV)
+	If IsNull(vecO) Then Exit Function
+	
+	'Get offset point.
+	vecO=Rhino.VectorScale(vecO,dblDistance )
+	vecO=Rhino.PointAdd(datPt,vecO)
+		
+	'Return.
+	GetCurveOffsetPoint = vecO
+	
+	
+End Function
+	
+
+
+Function IsPtInsideCurveCollection(arrPoint, arrCurves)
+	IsPtInsideCurveCollection = vbFalse
+	Dim i
+	For i = 0 To UBound(arrCurves)
+		If Rhino.PointInPlanarClosedCurve(arrPoint, arrCurves(i)) Then
+			IsPtInsideCurveCollection = vbTrue
+			Exit Function
+		End If
+	Next
+End Function
+
+Function AllCNCCurves()
+	'This function returns all curve ids currently active in the
+	'CNC layers.
+	AllCNCCurves = Null
+	Dim Curves1, Curves2, Curves3, Curves4, allCurves
+	Curves1 = Rhino.ObjectsByLayer("Edge-cables")
+	Curves2 = Rhino.ObjectsByLayer("Top-welded edges")
+	Curves3 = Rhino.ObjectsByLayer("Bottom-welded edges")
+	Curves4 = Rhino.ObjectsByLayer("Null-Edges")
+	If Not IsArray(Curves1) Then Curves1 = Array("Nothing")
+	If Not IsArray(Curves2) Then Curves2 = Array("Nothing")
+	If Not IsArray(Curves3) Then Curves3 = Array("Nothing")
+	If Not IsArray(Curves4) Then Curves4 = Array("Nothing")
+	allCurves = JoinArrays(Curves1, Curves2)
+	allCurves = JoinArrays(Curves3, allCurves)
+	allCurves = JoinArrays(Curves4, allCurves)
+	If Not IsArray(allCurves) Then Exit Function
+	AllCNCCurves = allCurves
+End Function
+
+Function TrimCurvesByBorders(arrCurves, arrBorders, blnKeepInside, blnSplitFirst)
+	'This function trims an existing collection of curves (arrCurves)
+	'Using a set of closed Planar curves (ARRBORDERS)
+	'You can either keep the curve remainders inside or outside the borders
+	TrimCurvesByBorders = Null
+
+	Dim splitCurves, filObjects()
+	Dim strCommand, i, j, mPt
+
+	For i = 0 To UBound(arrBorders)
+		If Not Rhino.IsCurvePLanar(arrBorders(i)) Then Exit Function
+		If Not Rhino.IsCurveClosed(arrBorders(i)) Then Exit Function
+	Next
+
+	Rhino.UnSelectAllObjects
+	
+	Rhino.SelectObjects arrCurves
+	
+	If blnSplitFirst Then
+		strCommand =  "-_Split"
+		For i = 0 To UBound(arrBorders)
+			strCommand = strCommand & " _SelID " & arrBorders(i)
+		Next
+		strCommand = strCommand & " _Enter"
+		Rhino.Command strCommand, vbFalse
+	End If
+
+	splitCurves = Rhino.SelectedObjects
+	If IsNull(splitCurves) Then
+		Rhino.DeleteObjects arrCurves
+		Exit Function
+	End If
+	' 	If UBound(splitCurves) = 0 Then
+	' 		Rhino.DeleteObjects arrCurves
+	' 		Exit Function
+	' 	End If
+
+	j = 0
+	For i = 0 To Ubound(splitCurves)
+		'If i/10 = i\10 Then 'SpoolMessage "Trimming curve segments..." & i
+		mPt = Rhino.DivideCurve(splitCurves(i), 3)(1)
+		If blnKeepInside Then
+			If IsPtInsideCurveCollection(mPt, arrBorders) Then
+				ReDim Preserve filObjects(j)
+				filObjects(j) = splitCurves(i)
+				j = j+1
+			Else
+				Rhino.DeleteObject splitCurves(i)
+			End If
+		Else
+			If Not IsPtInsideCurveCollection(mPt, arrBorders) Then
+				ReDim Preserve filObjects(j)
+				filObjects(j) = splitCurves(i)
+				j = j+1
+			Else
+				Rhino.DeleteObject splitCurves(i)
+			End If
+		End If
+	Next
+	If j = 0 Then Exit Function
+	TrimCurvesByBorders = filObjects
+End Function
+
+Function CreateClosedCNCLoops(allCurves, rgbColour)
+	'This function joins all loose CNC curves together into closed loops
+	'Non closed loops are disregarded.
+	CreateClosedCNCLoops = vbNull
+	Dim copyCurves
+	Dim Loops, i
+
+	copyCurves = Rhino.CopyObjects(allCurves)
+	Loops = Rhino.JoinCurves(copyCurves, vbTrue)
+	If IsNull(Loops) Then Exit Function
+	Rhino.ObjectName Loops, "Closed CNC-loops"
+	Rhino.ObjectColor Loops, rgbColour
+
+	For i = 0 To UBound(Loops)
+		If Not Rhino.IsCurveClosed(Loops(i)) Then
+			Rhino.DeleteObject Loops(i)
+			Loops(i) = "Nothing"
+		End If
+	Next
+	CreateClosedCNCLoops = Loops
+End Function
+
+Function JoinArrays(arr1, arr2)
+	'This function will join 2 arrays with identical variable types
+	'into a new array
+	JoinArrays = Null
+	If Not IsArray(arr1) Then Exit Function
+	If Not IsArray(arr2) Then Exit Function
+	Dim arrNew(), i
+	ReDim arrNew(UBound(arr1)+UBound(arr2)+1)
+
+	For i = 0 To UBound(arr1)
+		arrNew(i) = arr1(i)
+	Next
+	For i = 0 To UBound(arr2)
+		arrNew(UBound(arr1)+1+i) = arr2(i)
+	Next
+	JoinArrays = arrNew
+End Function
+
+'Function 'SpoolMessage(strMessage)
+	'On Error Resume Next
+	'Err.Clear
+	'w_Shell.RegWrite regLocation, strMessage, "REG_EXPAND_SZ"
+	'If Err.Number = 0 Then
+		'SpoolMessage = vbTrue
+	'Else
+		'SpoolMessage = Null
+	'End If
+	'Err.Clear
+'End Function

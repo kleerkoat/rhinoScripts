@@ -1,0 +1,30 @@
+Option Explicit
+'Script written by Pascal
+'Script version Thursday, August 06, 2009 
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+
+'Rhino.AddAlias "SketchInView", "_NoEcho _-Runscript (SketchInView)"
+'orients the current cplane to the view without moving its origin.
+'Call SketchInView()
+Sub SketchInView()
+	Dim Spt
+	Rhino.EnableRedraw(False) 
+	Spt = Rhino.Pt2Str(Rhino.ViewCPlane()(0),,True)
+	Rhino.Command "_noEcho _Cplane _View "
+	Rhino.Command "_noEcho _Cplane W" & spt
+	Rhino.EnableRedraw(True)
+	Rhino.Redraw()
+	Rhino.Command"_Sketch _Pause _Enter"
+	dim sCrv, aLast
+	
+	If Rhino.LastCommandResult = 0 then
+		alast = Rhino.LastCreatedObjects()
+		if isArray(aLast) then
+			for each scrv in aLast
+				Rhino.RebuildCurve sCrv,3,4
+			Next
+		end if
+	End If
+	
+End Sub

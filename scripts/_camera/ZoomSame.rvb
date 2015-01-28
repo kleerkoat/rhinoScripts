@@ -1,0 +1,88 @@
+﻿Option Explicit
+'Script written by Pascal
+'Script version Friday, April 17, 2009 
+
+Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+Rhino.AddAlias "ZoomSame", "_NoEcho _-Runscript (ZoomSame)"
+
+'Call ZoomSame()
+
+Sub ZoomSame()
+	
+	If Rhino.IsLayout(Rhino.CurrentView)  Then
+		Rhino.Print "This tool does not work in layouts."
+		Exit Sub
+	End If
+	
+	Dim aSel: aSel = Rhino.SelectedObjects	
+	Dim aViews: aViews = Rhino.ViewNames(False)
+	Dim CrntView: CrntView = Rhino.CurrentView(,False)
+	Dim aTarg: aTarg = Rhino.ViewTarget()
+	Dim sView
+	
+	Rhino.EnableRedraw(False)
+	
+	Rhino.UnselectAllObjects
+	
+	Dim VSphere
+	
+	If Rhino.ViewProjection = 2 Then
+		
+		vSphere = SphereToView(CrntView)
+	
+		Rhino.SelectObject vSphere
+	
+		For Each sView In aViews
+			If sView <> CrntView Then Rhino.ZoomSelected sView
+		Next
+		Rhino.DeleteObject VSphere
+		
+	Else
+		
+		Dim Rad:Rad = Rhino.ViewRadius
+		
+		For Each sView In aViews
+			If sView <> CrntView Then
+				Rhino.ViewTarget sView, aTarg
+				Rhino.ViewRadius sView, rad
+			End If
+		Next
+		
+	End If
+
+	If isArray(aSel) Then Rhino.SelectObjects aSel
+	
+	Rhino.EnableRedraw(True)
+	
+End Sub
+
+Function SphereToView(sView)
+	
+	Dim aCorners: aCorners = Rhino.ViewNearCorners
+	Dim Line1:	Line1 = array(Rhino.ViewCamera(),aCorners(0))
+	Dim Cam: Cam = Rhino.ViewCamera
+	Dim W: W = Rhino.Distance(aCorners(0), aCorners(1))
+	Dim H: H = Rhino.Distance(aCorners(0), aCorners(3))
+	Dim Line2
+	
+	If H < W Then
+	
+		Line2 = array(Cam,aCorners(3))
+	Else
+	
+		Line2 = array(Cam,aCorners(1))
+	End If
+	
+	Dim Plane: Plane = Rhino.ViewCameraPlane
+	Plane(0) = Rhino.ViewTarget
+	
+	Dim Pt1, Pt2
+	
+	Pt1 = Rhino.LinePlaneIntersection(Line1,Plane)
+	Pt2 = Rhino.LinePlaneIntersection(Line2,Plane)
+	
+	Dim Rad: Rad = Rhino.Distance(Pt1,Pt2)/2
+	
+	SphereToView = Rhino.AddSphere(Plane(0),rad)
+	 
+End Function

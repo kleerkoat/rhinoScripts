@@ -1,0 +1,105 @@
+Option Explicit
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "MouseCopy","_NoEcho _-Runscript (MouseCopy)"
+'Call MouseCopy()
+
+Sub MouseCopy()
+	Dim arrObjects(),i
+	
+	Dim arrPlane,dblRadius
+	
+	Dim lngViewColor
+	lngViewColor=Rhino.AppearanceColor(0)
+	Dim lngLockedColor: lngLockedColor=Rhino.AppearanceColor(6)
+	Call Rhino.AppearanceColor(6,lngViewColor)
+	
+	arrPlane=Rhino.WorldXYPlane()
+	
+	Call Rhino.EnableRedraw(False)
+	For i=0 To 999
+		
+		dblRadius=i+1
+		ReDim Preserve arrObjects(i)
+		arrObjects(i)=Rhino.AddCircle(arrPlane, dblRadius)
+			
+		
+	Next
+	
+	Call Rhino.LockObjects(arrObjects)
+	
+	Call Rhino.EnableRedraw(True)
+	
+	
+	
+	'retrieve last used osnap history
+	Call Rhino.ClearCommandHistory()
+	'call command and cancel
+	Call Rhino.Command("_-Osnap !")
+	Dim strHistory : strHistory=Rhino.CommandHistory()
+	'Call Rhino.Print (strHistory)
+	Dim strText : strText=Rhino.Strtok(strHistory,chr(41))(0)
+	'Call Rhino.Print(strText)
+	strText=Rhino.Strtok(strText,chr(40))(1)
+	'Call Rhino.Print(strText)
+	strText=Rhino.Strtok(strText)
+	Dim strReplace: strReplace=strText(0)&" "&strText(1)&" "&strText(2)&" "&strText(3)&" "&strText(4)&" "&strText(5)&" "&strText(6)&" "&strText(7)&" "&strText(8)&" "&strText(9)
+	'Call Rhino.Print(strReplace)
+	strComm="-_Osnap _Endpoint=On _Near=On _Point=On _Midpoint=Off _Center=Off _Intersection=Off _Perpendicular=Off _Tangent=Off _Quadrant=Off _Knot=Off _Enter"
+	Call Rhino.Command(strComm)
+	
+	
+
+
+	Dim  arrCopyObjects, arrStart, arrEnd
+	
+	arrCopyObjects = Rhino.GetObjects("Select objects to copy.")
+	
+	
+	If IsNull(arrCopyObjects) Then
+		Call Rhino.EnableRedraw(False)
+		Call Rhino.UnlockObjects(arrObjects)
+		Call Rhino.DeleteObjects(arrObjects)
+		Call Rhino.UnselectAllObjects()
+		Call Rhino.Command("-_Osnap " & strReplace & " _Enter")
+		Call Rhino.AppearanceColor(6,lngLockedColor)
+		Call Rhino.EnableRedraw(True)
+		Exit Sub
+			
+	Else
+		
+		Call Rhino.SelectObjects(arrCopyObjects)
+		arrStart=Rhino.GetPoint("Point to copy from.")
+		If IsNull(arrStart) Then 
+			Call Rhino.EnableRedraw(False)
+			Call Rhino.UnlockObjects(arrObjects)
+			Call Rhino.DeleteObjects(arrObjects)
+			Call Rhino.UnselectAllObjects()
+			Call Rhino.Command("-_Osnap " & strReplace & " _Enter")
+			Call Rhino.AppearanceColor(6,lngLockedColor)
+			Call Rhino.EnableRedraw(True)
+			Exit Sub
+		End If
+			
+			
+		Dim strPoint: strPoint=Rhino.Pt2Str(arrStart)
+		
+		'move the circular grid to the start point.
+		Call Rhino.MoveObjects(arrObjects,Array(0,0,0),arrStart)
+		
+		'copy the object.
+		Dim strComm: strComm=" -_Copy " & strPoint & " _Pause" 
+		Call Rhino.Command(strComm)
+		
+		Call Rhino.EnableRedraw(False)
+		Call Rhino.UnlockObjects(arrObjects)
+		Call Rhino.DeleteObjects(arrObjects)
+		Call Rhino.UnselectAllObjects()
+		Call Rhino.Command("-_Osnap " & strReplace & " _Enter")
+		Call Rhino.AppearanceColor(6,lngLockedColor)
+		Call Rhino.EnableRedraw(True)
+		
+		
+	End If
+	
+End Sub

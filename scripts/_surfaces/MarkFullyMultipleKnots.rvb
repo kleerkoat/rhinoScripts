@@ -1,0 +1,68 @@
+﻿'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' MarkFullyMultipleKnots.rvb -- March 2010
+' If this code works, it was written by Dale Fugier.
+' If not, I don't know who wrote it.
+' Works with Rhino 4.0.
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+
+Option Explicit
+
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' Adds points at full-multiplicity knot locations.
+' Note, a knot value is said to be a full-multiplicity
+' knot if it is duplicated degree many times
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+Sub MarkFullyMultipleKnots()
+  
+  Dim curve, degree, knots, knot_index, mult
+  
+  curve = Rhino.GetObject("Select curve", 4, True)
+  If IsNull(curve) Then Exit Sub
+    
+  degree = Rhino.CurveDegree(curve)
+  knots = Rhino.CurveKnots(curve)
+  
+  Call Rhino.EnableRedraw(False)
+  
+  For knot_index = 0 To UBound(knots)
+    mult = KnotMultiplicity(knots, knot_index)
+    If (degree = mult) Then
+      Call Rhino.AddPoint(Rhino.EvaluateCurve(curve, knots(knot_index)))
+    End If
+  Next
+
+  Call Rhino.EnableRedraw(True)
+  
+End Sub    
+
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' Calculates the multiplicity of a knot    
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+Function KnotMultiplicity(knots, knot_index)
+  
+  Dim knot_count, mult, index, t
+  
+  index = knot_index
+  knot_count = UBound(knots)
+  
+  If (index < 0 Or index > knot_count) Then
+    KnotMultiplicity = Null
+    Exit Function
+  End If
+  
+  t = knots(index)
+  mult = 1
+  
+  Do While (index < knot_count)
+    If (knots(index + 1) - t) > 1.0e-12 Then Exit Do
+    index = index + 1
+    mult = mult + 1
+  Loop
+  
+  KnotMultiplicity = mult
+    
+End Function
+
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+Rhino.AddAlias "MarkFullyMultipleKnots", "_NoEcho _-RunScript (MarkFullyMultipleKnots)"

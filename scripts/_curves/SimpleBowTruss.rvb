@@ -1,0 +1,982 @@
+' ****************************** RhinoScript.org ******************************
+'
+'   Simple bow truss, version 0.5
+'
+'   by Jean-Francois C. Lemay, published May 02, 2010
+'
+'
+'   This simple script for Rhino 4 generates, for each selected curve, a simple bow truss.  Not exciting, but useful when a large number of trusses need to be modeled.
+'   
+'   The base curve can be curved, and the trusses generated in a CPlane.  Options include: Warren, Howe, or Pratt web; a depth and number of nodes variable by span; pointy or square ends; etc.  Presently, the script doesn't create surfaces.
+'
+'
+'
+'
+'   This RhinoScript Application has been downloaded from RhinoScript.org.
+'
+'   Rhino versions: Rhino 4 (at least service release 5)
+'
+'   LICENSE INFORMATION:
+'   This script is published under the GNU General Public License, version 3
+'   or any later version, and thus comes WITHOUT ANY WARRANTY. You can get
+'   the complete license text here: www.rhinoscript.org/gpl
+'
+' ****************************** RhinoScript.org ******************************
+
+
+
+
+'Simple bow truss
+
+'Version 0.5, April 2010
+
+'This simple script for Rhino 4 generates, for each selected curve,
+'a simple bow truss, of Warren, Howe or Pratt type.
+'Please see the Read Me file for details.
+
+'Written by Jean-Francois C. Lemay
+'Please mention my name if you use large parts of this code.
+
+'www.mailoci.com/jf
+
+
+
+Option Explicit
+
+'-- Script top level
+
+Dim blnEndScript
+Dim i, j, k, n
+Dim intTempA, arrTempA, arrTempCoorA, arrTempCoorB
+ReDim arrTempA(0), arrTempCoorA(2), arrTempCoorB(2)
+
+Dim strView, arrCurrentCPlane, arrXformProjectToCPlane
+
+'Layer names
+Dim strLayerBeforeScript
+Dim strLayerNameGuideBase, strLayerNameGuideProcess
+Dim strLayerNameGuideTopChord, strLayerNameGuideBottomChord, strLayerNameGuideWeb
+Dim strLayerNameSurfTop, strLayerNameSurfBottom, strLayerNameSurfWeb
+
+'Get boolean
+Dim blnBaseCurvesAreTop
+
+'Get string
+Dim strTrussTypeAnswer
+
+'Get other booleans
+Dim blnChordsAreCurved, blnEndsArePointy, blnWebStartsOnTopChord, blnNbOfNodesIsVariable, blnDepthIsVariable
+
+'Get values
+Dim dblApproxNodeSpacing, intNbOfNodes
+Dim dblStartDepthMultiple, dblMidDepthMultiple, dblMinimumDepth
+Dim dblStartDepthFixed, dblMidDepthFixed
+
+'Get base curves
+Dim arrstrBaseCurves
+
+'Current truss processing
+Dim arrdblCurrentStartPoint, arrdblCurrentEndPoint
+Dim dblCurrentBaseCurveLength, dblCurrentBaseCurveProjLength, dblCurrentSpan
+Dim dblCurrentStartDepth, dblCurrentMidDepth, dblCurrentPrepareNbOfNodes, intCurrentNbOfNodes
+Dim dblCurrentDepth
+
+Dim strCurrentBaseCurveProj, intCurrentUBound
+
+Dim arrdblCurrentNodesProjCoorWorld, arrdblCurrentNodesProjCoorCPlane
+ReDim arrdblCurrentNodesProjCoorWorld(0), arrdblCurrentNodesProjCoorCPlane(0)
+
+Dim arrdblCurrentVLinesUpCoorWorld, arrdblCurrentVLinesUpCoorCPlane
+Dim arrdblCurrentVLinesDownCoorWorld, arrdblCurrentVLinesDownCoorCPlane
+Dim arrstrCurrentVLines
+ReDim arrdblCurrentVLinesUpCoorWorld(0), arrdblCurrentVLinesUpCoorCPlane(0)
+ReDim arrdblCurrentVLinesDownCoorWorld(0), arrdblCurrentVLinesDownCoorCPlane(0)
+ReDim arrstrCurrentVLines(0)
+
+Dim arrdblCurrentTopNodesCoorWorld, arrdblCurrentTopNodesCoorCPlane
+Dim arrdblCurrentBottomNodesCoorWorld, arrdblCurrentBottomNodesCoorCPlane
+ReDim arrdblCurrentTopNodesCoorWorld(0), arrdblCurrentTopNodesCoorCPlane(0)
+ReDim arrdblCurrentBottomNodesCoorWorld(0), arrdblCurrentBottomNodesCoorCPlane(0)
+
+Dim arrdblCurrentWebCoor
+ReDim arrdblCurrentWebCoor(0)
+
+Dim arrdblCurrentActualTopChordCoor, arrdblCurrentActualBottomChordCoor
+ReDim arrdblCurrentActualTopChordCoor(0), arrdblCurrentActualBottomChordCoor(0)
+
+'Arrays for all trusses
+Dim arrstrGuideTopChord, arrstrGuideBottomChord, arrstrGuideWeb
+
+
+
+
+blnEndScript = False
+
+'Call SimpleBowTruss()
+
+'-- End of the top level (and of the script!)
+
+
+
+
+Sub SimpleBowTruss()
+
+  Rhino.Print "Simple bow truss script for Rhino, April 2010.  Welcome!"
+  Rhino.Print "The trusses will be created in the vertical of the current CPlane."
+        
+  Call SelectionsStart
+  
+  If blnEndScript = False Then
+    Call CreateLayers
+    Call PrepareA
+    Call ProcessEachTruss
+  End If
+
+  Rhino.CurrentLayer strLayerBeforeScript
+  
+End Sub
+
+'End Sub: MainRoutine
+
+
+
+
+Sub SelectionsStart
+  
+  'GetBoolean: the order is Title, False, True
+   
+  Erase arrTempA
+  arrTempA = Rhino.GetBoolean("Selected whether the base curves are top or bottom chords",_
+    Array( "BaseCurvesAre", "Bottom", "Top"),_ 
+    Array(True) )
+    
+  If IsNull(arrTempA) Then 
+		Rhino.Print "Script: No answer!  Script ends."
+		blnEndScript = True
+		Exit Sub
+	End If     
+  blnBaseCurvesAreTop = arrTempA(0)
+
+	
+  strTrussTypeAnswer = Rhino.GetString("Select the type of truss to be made",_
+  "Warren",_
+  Array( "Warren", "Howe", "Pratt" ) )
+
+  If IsNull(strTrussTypeAnswer) Then 
+		Rhino.Print "Script: No answer!  Script ends."
+		blnEndScript = True
+		Exit Sub
+	End If
+		
+		
+  Erase arrTempA
+  arrTempA = Rhino.GetBoolean("Select whether to make curved or polygonal chords",_
+    Array( "ChordsAre", "Polygonal", "Curved" ),_
+    Array(True) )
+
+  If IsNull(arrTempA) Then 
+		Rhino.Print "Script: No answer!  Script ends."
+		blnEndScript = True
+		Exit Sub
+	End If
+	blnChordsAreCurved = arrTempA(0)
+		
+		
+  Erase arrTempA
+  arrTempA = Rhino.GetBoolean("Select whether to make pointy or square ends",_
+    Array( "EndsAre", "Square", "Pointy" ),_
+    Array(True) )
+
+  If IsNull(arrTempA) Then 
+		Rhino.Print "Script: No answer!  Script ends."
+		blnEndScript = True
+		Exit Sub
+  End If
+	blnEndsArePointy = arrTempA(0)
+	
+		
+	If strTrussTypeAnswer = "Warren" Then
+	  
+  	Erase arrTempA
+    arrTempA = Rhino.GetBoolean("Select whether the Warren truss web starts on the top or bottom chord",_
+      Array( "WebStartsOn", "BottomChord", "TopChord" ),_
+      Array(True) )
+      
+    If IsNull(arrTempA) Then 
+  		Rhino.Print "Script: No answer!  Script ends."
+  		blnEndScript = True
+  		Exit Sub
+  	End If
+    blnWebStartsOnTopChord = arrTempA(0)
+
+	End If
+
+
+  Erase arrTempA
+  arrTempA = Rhino.GetBoolean("Select whether the number of nodes is variable or fixed",_
+    Array( "NumberOfNodesIs", "Fixed", "Variable" ),_
+    Array(True) )
+
+  If IsNull(arrTempA) Then 
+		Rhino.Print "Script: No answer!  Script ends."
+		blnEndScript = True
+		Exit Sub
+	End If	
+  blnNbOfNodesIsVariable = arrTempA(0)
+  		
+
+  If blnNbOfNodesIsVariable = True Then
+    
+    dblApproxNodeSpacing = Rhino.GetReal("Enter the approx. distance (along the base curve) between truss nodes", 1000)
+    If IsNull(dblApproxNodeSpacing) Then
+  		Rhino.Print "Script: No answer!  Script ends."
+  		blnEndScript = True
+  		Exit Sub
+  		End If
+  		
+  Else
+  
+    intNbOfNodes = Rhino.GetInteger("Enter the number of nodes (should be odd)", 21, 3)
+    If IsNull(intNbOfNodes) Then
+  		Rhino.Print "Script: No answer!  Script ends."
+  		blnEndScript = True
+  		Exit Sub
+  	End If    
+  		
+  	If ( intNbOfNodes / 2 - Int(intNbOfNodes / 2) = 0 ) Then
+  	  intNbOfNodes = intNbOfNodes + 1
+  	  Rhino.Print "Script: Corrected number of nodes: " & intNbOfNodes
+  	End If
+  		
+  End If
+
+
+  Erase arrTempA
+  arrTempA = Rhino.GetBoolean("Select whether the depth of the truss should be variable or fixed",_
+    Array( "TrussDepthIs", "Fixed", "Variable" ),_
+    Array(True) )
+
+  If IsNull(arrTempA) Then 
+		Rhino.Print "Script: No answer!  Script ends."
+		blnEndScript = True
+		Exit Sub
+  End If
+	blnDepthIsVariable = arrTempA(0)
+	
+		
+	If blnDepthIsVariable = True Then
+	
+    dblStartDepthMultiple = Rhino.GetReal("Enter the start depth of the trusses as a multiple of their span (as a line)", 0.05)
+    If IsNull(dblStartDepthMultiple) Then
+  		Rhino.Print "Script: No answer!  Script ends."
+  		blnEndScript = True
+  		Exit Sub
+    End If
+  		
+    dblMidDepthMultiple = Rhino.GetReal("Enter the middle depth of the trusses as a multiple of their span (as a line)", 0.1)
+    If IsNull(dblMidDepthMultiple) Then
+  		Rhino.Print "Script: No answer!  Script ends."
+  		blnEndScript = True
+  		Exit Sub
+  		End If
+  		
+    dblMinimumDepth = Rhino.GetReal("Enter the absolute minimum depth of the trusses", 500)
+    If IsNull(dblMinimumDepth) Then
+  		Rhino.Print "Script: No answer!  Script ends."
+  		blnEndScript = True
+  		Exit Sub
+  	End If
+		
+	Else
+		
+    dblStartDepthFixed = Rhino.GetReal("Enter the fixed start depth of the trusses", 500)
+    If IsNull(dblStartDepthFixed) Then
+  		Rhino.Print "Script: No answer!  Script ends."
+  		blnEndScript = True
+  		Exit Sub
+  	End If
+  		
+    dblMidDepthFixed = Rhino.GetReal("Enter the fixed middle depth of the trusses", 500)
+    If IsNull(dblMidDepthFixed) Then
+  		Rhino.Print "Script: No answer!  Script ends."
+  		blnEndScript = True
+  		Exit Sub
+  	End If
+		
+  End If
+
+
+  arrstrBaseCurves = Rhino.GetObjects("Select the base curves", 4, False, False, False)
+  If (IsArray(arrstrBaseCurves) = False) Then 
+		Rhino.Print "Script: No base curves were selected!  Script ends."
+		blnEndScript = True
+		Exit Sub
+	End If
+	
+  'To program:
+  'Select web profile
+  'Select top chord profile
+  'Select bottom chord profile
+	
+End Sub
+'End Sub: SelectionsStart
+
+
+
+
+Sub CreateLayers
+
+  strLayerNameGuideBase = "Truss-Guide-Base"
+  strLayerNameGuideProcess = "Truss-Guide-Process"  
+  strLayerNameGuideTopChord = "Truss-Guide-Top-Chord"
+  strLayerNameGuideBottomChord = "Truss-Guide-Bottom-Chord"
+  strLayerNameGuideWeb = "Truss-Guide-Web"
+  strLayerNameSurfTop = "Truss-Surf-Top"
+  strLayerNameSurfBottom = "Truss-Surf-Bottom"
+  strLayerNameSurfWeb = "Truss-Surf-Web"
+    
+  If Rhino.IsLayer(strLayerNameGuideBase) = False Then 
+    Rhino.AddLayer strLayerNameGuideBase
+  End If
+  Rhino.LayerColor strLayerNameGuideBase, RGB(63,191,191)
+  Rhino.LayerVisible  strLayerNameGuideBase, True
+  Rhino.LayerLocked strLayerNameGuideBase, False   
+  
+  If Rhino.IsLayer(strLayerNameGuideProcess) = False Then 
+    Rhino.AddLayer strLayerNameGuideProcess
+  End If
+  Rhino.LayerColor strLayerNameGuideProcess, RGB(255,191,0)
+  Rhino.LayerVisible  strLayerNameGuideProcess, True
+  Rhino.LayerLocked strLayerNameGuideProcess, False 
+  
+  If Rhino.IsLayer(strLayerNameGuideTopChord) = False Then 
+    Rhino.AddLayer strLayerNameGuideTopChord
+  End If
+  Rhino.LayerColor strLayerNameGuideTopChord, RGB(0,255,0)
+  Rhino.LayerVisible  strLayerNameGuideTopChord, True
+  Rhino.LayerLocked strLayerNameGuideTopChord, False
+  
+  If Rhino.IsLayer(strLayerNameGuideBottomChord) = False Then 
+    Rhino.AddLayer strLayerNameGuideBottomChord
+  End If
+  Rhino.LayerColor strLayerNameGuideBottomChord, RGB(0,255,0)
+  Rhino.LayerVisible  strLayerNameGuideBottomChord, True
+  Rhino.LayerLocked strLayerNameGuideBottomChord, False
+  
+  If Rhino.IsLayer(strLayerNameGuideWeb) = False Then 
+    Rhino.AddLayer strLayerNameGuideWeb
+  End If
+  Rhino.LayerColor strLayerNameGuideWeb, RGB(127,255,127)
+  Rhino.LayerVisible  strLayerNameGuideWeb, True
+  Rhino.LayerLocked strLayerNameGuideWeb, False
+  
+  If Rhino.IsLayer(strLayerNameSurfTop) = False Then 
+    Rhino.AddLayer strLayerNameSurfTop
+  End If
+  Rhino.LayerColor strLayerNameSurfTop, RGB(255,255,255)
+  Rhino.LayerVisible  strLayerNameSurfTop, True
+  Rhino.LayerLocked strLayerNameSurfTop, False
+  
+  If Rhino.IsLayer(strLayerNameSurfBottom) = False Then 
+    Rhino.AddLayer strLayerNameSurfBottom
+  End If
+  Rhino.LayerColor strLayerNameSurfBottom, RGB(255,255,255)
+  Rhino.LayerVisible  strLayerNameSurfBottom, True
+  Rhino.LayerLocked strLayerNameSurfBottom, False
+  
+  If Rhino.IsLayer(strLayerNameSurfWeb) = False Then 
+    Rhino.AddLayer strLayerNameSurfWeb
+  End If
+  Rhino.LayerColor strLayerNameSurfWeb, RGB(255,255,255)
+  Rhino.LayerVisible  strLayerNameSurfWeb, True
+  Rhino.LayerLocked strLayerNameSurfWeb, False
+  
+End Sub
+'End Sub: CreateLayers
+
+
+
+
+Sub PrepareA
+  
+  strView = Rhino.CurrentView
+	arrCurrentCPlane = Rhino.ViewCPlane(strView)
+	arrXformProjectToCPlane = Rhino.XformPlanarProjection(arrCurrentCPlane)
+  
+  strLayerBeforeScript = Rhino.CurrentLayer
+  
+  i = 0
+  While i <= UBound(arrstrBaseCurves)  
+    Rhino.ObjectLayer arrstrBaseCurves(i), strLayerNameGuideBase
+    i = i+1
+  Wend
+
+  intTempA = UBound(arrstrBaseCurves)
+
+  ReDim arrstrGuideTopChord( intTempA )
+  ReDim arrstrGuideBottomChord( intTempA )
+  ReDim arrstrGuideWeb( intTempA )
+  
+End Sub
+'End Sub: PrepareA
+
+
+
+Sub ProcessEachTruss
+    
+  i = 0
+  While i <= UBound(arrstrBaseCurves)  'For each truss
+    
+    Rhino.CurrentLayer strLayerNameGuideProcess
+    
+    Call EachTrussNodes
+    
+    If strTrussTypeAnswer = "Warren" Then 
+      Call EachTrussPrepareWebWarren
+    ElseIf strTrussTypeAnswer = "Howe" Then
+      Call EachTrussPrepareWebHowe
+    ElseIf strTrussTypeAnswer = "Pratt" Then
+      Call EachTrussPrepareWebPratt
+    End If
+
+    Call EachTrussCreateGuides
+   
+    i = i+1
+  Wend
+  
+End Sub
+'End Sub: ProcessEachTruss
+
+
+
+
+Sub EachTrussNodes
+  
+  arrdblCurrentStartPoint = Rhino.CurveStartPoint( arrstrBaseCurves(i) )
+  arrdblCurrentEndPoint = Rhino.CurveEndPoint( arrstrBaseCurves(i) )
+  
+
+  'Project base curve to CPlane
+  
+  Rhino.EnableRedraw False
+  strCurrentBaseCurveProj = Rhino.TransformObject(arrstrBaseCurves(i), arrXformProjectToCPlane, True)
+  Rhino.ObjectLayer strCurrentBaseCurveProj, strLayerNameGuideProcess
+  arrTempCoorA = Rhino.CurveStartPoint( strCurrentBaseCurveProj )
+  Rhino.MoveObject strCurrentBaseCurveProj, arrTempCoorA, arrdblCurrentStartPoint
+  Rhino.EnableRedraw True
+  
+  
+  'Set the number of nodes
+  
+  dblCurrentBaseCurveLength = Rhino.CurveLength( arrstrBaseCurves(i) )
+  dblCurrentBaseCurveProjLength = Rhino.CurveLength( strCurrentBaseCurveProj )
+  dblCurrentSpan = Rhino.Distance( arrdblCurrentStartPoint, arrdblCurrentEndPoint )
+      
+  Rhino.Print "Current span: " & dblCurrentSpan
+  
+  If blnNbOfNodesIsVariable = True Then
+  
+    dblCurrentPrepareNbOfNodes = dblCurrentBaseCurveProjLength / dblApproxNodeSpacing
+    
+    If dblCurrentPrepareNbOfNodes < 3 Then
+      dblCurrentPrepareNbOfNodes = 3
+    End If
+    
+    If Round(dblCurrentPrepareNbOfNodes)/2 - Int(Round(dblCurrentPrepareNbOfNodes)/2) = 0 Then
+      'Rounded number is even
+      intCurrentNbOfNodes = Round(dblCurrentPrepareNbOfNodes) + 1
+    Else
+      'Rounded number is odd
+      intCurrentNbOfNodes = Round(dblCurrentPrepareNbOfNodes)
+    End If
+    
+    Rhino.Print "Current number of nodes: " & intCurrentNbOfNodes
+  
+  Else
+    intCurrentNbOfNodes = intNbOfNodes
+  End If
+
+
+  'Find the start and mid depth of the current truss
+  
+  If blnDepthIsVariable = True Then
+  
+    dblCurrentStartDepth = dblCurrentSpan * dblStartDepthMultiple
+    dblCurrentMidDepth = dblCurrentSpan * dblMidDepthMultiple
+    
+    If dblCurrentStartDepth < dblMinimumDepth Then
+      dblCurrentStartDepth = dblMinimumDepth
+    End If
+    
+    If dblCurrentMidDepth < dblMinimumDepth Then
+      dblCurrentMidDepth = dblMinimumDepth
+    End If
+  
+  Else 
+    dblCurrentStartDepth = dblStartDepthFixed
+    dblCurrentMidDepth = dblMidDepthFixed
+  End If
+
+  
+  'Subdivide the projected base curve and redim arrays
+  
+  arrdblCurrentNodesProjCoorWorld = Rhino.DivideCurve(strCurrentBaseCurveProj, intCurrentNbOfNodes-1, False)
+  
+  intCurrentUBound = UBound(arrdblCurrentNodesProjCoorWorld, 1)
+  
+  ReDim arrdblCurrentNodesProjCoorCPlane( intCurrentUBound )
+  
+  ReDim arrdblCurrentVLinesUpCoorCPlane( intCurrentUBound )
+  ReDim arrdblCurrentVLinesDownCoorCPlane( intCurrentUBound )
+  ReDim arrdblCurrentVLinesUpCoorWorld( intCurrentUBound )
+  ReDim arrdblCurrentVLinesDownCoorWorld( intCurrentUBound )
+  ReDim arrstrCurrentVLines( intCurrentUBound )
+  
+  ReDim arrdblCurrentTopNodesCoorWorld( intCurrentUBound )
+  ReDim arrdblCurrentTopNodesCoorCPlane( intCurrentUBound )
+  ReDim arrdblCurrentBottomNodesCoorWorld( intCurrentUBound )
+  ReDim arrdblCurrentBottomNodesCoorCPlane( intCurrentUBound )
+ 
+
+  'Create Vlines and find the nodes coordinates
+
+  Rhino.EnableRedraw False
+  
+  j = 0
+  While j <= intCurrentUBound
+    
+    arrdblCurrentNodesProjCoorCPlane(j) = Rhino.XformWorldToCPlane(arrdblCurrentNodesProjCoorWorld(j), arrCurrentCPlane)
+    
+    'They are 1d arrays with a 1d array the first dimension, and not 2d arrays...
+    
+    arrTempCoorA(0) = arrdblCurrentNodesProjCoorCPlane(j)(0)  
+    arrTempCoorA(1) = arrdblCurrentNodesProjCoorCPlane(j)(1)
+    arrTempCoorA(2) = arrdblCurrentNodesProjCoorCPlane(j)(2) + dblCurrentBaseCurveLength / 2
+    arrdblCurrentVLinesUpCoorCPlane(j) = arrTempCoorA
+    
+    arrTempCoorB(0) = arrdblCurrentNodesProjCoorCPlane(j)(0)
+    arrTempCoorB(1) = arrdblCurrentNodesProjCoorCPlane(j)(1)
+    arrTempCoorB(2) = arrdblCurrentNodesProjCoorCPlane(j)(2) - dblCurrentBaseCurveLength / 2
+    arrdblCurrentVLinesDownCoorCPlane(j) = arrTempCoorB
+    
+    arrdblCurrentVLinesUpCoorWorld(j) = Rhino.XformCPlaneToWorld( arrdblCurrentVLinesUpCoorCPlane(j), arrCurrentCPlane)
+    arrdblCurrentVLinesDownCoorWorld(j) = Rhino.XformCPlaneToWorld( arrdblCurrentVLinesDownCoorCPlane(j), arrCurrentCPlane)
+    
+    arrstrCurrentVLines(j) = Rhino.AddLine( arrdblCurrentVLinesDownCoorWorld(j) , arrdblCurrentVLinesUpCoorWorld(j) )
+    
+    Erase arrTempA
+    arrTempA = Rhino.CurveCurveIntersection( arrstrBaseCurves(i), arrstrCurrentVLines(j) )
+    
+    dblCurrentDepth = fcUnitParabola( j/intCurrentUBound ) * ( dblCurrentMidDepth - dblCurrentStartDepth )_
+    + dblCurrentStartDepth
+    
+    If blnBaseCurvesAreTop = True Then
+      
+      arrdblCurrentTopNodesCoorWorld(j) = arrTempA(0,1)
+      arrdblCurrentTopNodesCoorCPlane(j) = Rhino.XformWorldToCPlane(arrdblCurrentTopNodesCoorWorld(j), arrCurrentCPlane)
+      
+      arrTempCoorA(0) = arrdblCurrentTopNodesCoorCPlane(j)(0)  
+      arrTempCoorA(1) = arrdblCurrentTopNodesCoorCPlane(j)(1)
+      arrTempCoorA(2) = arrdblCurrentTopNodesCoorCPlane(j)(2) - dblCurrentDepth
+      arrdblCurrentBottomNodesCoorCPlane(j) = arrTempCoorA
+      
+      arrdblCurrentBottomNodesCoorWorld(j) = Rhino.XformCPlaneToWorld( arrdblCurrentBottomNodesCoorCPlane(j), arrCurrentCPlane)
+       
+    Else
+    
+      arrdblCurrentBottomNodesCoorWorld(j) = arrTempA(0,1)
+      arrdblCurrentBottomNodesCoorCPlane(j) = Rhino.XformWorldToCPlane(arrdblCurrentBottomNodesCoorWorld(j), arrCurrentCPlane)
+      
+      arrTempCoorA(0) = arrdblCurrentBottomNodesCoorCPlane(j)(0)  
+      arrTempCoorA(1) = arrdblCurrentBottomNodesCoorCPlane(j)(1)
+      arrTempCoorA(2) = arrdblCurrentBottomNodesCoorCPlane(j)(2) + dblCurrentDepth
+      arrdblCurrentTopNodesCoorCPlane(j) = arrTempCoorA
+      
+      arrdblCurrentTopNodesCoorWorld(j) = Rhino.XformCPlaneToWorld( arrdblCurrentTopNodesCoorCPlane(j), arrCurrentCPlane)
+    
+    End If
+    
+    j=j+1
+    
+  Wend
+  
+  Rhino.EnableRedraw True
+  
+End Sub
+'End Sub: EachTrussNodes
+
+
+
+
+Sub EachTrussPrepareWebWarren
+  
+  j = 0  'Current node
+  k = 0  'Array arrdblCurrentWebCoor(k)
+  
+  If blnWebStartsOnTopChord = True Then
+    
+    If blnEndsArePointy = False Then
+      ReDim arrdblCurrentWebCoor(intCurrentUBound + 2)
+      arrdblCurrentWebCoor(k) = arrdblCurrentBottomNodesCoorWorld(0)
+      k = k+1
+    Else
+      ReDim arrdblCurrentWebCoor(intCurrentUBound)
+    End If
+    
+    arrdblCurrentWebCoor(k) = arrdblCurrentTopNodesCoorWorld(0)
+    k = k+1
+    
+    j = 1    
+    While j <= intCurrentUBound - 1 
+      arrdblCurrentWebCoor(k) = arrdblCurrentBottomNodesCoorWorld(j)
+      k = k+1
+      arrdblCurrentWebCoor(k) = arrdblCurrentTopNodesCoorWorld(j+1)
+      k = k+1
+      j = j+2
+    Wend
+    
+    If blnEndsArePointy = False Then
+      arrdblCurrentWebCoor(k) = arrdblCurrentBottomNodesCoorWorld(intCurrentUBound)
+      k = k+1
+    End If
+
+  Else
+  
+    If blnEndsArePointy = False Then
+      ReDim arrdblCurrentWebCoor(intCurrentUBound + 2)
+      arrdblCurrentWebCoor(k) = arrdblCurrentTopNodesCoorWorld(0)
+      k = k+1
+    Else
+      ReDim arrdblCurrentWebCoor(intCurrentUBound)
+    End If
+    
+    arrdblCurrentWebCoor(k) = arrdblCurrentBottomNodesCoorWorld(0)
+    k = k+1
+    
+    j = 1    
+    While j <= intCurrentUBound - 1 
+      arrdblCurrentWebCoor(k) = arrdblCurrentTopNodesCoorWorld(j)
+      k = k+1
+      arrdblCurrentWebCoor(k) = arrdblCurrentBottomNodesCoorWorld(j+1)
+      k = k+1
+      j = j+2
+    Wend
+    
+    If blnEndsArePointy = False Then
+      arrdblCurrentWebCoor(k) = arrdblCurrentTopNodesCoorWorld(intCurrentUBound)
+      k = k+1
+    End If
+    
+  End If
+  
+End Sub
+'End Sub: EachTrussPrepareWebWarren
+
+
+
+
+Sub EachTrussPrepareWebHowe
+
+  j = 0  'Current node
+  k = 0  'Array arrdblCurrentWebCoor(k)
+  
+  If blnEndsArePointy = False Then
+    ReDim arrdblCurrentWebCoor(intCurrentUBound * 2)
+    arrdblCurrentWebCoor(k) = arrdblCurrentTopNodesCoorWorld(0)
+    k = k+1
+  Else
+    ReDim arrdblCurrentWebCoor(intCurrentUBound * 2 - 2)
+  End If
+  
+  arrdblCurrentWebCoor(k) = arrdblCurrentBottomNodesCoorWorld(0)
+  k = k+1
+  
+  j = 1    
+  While j <= intCurrentUBound / 2 - 1 
+    arrdblCurrentWebCoor(k) = arrdblCurrentTopNodesCoorWorld(j)
+    k = k+1
+    arrdblCurrentWebCoor(k) = arrdblCurrentBottomNodesCoorWorld(j)
+    k = k+1
+    j = j+1
+  Wend
+  
+  arrdblCurrentWebCoor(k) = arrdblCurrentTopNodesCoorWorld( intCurrentUBound / 2 )
+  k = k+1
+  
+  j = intCurrentUBound / 2 + 1    
+  While j <= intCurrentUBound - 1 
+    arrdblCurrentWebCoor(k) = arrdblCurrentBottomNodesCoorWorld(j)
+    k = k+1
+    arrdblCurrentWebCoor(k) = arrdblCurrentTopNodesCoorWorld(j)
+    k = k+1
+    j = j+1
+  Wend  
+  
+  arrdblCurrentWebCoor(k) = arrdblCurrentBottomNodesCoorWorld( intCurrentUBound )
+  k = k+1  
+  
+  If blnEndsArePointy = False Then
+    arrdblCurrentWebCoor(k) = arrdblCurrentTopNodesCoorWorld( intCurrentUBound )
+    k = k+1
+  End If
+  
+End Sub
+'End Sub: EachTrussPrepareWebHowe
+
+
+
+
+Sub EachTrussPrepareWebPratt
+
+  j = 0  'Current node
+  k = 0  'Array arrdblCurrentWebCoor(k)
+  
+  If blnEndsArePointy = False Then
+    ReDim arrdblCurrentWebCoor(intCurrentUBound * 2)
+    arrdblCurrentWebCoor(k) = arrdblCurrentBottomNodesCoorWorld(0)
+    k = k+1
+  Else
+    ReDim arrdblCurrentWebCoor(intCurrentUBound * 2 - 2)
+  End If
+  
+  arrdblCurrentWebCoor(k) = arrdblCurrentTopNodesCoorWorld(0)
+  k = k+1
+  
+  j = 1    
+  While j <= intCurrentUBound / 2 - 1 
+    arrdblCurrentWebCoor(k) = arrdblCurrentBottomNodesCoorWorld(j)
+    k = k+1
+    arrdblCurrentWebCoor(k) = arrdblCurrentTopNodesCoorWorld(j)
+    k = k+1
+    j = j+1
+  Wend
+  
+  arrdblCurrentWebCoor(k) = arrdblCurrentBottomNodesCoorWorld( intCurrentUBound / 2 )
+  k = k+1
+  
+  j = intCurrentUBound / 2 + 1    
+  While j <= intCurrentUBound - 1 
+    arrdblCurrentWebCoor(k) = arrdblCurrentTopNodesCoorWorld(j)
+    k = k+1
+    arrdblCurrentWebCoor(k) = arrdblCurrentBottomNodesCoorWorld(j)
+    k = k+1
+    j = j+1
+  Wend  
+  
+  arrdblCurrentWebCoor(k) = arrdblCurrentTopNodesCoorWorld( intCurrentUBound )
+  k = k+1  
+  
+  If blnEndsArePointy = False Then
+    arrdblCurrentWebCoor(k) = arrdblCurrentBottomNodesCoorWorld( intCurrentUBound )
+    k = k+1
+  End If
+  
+End Sub
+'End Sub: EachTrussPrepareWebPratt
+
+
+
+
+Sub EachTrussCreateGuides 
+  
+  'Find the actual coordinates of the top and bottom chords
+
+  If (strTrussTypeAnswer = "Warren") And (blnChordsAreCurved = False) Then
+    
+    If blnWebStartsOnTopChord And blnEndsArePointy Then
+      
+      ReDim arrdblCurrentActualTopChordCoor( intCurrentUBound / 2 )
+      ReDim arrdblCurrentActualBottomChordCoor( intCurrentUBound / 2 - 1 )
+      
+      k=0
+      j=0
+      While j <= intCurrentUBound
+        arrdblCurrentActualTopChordCoor(k) = arrdblCurrentTopNodesCoorWorld(j)
+        k = k+1
+        j = j+2
+      Wend
+      
+      k=0
+      j=1
+      While j <= intCurrentUBound - 1
+        arrdblCurrentActualBottomChordCoor(k) = arrdblCurrentBottomNodesCoorWorld(j)
+        k = k+1
+        j = j+2
+      Wend
+      
+    ElseIf (blnWebStartsOnTopChord = False) And blnEndsArePointy Then
+    
+      ReDim arrdblCurrentActualTopChordCoor( intCurrentUBound / 2 - 1 )
+      ReDim arrdblCurrentActualBottomChordCoor( intCurrentUBound / 2 )
+      
+      k=0
+      j=1
+      While j <= intCurrentUBound - 1
+        arrdblCurrentActualTopChordCoor(k) = arrdblCurrentTopNodesCoorWorld(j)
+        k = k+1
+        j = j+2
+      Wend
+    
+      k=0
+      j=0
+      While j <= intCurrentUBound
+        arrdblCurrentActualBottomChordCoor(k) = arrdblCurrentBottomNodesCoorWorld(j)
+        k = k+1
+        j = j+2
+      Wend
+    
+    ElseIf blnWebStartsOnTopChord And (blnEndsArePointy = False) Then
+
+      ReDim arrdblCurrentActualTopChordCoor( intCurrentUBound / 2 )
+      ReDim arrdblCurrentActualBottomChordCoor( intCurrentUBound / 2 + 1 )
+
+      k=0
+      j=0
+      While j <= intCurrentUBound
+        arrdblCurrentActualTopChordCoor(k) = arrdblCurrentTopNodesCoorWorld(j)
+        k = k+1
+        j = j+2
+      Wend
+      
+      k=0
+      arrdblCurrentActualBottomChordCoor(k) = arrdblCurrentBottomNodesCoorWorld(0)
+      k = k+1
+      j=1
+      While j <= intCurrentUBound - 1
+        arrdblCurrentActualBottomChordCoor(k) = arrdblCurrentBottomNodesCoorWorld(j)
+        k = k+1
+        j = j+2
+      Wend
+      arrdblCurrentActualBottomChordCoor(k) = arrdblCurrentBottomNodesCoorWorld( intCurrentUBound )
+    
+    ElseIf (blnWebStartsOnTopChord = False) And (blnEndsArePointy = False) Then
+
+      ReDim arrdblCurrentActualTopChordCoor( intCurrentUBound / 2 + 1 )
+      ReDim arrdblCurrentActualBottomChordCoor( intCurrentUBound / 2 )
+      
+      k=0
+      arrdblCurrentActualTopChordCoor(k) = arrdblCurrentTopNodesCoorWorld(0)
+      k = k+1
+      j=1
+      While j <= intCurrentUBound - 1
+        arrdblCurrentActualTopChordCoor(k) = arrdblCurrentTopNodesCoorWorld(j)
+        k = k+1
+        j = j+2
+      Wend
+      arrdblCurrentActualTopChordCoor(k) = arrdblCurrentTopNodesCoorWorld( intCurrentUBound )
+    
+      k=0
+      j=0
+      While j <= intCurrentUBound
+        arrdblCurrentActualBottomChordCoor(k) = arrdblCurrentBottomNodesCoorWorld(j)
+        k = k+1
+        j = j+2
+      Wend      
+
+    End If
+  
+  ElseIf (strTrussTypeAnswer = "Howe" Or (blnWebStartsOnTopChord = False)) And blnEndsArePointy Then 
+    'The second condition is for Warren curved
+        
+    ReDim arrdblCurrentActualTopChordCoor( intCurrentUBound - 2 )
+    ReDim arrdblCurrentActualBottomChordCoor( intCurrentUBound )
+    
+    k=0
+    j=1
+    While j <= intCurrentUBound - 1
+      arrdblCurrentActualTopChordCoor(k) = arrdblCurrentTopNodesCoorWorld(j)
+      k = k+1
+      j = j+1
+    Wend
+    
+    k=0
+    j=0
+    While j <= intCurrentUBound
+      arrdblCurrentActualBottomChordCoor(k) = arrdblCurrentBottomNodesCoorWorld(j)
+      k = k+1
+      j = j+1
+    Wend 
+  
+  ElseIf (strTrussTypeAnswer = "Pratt" Or blnWebStartsOnTopChord) And blnEndsArePointy Then 
+    'The second condition is for Warren curved
+    
+    ReDim arrdblCurrentActualTopChordCoor( intCurrentUBound )
+    ReDim arrdblCurrentActualBottomChordCoor( intCurrentUBound - 2 )
+    
+    k=0
+    j=0
+    While j <= intCurrentUBound
+      arrdblCurrentActualTopChordCoor(k) = arrdblCurrentTopNodesCoorWorld(j)
+      k = k+1
+      j = j+1
+    Wend
+    
+    k=0
+    j=1
+    While j <= intCurrentUBound - 1
+      arrdblCurrentActualBottomChordCoor(k) = arrdblCurrentBottomNodesCoorWorld(j)
+      k = k+1
+      j = j+1
+    Wend 
+    
+  Else 'Warren curved with square ends; Howe and Pratt, curved or polygonal, with square ends
+  
+    ReDim arrdblCurrentActualTopChordCoor( intCurrentUBound )
+    ReDim arrdblCurrentActualBottomChordCoor( intCurrentUBound )
+    
+    k=0
+    j=0
+    While j <= intCurrentUBound
+      arrdblCurrentActualTopChordCoor(k) = arrdblCurrentTopNodesCoorWorld(j)
+      arrdblCurrentActualBottomChordCoor(k) = arrdblCurrentBottomNodesCoorWorld(j)
+      k = k+1
+      j = j+1
+    Wend 
+  
+  End If
+  
+  
+  'Create the objects at last!
+  
+  Rhino.EnableRedraw False
+  
+  If blnChordsAreCurved Then
+    
+    If blnBaseCurvesAreTop Then
+      arrstrGuideTopChord(i) = Rhino.CopyObject( arrstrBaseCurves(i) )
+      arrstrGuideBottomChord(i) = Rhino.AddInterpCurve( arrdblCurrentActualBottomChordCoor )
+    Else
+      arrstrGuideTopChord(i) = Rhino.AddInterpCurve( arrdblCurrentActualTopChordCoor )
+      arrstrGuideBottomChord(i) = Rhino.CopyObject( arrstrBaseCurves(i) )
+    End If
+
+    'Must trim base curve!
+
+  Else
+  
+    arrstrGuideTopChord(i) = Rhino.AddPolyline( arrdblCurrentActualTopChordCoor )
+    arrstrGuideBottomChord(i) = Rhino.AddPolyline( arrdblCurrentActualBottomChordCoor )
+  
+  End If
+
+  arrdblCurrentWebCoor(i) = Rhino.AddPolyline( arrdblCurrentWebCoor )
+
+  Rhino.ObjectLayer arrstrGuideTopChord(i), strLayerNameGuideTopChord
+  Rhino.ObjectLayer arrstrGuideBottomChord(i), strLayerNameGuideBottomChord
+  Rhino.ObjectLayer arrdblCurrentWebCoor(i), strLayerNameGuideWeb
+
+  Rhino.EnableRedraw True
+  
+End Sub
+'End Sub: EachTrussCreateGuides
+
+
+
+
+Function fcUnitParabola( dblX )
+  
+  'A parabola that passes through (0,0) (0.5,1) (1,0)
+  
+  fcUnitParabola = -4 * (dblX - 0.5) ^2 + 1
+  
+End Function

@@ -1,0 +1,35 @@
+﻿Option Explicit
+'Script written by Pascal
+'Script version Wednesday, April 29, 2009 
+
+Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+Rhino.AddAlias "SelByInstanceName", "_NoEcho _-Runscript (SelByInstanceName)"
+
+Sub SelByInstanceName()
+
+	Dim aBlockNames: aBlockNames = Rhino.Blocknames
+	Dim aBlocks: aBlocks = Rhino.ObjectsbyType (4096)
+	If Not isArray(aBlocks) Then
+		Rhino.Print"No block instances found."
+		Exit Sub
+	End If
+	
+	Dim aSel: aSel = Rhino.MultiListBox(aBlockNames, "Select block instances","Block Selecter")
+	
+	Dim sSel, sBlock,aTemp
+	
+	Rhino.EnableRedraw(False)
+	If isArray(aSel) Then
+		For Each sSel In aSel
+			For Each sBlock In aBlocks
+				If Rhino.BlockInstanceName(sBlock) = sSel Then
+					atemp = Rhino.BlockInstances(sSel)
+					Rhino.SelectObjects atemp
+				End If
+			Next
+			
+		Next
+	End If
+	Rhino.EnableRedraw(True)
+	
+End Sub

@@ -1,0 +1,123 @@
+'Divide Curve : Feather Gradient
+'
+'Here is a script to divide a curve based on a length smaller than its own. It 
+'produces a curve division solution which initially approximates a uniform 
+'division of the shorter input length, but gradually shifts to cover the entire 
+'curve. The speed of the transition is based on a factor which is a double 
+'between zero and one. Zero gives you an uniform point division and one gives 
+'the most extreme gradient division. Curve direction is important, the point 
+'division is most dense at the beginning and feathers out towards the end of 
+'the curve. Hope that all made sense.
+
+Option Explicit
+
+
+'Script written by Peter Van Hage, www.arcnarc.com  
+'Script copyrighted by Peter Van Hage, give credit where it is due  
+  
+'Call Main()  
+Sub DivideCurveFeatherGradient()  
+  
+      
+    Dim arrCurves,intDivisions,arrDivPoints(),dblShortestCurveLength,dblFactor,arrCurvePoints()  
+      
+    arrCurves = rhino.GetObjects("select loft Curves in order",4)  
+    If isNull(arrCurves) Then Exit Sub  
+      
+    intDivisions = 24  
+      
+    dblShortestCurveLength = rhino.CurveLength(arrCurves(0))  
+      
+    Dim i  
+    For i = 1 To Ubound(arrCurves)  
+          
+        If rhino.CurveLength(arrCurves(i)) < dblShortestCurveLength then  
+              
+            dblShortestCurveLength = rhino.CurveLength(arrCurves(i))  
+              
+        End If    
+          
+    Next  
+  
+    Call rhino.EnableRedraw(False)  
+      
+    ReDim arrDivPoints(Ubound(arrCurves))  
+      
+    'get division points on each curve  
+    For i = 0 To ubound(arrDivPoints)  
+          
+        arrDivPoints(i) = divideCurve_featherGradient(arrCurves(i),dblShortestCurveLength,intDivisions,0.99)  
+          
+    Next  
+      
+    'add a series of interp curves through each point across the input curves  
+    Dim j  
+    ReDim arrCurvePoints(Ubound(arrCurves))   
+      
+    For i = 0 To intDivisions  
+          
+        For j = 0 To Ubound(arrCurves)  
+          
+            arrCurvePoints(j) = arrDivPoints(j)(i)    
+              
+        Next  
+          
+        Call rhino.AddInterpCurve(arrCurvePoints,3)  
+          
+    Next  
+      
+    Call rhino.EnableRedraw(True)  
+      
+End Sub  
+  
+Function divideCurve_featherGradient(strBaseCurve,dblControlLength,intDivisions,factor)  
+    divideCurve_featherGradient = Null  
+      
+    Dim lineX,ptA,ptB,ptC,cubicCurve,strIntersectLine,arrIntersect(),ptX,arrPts(),i  
+  
+    ptA = array(0,intDivisions,0)  
+    ptB = rhino.PointAdd(ptA, rhino.VectorScale(rhino.VectorCreate(array(dblControlLength,0,0),ptA),factor))  
+    ptC = array(rhino.CurveLength(strBaseCurve),0,0)  
+      
+    lineX = rhino.AddLine(array(0,0,0),ptC)  
+    cubicCurve = rhino.AddCurve(array(ptA,ptB,ptC),3)  
+  
+    ReDim arrIntersect(intDivisions)  
+    ReDim arrPts(intDivisions)  
+      
+    For i = 0 To intDivisions  
+          
+        strIntersectLine = rhino.AddLine(array(0,i,0),array(rhino.CurveLength(strBaseCurve),i,0))  
+          
+        ptX =   rhino.CurveCurveIntersection(cubicCurve,strIntersectLine)(0,1)  
+          
+        Call rhino.DeleteObject(strIntersectLine)  
+          
+        arrIntersect(i) = TvalFromCurveParam(lineX,rhino.CurveClosestPoint(lineX,array(ptX(0),0,0)))  
+          
+        arrPts(i) = pointOnCurveFromTval(strBaseCurve,arrIntersect(i))  
+          
+    Next  
+  
+    Call rhino.DeleteObject(cubicCurve)  
+    Call rhino.DeleteObject(lineX)  
+      
+    divideCurve_featherGradient = arrPts      
+End Function  
+  
+Function pointOnCurveFromTval(strCurve,tValue)  
+    pointOnCurveFromTval = Null  
+      
+    Dim arrCurveDomain  
+    arrCurveDomain = rhino.CurveDomain(strCurve)      
+  
+    pointOnCurveFromTval =  rhino.EvaluateCurve(strCurve,arrCurveDomain(0) + (tValue * (arrCurveDomain(1)-arrCurveDomain(0))))  
+End Function  
+  
+Function TvalFromCurveParam(strCurve,dblParam)  
+    TvalFromCurveParam = Null  
+      
+    Dim arrCurveDomain  
+    arrCurveDomain = rhino.CurveDomain(strCurve)      
+      
+    TvalFromCurveParam = (dblParam-arrCurveDomain(0))/(arrCurveDomain(1)-arrCurveDomain(0))  

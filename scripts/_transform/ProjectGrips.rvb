@@ -1,0 +1,128 @@
+﻿Option Explicit
+'Script written by Pascal
+'RMA
+'Script version Monday, December 17, 2007
+
+
+Sub ProjectGrips
+	
+	ProjGrips(0)
+	
+End Sub
+
+Sub PullGrips
+	
+	ProjGrips(1)
+	
+End Sub
+
+Sub ProjGrips(intStyle)
+	
+	Dim aAll: aAll = Rhino.NormalObjects
+	
+	If Not IsArray(aAll) Then Exit Sub
+		
+	If Not SomeGripsOn() Then
+		MsgBox "At least one object must have control points on."
+		Exit Sub
+	End If
+	
+	Dim sMessage
+	
+	If intStyle = 0 Then
+		sMessage = "Select grips to project"
+	Else sMessage = "Select grips to pull"
+	End If
+	Dim VecDir:VecDir = Rhino.ViewCPlane()(3)
+	Dim aInfo:aInfo = Rhino.GetObjectGrips(sMessage,True,True)
+			
+	If Not isArray(aInfo) Then Exit Sub
+
+	Dim starg: sTarg = Rhino.GetObject("Select target surface or polysurface",8 + 16)
+	If isNull(sTarg) Then Exit Sub
+	
+	Dim str, x
+	
+	If intStyle = 0 Then
+		Rhino.EnableRedraw(False)
+		str = "_Project"
+		str = str & " _SelID " &sTarg
+		str = str & " _Enter"
+		
+		Dim aNewPts, temp, i, n
+	
+		For i = 0 To Ubound(aInfo)
+		
+			Rhino.UnselectAllObjects
+
+			aNewPts = Rhino.ProjectPointToSurface(aInfo(i)(2),sTarg,VecDir)
+
+			If Not IsNull(aNewpts) Then
+				x = UBound(anewPts)
+			
+				Rhino.ObjectGripLocation aInfo(i)(0), aInfo(i)(1), (aNewPts(x))
+	
+			End If
+		Next
+		
+	ElseIf intStyle = 1 Then
+		
+		Rhino.EnableRedraw(False)		
+		
+		For i = 0 To UBound(aInfo)
+			temp = Rhino.PullPoints(sTarg, array(aInfo(i)(2)))
+			
+			If isArray(temp) Then
+				Rhino.ObjectGripLocation aInfo(i)(0),aInfo(i)(1),Temp(0)
+			End If
+			
+		Next
+		
+	End If
+
+	Rhino.EnableRedraw(True)
+
+End Sub
+
+Rhino.AddAlias "ProjectGrips", "_NoEcho _-Runscript ProjectGrips"
+Rhino.AddAlias "PullGrips", "_NoEcho _-Runscript PullGrips"
+Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+
+Function SomeGripsOn()
+	Dim arr: arr = Rhino.NormalObjects
+	
+	Dim Result: Result = False
+	
+	If Not isArray(arr) Then
+		Exit Function
+	End If
+	
+	Dim sobj
+	For Each sObj In arr
+		
+		If Rhino.ObjectGripsOn(sObj) Then
+			Result = True
+			Exit For
+		End If
+		
+	Next
+	
+	SomeGripsOn = Result
+	
+End Function
+
+Function IsUpperBound(ByRef arr)
+
+	IsUpperBound = False
+
+	If IsArray(arr) Then
+
+		On Error Resume Next
+
+		UBound arr
+
+		If Err.Number = 0 Then IsUpperBound = True
+
+	End If
+
+End Function

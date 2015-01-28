@@ -1,0 +1,15 @@
+Option Explicit
+ 
+'Call RandomLayerColor()
+Sub RandomLayerColor()
+	Dim arrLayers, strLayer
+	arrLayers = Rhino.LayerNames
+	If IsArray(arrLayers) Then
+		Rhino.EnableRedraw False
+		Randomize
+		For Each strLayer In arrLayers
+			Rhino.LayerColor strLayer, RGB(Int(256*Rnd), Int(256*Rnd), Int(256*Rnd))
+		Next
+		Rhino.EnableRedraw True
+	End If
+End Sub 

@@ -1,0 +1,119 @@
+Option Explicit
+'Script by Mitch Heynick
+'Version 6 October, 2010
+
+Private dblOldATol,dblOldFactor,intOldDegree
+If IsEmpty(dblOldATol) Then dblOldAtol = Rhino.UnitAngleTolerance
+If IsEmpty(dblOldFactor) Then dblOldFactor = 1
+If IsEmpty(intOldDegree) then intOldDegree=3
+
+'Call RebuildPLBetweenCorners
+Sub RebuildPLBetweenCorners()
+	
+	Dim arrCrvs,strCrv,dblATol,dblDeg,factor,u,n : n = 0
+	
+	arrCrvs = Rhino.GetObjects("Select polylines to simplify", 4,, true)
+	If Not IsArray(arrCrvs) Then Exit Sub
+	u = Ubound(arrCrvs) + 1
+	
+	'angle above which corner is conserved
+	dblATol = Rhino.GetReal("Conserve kinks at angles sharper than: ", dblOldATol, 0)
+	If varType(dblATol) = 0 or dblATol = 0 Then Exit Sub
+	dblOldATol = dblATol
+	
+	'multiplication factor for point count: 1=same number of of points as PL
+	factor = Rhino.GetReal("Point count multiplication factor", dblOldFactor, 0)
+	If varType(factor) = 0 Or factor = 0 Then Exit Sub
+	dblOldFactor = factor
+	
+	dblDeg=Rhino.GetInteger("Curve rebuild degree?",intOldDegree,2,5)
+	If IsNull(dblDeg) Then Exit Sub
+	intOldDegree=dblDeg
+	
+	Call Rhino.EnableRedraw(False)
+	For each strCrv in arrCrvs
+		If Rhino.IsPolyline(strCrv) or Rhino.CurveDegree(strCrv) = 1 Then
+			Dim arrSplitParams,arrSegs,i,strNewCrv,pts
+			arrSplitParams = CollectCorners(strCrv, dblATol)
+			
+			If IsArray(arrSplitParams) Then
+				n = n + 1
+				arrSegs = Rhino.SplitCurve(strCrv, arrSplitParams, True)				
+				For i=0 To Ubound(arrSegs)
+					pts = factor * Rhino.CurvePointCount(arrSegs(i))
+					If pts < dblDeg+1 Then pts = dblDeg+1			
+					Call Rhino.RebuildCurve(arrSegs(i), intOldDegree, pts)					
+				Next				
+				strNewCrv = Rhino.JoinCurves(arrSegs, True)				
+			End If			
+		End If
+	Next
+	Call Rhino.EnableRedraw(True)	
+	Call Rhino.Print("Rebuilt" & Cstr(n) & "/" & cstr(u) & " curves")
+		
+End Sub
+
+Function CollectCorners(strCrv, dblATol)
+	
+	CollectCorners = Null
+
+	Dim intCount,arrPts,arrPtParams(),i,j
+	Dim arrAng2,dblTestAng,ub
+	
+	intCount = Rhino.CurvePointCount(strCrv)
+	'get curve points
+	arrPts = Rhino.CurvePoints(strCrv)
+	ub = Ubound(arrPts)
+	'get parameters of curve points
+	Redim arrPtParams(ub)
+	For i=0 to ub
+		arrPtParams(i) = Rhino.CurveClosestPoint(strCrv, arrPts(i))	
+	Next
+	
+	If Rhino.IsCurveClosed(strCrv) Then
+		'check the start point and change if necessary
+		For j=0 to ub - 1
+			If j = 0 Then
+				arrAng2 = Rhino.Angle2(Array(arrPts(j), arrPts(j + 1)), Array(arrPts(ub), arrPts(ub - 1)))
+			Else
+				arrAng2 = Rhino.Angle2(Array(arrPts(j), arrPts(j + 1)), Array(arrPts(j), arrPts(j - 1)))
+			End If
+			dbltestAng = arrAng2(0)
+		
+			If Abs(dblTestAng - 180) > dblATol Then 'segments are not tangent, curve seam is OK
+				If j > 0 Then 
+					Call Rhino.CurveSeam(strCrv, arrPtParams(j))
+				End If
+				Exit For 'get out of loop
+			End If
+		Next
+	
+		'reset curve point array based on new start point if necessary
+		If j > 0 Then arrPts = Rhino.CurvePoints(strCrv)		
+	End If
+		
+	'Collect curve corner points	
+	Dim dblNextAng,arrCParams(),blnChanged,n : blnChanged = False : n = 0
+	Redim arrCParams(ub)
+	arrCParams(0) = Rhino.CurveDomain(strCrv)(0) 'arrPts(0)?
+
+	'test for angles between segments
+	For j=1 to ub - 1		
+		arrAng2 = Rhino.Angle2(Array(arrPts(j), arrPts(j + 1)), Array(arrPts(j), arrPts(j - 1)))
+		dblNextAng = arrAng2(0)
+		
+		If Abs(dblNextAng - 180) > dblATol Then ' is a significant corner, OK to add point
+			n = n + 1
+			arrCParams(n) = Rhino.CurveClosestPoint(strCrv, arrPts(j)) 'need parameters
+		Else
+			blnChanged = True 'means that at least one corner is rebuildable
+		End If
+	Next
+	
+	If blnChanged Then
+		Redim Preserve arrCParams(n+1)		
+		arrCParams(n + 1) = Rhino.CurveDomain(strCrv)(1)
+		CollectCorners = arrCParams
+	End If
+	
+End Function

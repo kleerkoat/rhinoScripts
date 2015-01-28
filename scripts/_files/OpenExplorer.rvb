@@ -1,0 +1,10 @@
+Option Explicit 
+
+'Call OpenExplorer
+Sub OpenExplorer
+ Dim objShell, strCommand, strPath
+ Set objShell = CreateObject("Wscript.Shell")
+ strPath = "C:\"
+ strCommand = "explorer.exe /e," & strPath
+ Call objShell.Run(strCommand)
+End Sub 

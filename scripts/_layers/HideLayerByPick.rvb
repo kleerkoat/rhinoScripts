@@ -1,0 +1,29 @@
+﻿Option Explicit
+'Script written by Don Lewis
+'Script copyrighted by Lewis Tool & Engineering llc
+'Script version Monday, June 01, 2009 4:57:59 PM
+
+Call Main()
+Sub Main()
+	
+	Dim strObject, strLayer, arrObjects
+	
+	Do
+		
+		strObject = Rhino.GetObject("Select object to hide layer",,True)
+		If isNull (strObject) Then Exit Sub
+		strLayer = Rhino.ObjectLayer(strObject)
+		
+		Call Rhino.EnableRedraw(False)
+		arrObjects = Rhino.ObjectsByLayer(strLayer)
+		If IsArray (arrObjects) Then
+			Call Rhino.HideObjects(arrObjects)
+		End If
+		Call Rhino.EnableRedraw(True)
+	
+		strObject = Null
+		strLayer = Null
+		
+	Loop
+	
+End Sub

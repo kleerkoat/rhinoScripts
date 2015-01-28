@@ -1,0 +1,252 @@
+﻿Option Explicit
+
+'Private arrViews
+ ' arrViews = Rhino.NamedViews  
+  'Script date Thursday, September 03, 2009 
+
+Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+Rhino.AddAlias "Isolate", "_NoEcho _-Runscript (Isolate)"
+Rhino.AddAlias "Unisolate", "_NoEcho _-Runscript (Unisolate)"
+Rhino.AddAlias "IsolateLock", "_NoEcho _-Runscript (IsolateLock)"
+Rhino.AddAlias "UnisolateLock", "_NoEcho _-Runscript (UnisolateLock)"
+Rhino.AddAlias "IsolateLayer", "_NoEcho _-Runscript (IsolateLayer)"
+Rhino.AddAlias "UnIsolateLayer", "_NoEcho _-Runscript (UnIsolateLayer)"
+
+Sub Isolate()
+
+	IsolateAction("H")
+	
+End Sub
+
+Sub IsolateLock()
+	
+	IsolateAction("L")
+	
+End Sub
+
+Sub UnIsolate()
+	
+	UnIsolateAction("H")
+	
+End Sub
+
+Sub UnIsolateLock()
+	
+	UnIsolateAction("L")
+	
+End Sub
+
+Sub IsolateAction(sType)
+
+	Dim strSection, strEntry
+	Dim arrSel, arrObj
+  	
+	
+	Dim blnView: blnView = Rhino.GetBoolean("Save current view?",array("Save", "No", "Yes") , array(True))
+	If isNull(blnView) Then Exit Sub
+	
+	
+	arrSel = Rhino.GetObjects("Select objects to isolate",,,True ,True)
+	If Not isArray(arrSel) Then Exit Sub
+	
+	Rhino.EnableReDraw(False)
+	
+	Dim aObj: aObj = Rhino.InvertSelectedObjects(True)
+	
+	If Not IsArray(aObj) Then 
+		Rhino.EnableReDraw(True)
+		Exit Sub
+	End If
+	
+	Dim aDat, sDat, sHDat, sLDat, 	blnHDat, 	blnLDat, sSection
+	blnHDat = False
+	blnLDat = False
+	
+	If Rhino.IsDocumentData() Then
+		
+		aDat = Rhino.GetDocumentData()
+		
+		For Each sSection In aDat
+			If sSection = "Iso" Then
+			
+				sHDat = Rhino.GetDocumentData("Iso",  "H_Objects")
+				If Not isNull(sHDat) Then blnHDat = True
+					
+				sLDat = Rhino.GetDocumentData("Iso",  "L_Objects")
+				If Not isNull(sLDat) Then blnLDat = True
+			
+				Exit For
+				
+			End If
+		Next
+			
+	End If 
+	
+	Dim sView: sView = Rhino.CurrentView()
+	
+	If BlnView(0) = True Then
+		If sType = "H" Then
+			sDat = sHDat
+			If blnHDat = False Then
+				Rhino.AddNamedView "_h_I_S_O_"
+				Rhino.SetDocumentData "Iso", "H_View", sView
+			End If
+		Else
+			sDat = sLDat
+			If blnLDat = False Then
+				Rhino.AddNamedView "_l_I_S_O_"
+				Rhino.SetDocumentData "Iso", "L_View", sView
+			End If
+		End If
+	
+		Rhino.command "_-ViewportProperties _Title " & chr(34) & sView &Chr(34) & " _Enter _Enter"
+		
+	Else
+		Rhino.SetDocumentData "Iso", "L_View", ""
+		Rhino.SetDocumentData "Iso", "H_View", ""
+		
+	End If
+	
+	
+	Rhino.EnableRedraw(False)
+		
+	If isEmpty(sDat) Then
+		sDat	= Join(aObj, ",")
+	Else
+		sDat = sDat &"," & Join(aObj, ",")
+	End If
+
+	If sType = "H" Then
+		Rhino.HideObjects aObj
+		Rhino.SetDocumentData "Iso", "H_Objects", sDat
+	Else
+		Rhino.LockObjects aObj
+		Rhino.SetDocumentData "Iso", "L_Objects", sDat
+	End If
+   
+	Rhino.EnableRedraw(True)			
+		
+End Sub
+  
+Sub UnIsolateAction(sType)
+	
+	Dim  sLDat, sHDat, sLView, sHView, sView
+
+	
+	If Rhino.IsDocumentData() Then
+		sLDat = Rhino.GetDocumentData("Iso","L_Objects")
+		sLView = Rhino.GetDocumentData ("Iso", "L_View")
+		sHdat = Rhino.GetDocumentData("Iso","H_Objects")
+		sHView = Rhino.GetDocumentData ("Iso", "H_View")
+		If isNull(sLDat) And IsNull(sHDat) Then Exit Sub
+	End If
+	
+	Dim Views: Views = True
+	If sHView = "" Then Views = False
+	
+	Rhino.EnableReDraw(False)
+	If Views = True Then
+		Dim arrViews: arrViews = Rhino.NamedViews
+	
+		Dim aViews: aViews = Rhino.NamedViews()
+	
+		If isArray(aViews) Then
+			If sType = "H" Then
+				Rhino.RestoreNamedView "_h_I_S_O_"
+				Rhino.DeleteNamedView "_h_I_S_O_"
+			Else
+				Rhino.RestoreNamedView "_l_I_S_O_"
+				Rhino.DeleteNamedView "_l_I_S_O_"
+			End If
+		End If
+	End If
+	
+	Dim aHDat, aLDat
+	If Not iSNull(sHDat) Then aHDat = Split(sHDat,",")
+	If Not iSNull(sLDat) Then aLDat = Split(sLDat,",")	
+	
+	If Not IsArray(aHDat) And Not isArray(aLDat) Then 
+		Rhino.EnableReDraw(True)
+		Exit Sub
+	End If
+	
+	If sType = "H"  Then 'hide
+		
+		sView = sHView
+		If isArray(aHDat) Then Rhino.ShowObjects aHDat
+		
+		If isNull (sLDat) Then 
+			Rhino.DeleteDocumentData "Iso"
+		Else
+			Rhino.DeleteDocumentData "Iso", "H_Objects"
+			Rhino.DeleteDocumentData "Iso", "H_View"
+		End If
+	
+	Else 'Lock
+		
+		sView = sLView
+		If isArray(aLDat) Then Rhino.UnlockObjects aLDat
+		
+		If isNull (sHDat) Then 
+			Rhino.DeleteDocumentData "Iso"
+		Else
+			Rhino.DeleteDocumentData "Iso", "L_Objects"
+			Rhino.DeleteDocumentData "Iso", "L_View"
+		End If
+	End If
+		
+	Rhino.command "_-ViewportProperties _Title " & sView & " _Enter _Enter"
+	Rhino.EnableReDraw(True)
+	
+End Sub
+
+Sub IsolateLayer()
+
+	Dim alayers: alayers = Rhino.LayerNames
+	
+	Dim sLayer, O,L,aStares(),n
+	n = 0
+	
+	For Each sLayer In aLayers
+		
+		O = Rhino.IsLayerOn(sLayer)
+		L = Rhino.IsLayerLocked(slayer)
+	
+		Rhino.SetDocumentData "States",Slayer , CStr(O)& "," & CStr(L) 
+		n = n +1
+	Next
+	
+	If n > 0 Then
+		Rhino.SetDocumentData "States","Current" , Rhino.CurrentLayer
+	End If
+	
+	Rhino.Command "_OneLayerOn" 
+	If Rhino.LastCommandResult <> 0 Then Exit Sub
+	
+	
+End Sub
+
+Sub UnIsolateLayer()
+
+	Dim aLayers: alayers = Rhino.LayerNames
+	
+	Dim sCrnt:sCrnt = Rhino.GetDocumentData ("States","Current")
+	
+	Rhino.CurrentLayer sCrnt
+	Dim slayer, arr, str
+	
+	For Each sLayer In aLayers
+		 
+		str =	Rhino.GetDocumentData ("States",Slayer)
+		
+		If Not IsNull(str) Then
+			
+			arr = Split(str,",")
+			Rhino.LayerVisible slayer, CBool(arr(0))
+			Rhino.layerLocked slayer, CBool(arr(1))
+			
+		End If
+		
+	Next
+	
+End Sub

@@ -1,0 +1,114 @@
+﻿Option Explicit
+
+'
+'Script written by Dimitrie Stefanescu
+'Released under the Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Licence
+'
+
+'
+'Cuts rectangular holes in any given surface.
+'The dimension of the holes is proportional to an input point.
+'
+
+'Needs cleanup.
+
+Call Main()
+Sub Main()
+	
+	Dim surf : surf = Rhino.GetObject("sel surf ", 8)
+	
+	Dim detailLevel : detailLevel = Rhino.GetInteger("det lev ", 10, 5, 100)
+	Dim scaleFactor : scaleFactor = Rhino.GetReal("scale factor", .002, .00001, 10)
+	Dim sun : sun = Rhino.getPoint("sel sun ")
+	
+	Call Rhino.Print("Please wait...")
+	
+	Dim uDomain : uDomain = Rhino.SurfaceDomain(surf, 0)
+	Dim uStep : uStep = (uDomain(1) - uDomain(0))/detailLevel
+  
+	Dim vDomain : vDomain = Rhino.SurfaceDomain(surf, 1)
+	Dim vStep : vStep = (vDomain(1) - vDomain(0))/detailLevel
+	
+	Dim i, j, m, mm : m = 0 : mm = 0
+	Dim a,b,c,d, text
+	
+	Dim facet, scaledfacet, orig, udom, vdom, scale, distance, srfbckp
+	'Dim arrspl : arrspl = Array()
+	
+	Call rhino.enableredraw(False)
+	
+	For i=uDomain(0)  To uDomain(1) - uStep   Step uStep
+		For j=vDomain(0)  To vDomain(1) - vStep Step vStep
+			
+			srfbckp = surf
+			
+			a = Rhino.EvaluateSurface(surf, Array(i,j))
+			b = Rhino.EvaluateSurface(surf, Array(i + uStep,j))
+			d = Rhino.EvaluateSurface(surf, Array(i,j + vStep))
+			c = Rhino.EvaluateSurface(surf, Array(i + uStep, j + vStep))
+			
+			facet = Rhino.AddSrfPt(Array(a, b, c, d)) 		
+			
+			udom = Rhino.SurfaceDomain(facet, 0)
+			vdom = Rhino.SurfaceDomain(facet, 1)
+			
+			orig = Rhino.EvaluateSurface(facet, Array((udom(1)-udom(0))/2, (vdom(1)-vdom(0))/2))
+			'Call rhino.AddPoint(orig)
+			distance = Rhino.Distance(orig, sun)
+			
+			scale = distance * scaleFactor + 0.001
+			
+			If scale > 0.9 Then
+				scale = 0.9
+			End If
+			
+			If scale < 0.1 Then
+				scale = 0.1
+			End If
+			
+			scaledfacet = rhino.ScaleObject(facet, orig, Array(scale, scale, scale), True)
+			
+			Dim extrusion, extrDir
+			Dim norm : norm = Rhino.SurfaceNormal(scaledfacet, Array((udom(1)-udom(0))/2, (vdom(1)-vdom(0))/2))
+			Dim pt1, pt2
+			
+			pt1 = Array(orig(0)+norm(0), orig(1)+norm(1), orig(2) + norm(2))
+			norm = Rhino.VectorReverse(norm)
+			pt2 = Array(orig(0)+norm(0), orig(1)+norm(1), orig(2) + norm(2))
+			extrDir = Rhino.AddLine(pt1, pt2)
+			
+			Call Rhino.MoveObject(scaledfacet, orig, pt1)
+			
+			extrusion = Rhino.ExtrudeSurface(scaledfacet, extrDir)
+			
+			Dim arrspl
+			arrspl = Rhino.SplitBrep(surf, extrusion, True)
+					
+			If Not isArray(arrspl) Then
+				Call Rhino.Print("Smth wrng in tha split. Trying again...")
+				If arrspl = Null Then
+					Call Rhino.Print("hopeless...")
+				End If
+				surf = srfbckp
+			Else
+				Call rhino.DeleteObject(arrspl(1))
+				Call rhino.DeleteObject(scaledfacet)
+				Call rhino.DeleteObject(facet)
+				Call rhino.DeleteObject(extrusion)
+				Call rhino.DeleteObject(extrDir)
+				
+				surf = arrspl(0)
+			End If
+			
+			text = CStr(m) + ", " + CStr(mm Mod 10)
+			Call Rhino.AddPoint(a)
+			'Call Rhino.AddText(text, a, 0.3)
+	
+			mm = mm + 1 
+	Next
+	m = m + 1
+	Next
+	
+	Call rhino.enableredraw(True)
+	'Call rhino.HideObject(surf)
+End Sub

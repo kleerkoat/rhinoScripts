@@ -1,0 +1,95 @@
+Option Explicit
+'Script written by Pascal
+'Company: RMA
+'Script version Wednesday, April 11, 2007 2:01:33 PM
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "PopUpPlanes", "_noEcho _-Runscript PopUpPlanes"
+'Rhino.AddAlias "CurrentPlane", "_noEcho _-Runscript CurrentPlane"
+
+Sub PopUpPlanes()
+	
+	Dim arrPlanes,strPlane,idxPlane
+	arrPlanes = Rhino.NamedCPlanes
+	If isArray(arrPlanes) Then
+		idxPlane = Rhino.PopupMenu(arrPlanes)
+		If Not isnull(strPlane) Then
+			Rhino.RestoreNamedCPlane arrPlanes(idxPlane)
+		End If
+	Else Rhino.PopUpMenu array("There are no named cplanes in this file.")	
+		Exit Sub
+		
+	End If
+	
+End Sub
+
+Sub CurrentPlane
+	
+	Dim  testPlane, str, sPlane
+	Dim aPlanes: aPlanes = Rhino.NamedCPlanes
+	Dim CrntPlane: CrntPlane= Rhino.ViewCPlane
+	Dim X : X = False
+	
+	Dim sPlaneName: sPlaneName = GetWorldPlaneName
+	
+	If sPlaneName = "Unsaved" Then
+	
+		For Each sPlane In aPlanes
+			testPlane = Rhino.NamedCPlane(sPlane)
+			If  ArePlanesEqual (TestPlane , CrntPlane) Then
+				sPlaneName = sPlane
+				Exit For
+			End If
+		Next
+	
+	End If
+
+	str = "Current CPlane is " & sPlaneName
+
+	Rhino.PopupMenu array(str)
+			
+End Sub
+
+Function GetWorldPlaneName
+
+	Dim CrntPlane: CrntPlane = Rhino.ViewCplane
+	Dim Origin: Origin = array(0,0,0)
+	Dim aX: aX = array(1,0,0)
+	Dim aY: aY = array(0,1,0)
+	Dim aZ: aZ = array(0,0,1)
+	Dim negX : negX = Rhino.Vectorreverse(aX)
+	Dim negY : negY = Rhino.Vectorreverse(aY)
+	Dim negZ : negZ = Rhino.Vectorreverse(aZ)
+	
+	
+	If arePlanesEqual(CrntPlane ,array(Origin, aX,aY,aZ)) Then
+		GetWorldPlaneName = "World Top"
+	ElseIf arePlanesEqual (CrntPlane, array(Origin, aY,aZ,aX)) Then
+		GetWorldPlaneName = "World Right"
+	ElseIf arePlanesEqual (CrntPlane, array(Origin, aX,aZ,negY)) Then
+		GetWorldPlaneName = "World Front"
+	ElseIf arePlanesEqual (CrntPlane, array(Origin, aX,negY,NegZ)) Then
+		GetWorldPlaneName = "World Bottom"
+	ElseIf arePlanesEqual (CrntPlane, array(Origin, negX,aZ,aY)) Then
+		GetWorldPlaneName = "World Back"
+	ElseIf arePlanesEqual (CrntPlane, array(Origin, negY,aZ,NegX)) Then
+		GetWorldPlaneName = "World Left"
+	Else  GetWorldPlaneName = "Unsaved"
+		
+	End If
+	
+End Function
+
+Function ArePlanesEqual(Plane1, Plane2)
+
+	Dim i 
+	ArePlanesEqual= True
+	
+	For i = 0 To 3
+		If Not Rhino.PointCompare(Plane1(i),Plane2(i)) Then
+			ArePlanesEqual= False
+			Exit For
+		End If
+	Next
+	
+End Function

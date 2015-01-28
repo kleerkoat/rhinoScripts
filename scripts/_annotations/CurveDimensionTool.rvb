@@ -1,0 +1,109 @@
+' ****************************** RhinoScript.org ******************************
+'
+'   Planar Curve Dimension Tool, version 1
+'
+'   by Jan Hempel, published Nov 06, 2010
+'
+'
+'   Uses closed planar Polylines and adds a dimension inside or outside with a given distance.
+'
+'
+'
+'
+'   This RhinoScript Tool has been downloaded from RhinoScript.org.
+'   It is based on "AutoDimension" by ddelgiu.
+'
+'   Rhino versions: Rhino 4 (at least service release 7)
+'
+'   LICENSE INFORMATION:
+'   This script is published under the GNU General Public License, version 3
+'   or any later version, and thus comes WITHOUT ANY WARRANTY. You can get
+'   the complete license text here: www.rhinoscript.org/gpl
+'
+' ****************************** RhinoScript.org ******************************
+
+
+
+Option Explicit
+
+'Call CurveDimensionTool()
+
+Sub CurveDimensionTool()
+
+	Dim arrPolycrv	: arrPolycrv 	= Rhino.GetObjects("select lines",4)
+	Dim dblOffset 	: dblOffset 	= rhino.GetReal ("dimension Distance (out = pos., in = neg.) :",5)
+	Dim Line, arrLine, i, strSrf
+	
+	Call Rhino.EnableRedraw (False)
+	
+	If isNull (arrLine) Then Exit Sub
+
+	Call Rhino.AddLayer ("DIMENSIONS",RGB(255,0,0))
+	Call Rhino.CurrentLayer ("DIMENSIONS")
+	
+	For i = 0 To Ubound(arrPolycrv)
+		
+		If Rhino.IsCurve(arrPolycrv(i)) And Rhino.IsCurveClosed(arrPolycrv(i)) Then
+		
+			arrLine = rhino.ExplodeCurves (arrPolycrv(i))
+	
+			If Not isnull(arrLine) Then
+				
+				If IsArray(arrLine) And Ubound(arrLine) > 0 Then
+			
+					strSrf = Rhino.AddPlanarSrf(arrLine)(0)
+		
+					For Each Line In arrLine
+						Call dimension(Line, strSrf, dblOffset)
+					Next
+
+					Call rhino.deleteObjects (arrLine)
+					Call rhino.deleteObject (strSrf)
+				
+				End If
+			
+			End If
+		End If
+	Next
+		
+	Rhino.MessageBeep 1
+	
+	Call Rhino.EnableRedraw (True)
+	
+End Sub
+
+Sub dimension(line, strSrf, dblOffset)
+
+	Dim a,b,c,point,point2,strp,strq,arrStartPt, arrEndPt,arrMP
+	Dim midPt, V1, V2, V3, V4, Pt01, Pt02, arrDstPt
+	
+	arrStartPt = Rhino.CurveStartPoint( line)
+	arrEndPt = Rhino.CurveEndPoint( line)
+	
+	midPt = Rhino.CurveMidPoint(line)
+	V1 = Rhino.VectorCreate(midPt, arrStartPt)
+	V1 = Rhino.VectorUnitize(V1)
+	V1 = Rhino.VectorScale(V1, 0.5)
+	V3 = Rhino.VectorScale(V1, 2*dblOffset)
+	V3 = Rhino.VectorRotate(V3, 90, array(0,0,1))
+	V4 = Rhino.VectorRotate(V3, 180, array(0,0,1))
+	V1 = Rhino.VectorRotate(V1, 90, array(0,0,1))
+	V2 = Rhino.VectorRotate(V1, 180, array(0,0,1))
+	Pt01 = Rhino.VectorAdd(midPt, V1)
+	Pt02 = Rhino.VectorAdd(midPt, V2)
+	
+	If Not Rhino.IsPointOnSurface(strSrf, Pt01) Then
+		arrDstPt = Rhino.VectorAdd(midPt, V3)
+	Else
+		arrDstPt = Rhino.VectorAdd(midPt, V4)
+	End If
+	
+	a = Rhino.Pt2Str(arrStartPt)
+	b = Rhino.Pt2Str(arrEndPt)
+	c = Rhino.Pt2Str(arrDstPt)
+	
+	rhino.Command "_DimAligned " & a &" "& b &" "& c
+	rhino.deleteObject line
+		
+	
+End Sub

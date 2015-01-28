@@ -1,0 +1,28 @@
+Option Explicit
+'Script by Mitch Heynick
+'Version 3 February, 2011
+
+'Call GroupCount()
+Sub GroupCount()
+	
+	Dim arrObjs,strObj,arrGNames(),i : i=-1
+	arrObjs=Rhino.SelectedObjects
+	If IsArray(arrObjs) Then
+		For Each strObj in arrObjs
+			If Rhino.IsObjectInGroup(strObj)then
+				i=i+1
+				Redim Preserve arrGNames(i)
+				arrGNames(i)=Rhino.ObjectTopGroup(strObj)
+			End If
+		Next		
+	End If
+	
+	If i>-1 then
+		Dim arrUNames,n
+		arrUNames=Rhino.CullDuplicateStrings(arrGNames)		
+		n=Ubound(arrUNames)+1
+		Call Rhino.Print("Selection contains "&n&" top groups")
+	Else
+		Call Rhino.Print("No groups found in selection")
+	End If
+End Sub

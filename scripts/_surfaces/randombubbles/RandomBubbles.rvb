@@ -1,0 +1,876 @@
+' RandomBubbles for Rhinoceros 3.0 - from the amazing discoveries series...
+' a script to create random bubbles......
+' © Clement Greiner
+' 30.04.2004, added support for objects with userdata
+
+Option Explicit
+Sub RandomBubbles
+
+Dim arrPlane				' the current CPlane
+Dim SourceType				' point, curve or surface
+Dim Ready, Result  			' command line options, command clicks
+Dim BasePt					' the base point for random coordinates
+Dim BaseCrv					' a curve base
+Dim BaseSrf					' a surface base
+Dim BaseVol					' a custom bounding volume
+Dim arrBaseBBVolume
+Dim BubbleCount				' number of bubbles to create
+Dim MinSize, MaxSize		' min and max bubble size
+Dim Dimension				' Cubic dimension near base point
+Dim CollisionDetection		' a toggle to enable/disable collisions
+Dim Pt						' one bubble center point
+Dim Index					' loop index
+Dim StrSphere()				' a single bubble
+Dim count, skipped			' counter / collision counter
+Dim SphereSize				' bubble radius
+Dim VolumeType				' bounding volume type
+Dim BasePtAndPlane			' a point on source and its perpendicular plane
+Dim arrCurvePlane			' array containing only the curve plane
+Dim arrSurfacePlane			' array containing only the curve plane
+Dim TempPt					' elevation point for surfaces
+Dim arrCustomOptions(6)		' some custom options
+Dim arrNewCustomOptions		' user custom options
+Dim X
+Dim intLCID
+
+' set the current locale to en-us to force usage of the comma seperator "."
+intLCID = Rhino.LocaleID
+SetLocale("en-us")
+
+' define some fixed default variables
+arrPlane = Rhino.ViewCPlane
+SourceType = "Point"
+BasePt = Str2Pt("0,0,0")
+
+' define defaults, read from saved document settings
+BubbleCount = Rhino.GetDocumentData("RandomBubbles", "BubbleCount")
+If IsNull(Int(BubbleCount)) Then BubbleCount = 64 Else BubbleCount = Int(BubbleCount)
+MinSize = Rhino.GetDocumentData("RandomBubbles", "MinSize")
+If IsNull(MinSize) Then MinSize = 0.2 Else MinSize = CDbl(MinSize)
+MaxSize = Rhino.GetDocumentData("RandomBubbles", "MaxSize")
+If IsNull(MaxSize) Then MaxSize = 2.0 Else MaxSize = CDbl(MaxSize)
+Dimension = Rhino.GetDocumentData("RandomBubbles", "Dimension")
+If IsNull(Dimension) Then Dimension = 20 Else Dimension = CDbl(Dimension)
+VolumeType = Rhino.GetDocumentData("RandomBubbles", "VolumeType")
+If IsNull(VolumeType) Then VolumeType = "Cubic" Else VolumeType = CStr(VolumeType)
+
+CollisionDetection = 0
+
+' define an array of custom options
+arrCustomOptions(0) = 0.00				' the minimum allowed distance between spheres in collision detection mode, default = 0
+arrCustomOptions(1) = 1					' a toggle to enable the skip limiter in collision mode, default = 1 (on)
+arrCustomOptions(2) = 0					' a toggle to enable/disable dynamic redraw, default = no redraw
+arrCustomOptions(3) = 0.00				' an offset value for the "AbovePlane" volume option, default = 0
+
+' a toggle to output either "Sphere", "Ellipsoid", "Drop" or "Point" objects
+arrCustomOptions(4) = Rhino.GetDocumentData("RandomBubbles", "OutputType")
+If IsNull(arrCustomOptions(4)) Then arrCustomOptions(4) = "Sphere"
+
+' define global control of RiBlobby exporter > assign positive or negative Influence values to all RandomBubble objects
+arrCustomOptions(5) = 1					' RiBlobby influence assignments (0=off, 1=on)
+arrCustomOptions(6) = 1					' RiBlobby influence mode (1=add, -1=subtract)
+
+Do While Ready = 0
+	If SourceType = "CustomVolume" Then
+        Result = Rhino.GetString("RandomBubbles", , Array("Source","BubbleCount","MinSize","MaxSize","Collision","Options","Preview","Keep") )
+    ElseIf VolumeType = "OnSource" Then
+        Result = Rhino.GetString("RandomBubbles", , Array("Source","BubbleCount","MinSize","MaxSize","Volume","Collision","Options","Preview","Keep") )
+	Else
+		Result = Rhino.GetString("RandomBubbles", , Array("Source","BubbleCount","MinSize","MaxSize","Dimension","Volume","Collision","Options","Preview","Keep") )
+	End If
+
+    Select Case Result
+
+		Case "Source"
+			SourceType = GET_CreationSource (SourceType)
+			Rhino.Print "SourceType = " & SourceType
+			If SourceType = "Curve" And VolumeType = "AbovePlane" Then
+				VolumeType = "OnPlane"
+				Rhino.Print "Note: AbovePlane Volume option cannot be used with a curve, using OnPlane bounding instead !"
+			ElseIf SourceType = "Point" And VolumeType = "OnSource" Then
+				VolumeType = "OnPlane"
+				Rhino.Print "Note: OnSource Volume option cannot be used with a point, using OnPlane bounding instead !"
+			End If
+
+			If SourceType = "Point" Then BasePt = GET_SinglePointSource (BasePt, arrPlane)
+	        If SourceType = "Curve" Then BaseCrv = GET_SingleCurveSource
+	        If BaseCrv = -1 Then SourceType = "Point"
+	        If SourceType = "Surface" Then BaseSrf = GET_SingleSurfaceSource
+	        If BaseSrf = -1 Then SourceType = "Point"
+	        If SourceType = "CustomVolume" Then
+	        	BaseVol = GET_CustomVolumeSource
+	        		If BaseVol = -1 Then
+	        			Rhino.Print "Please create / select a closed Surface or PolySurface before using this option !"
+	        			SourceType = "Point"
+	        		Else
+	        			Rhino.Print "Successfully calculated BoundingBox for random point calculations."
+	        			arrBaseBBVolume = Rhino.BoundingBox (BaseVol)
+	        		End If
+	        End If
+
+		Case "BubbleCount"
+			BubbleCount = Rhino.GetInteger("Enter the number of bubbles to create", BubbleCount, 2)
+			If IsNull(BubbleCount) Then BubbleCount = 64
+			Rhino.Print "Number of bubbles to create = " & BubbleCount
+			' save setting
+			Rhino.SetDocumentData "RandomBubbles", "BubbleCount", Int(BubbleCount)
+
+        Case "MinSize"
+            MinSize = Rhino.GetReal("Enter the minimum bubble radius", CdBl(MinSize), 0.001, CdBl(MaxSize) )
+            If IsNull(MinSize) Then MinSize = 0.2
+            Rhino.Print "Minimum bubble radius = " & MinSize
+            ' save setting
+            Rhino.SetDocumentData "RandomBubbles", "MinSize", CDBl(MinSize)
+
+        Case "MaxSize"
+			MaxSize = Rhino.GetReal("Enter the maximum bubble radius", CdBl(MaxSize), CdBl(MinSize), (Dimension))
+			If IsNull(MaxSize) Then MaxSize = 2
+			Rhino.Print "Maximum bubble radius = " & MaxSize
+			' save setting
+			Rhino.SetDocumentData "RandomBubbles", "MaxSize", CDBl(MaxSize)
+
+        Case "Dimension"
+			Dimension = Rhino.GetReal("Enter the dimension multiplier", CdBl(Dimension), CdBl(MaxSize) )
+			If IsNull(Dimension) Then Dimension = 20
+			Rhino.Print "Dimension multiplier = " & Dimension
+			' save settings
+			Rhino.SetDocumentData "RandomBubbles", "Dimension", CdBl(Dimension)
+
+		Case "Volume"
+			VolumeType = GET_VolumeType (VolumeType)
+			If VolumeType = "AbovePlane" And SourceType = "Curve" Then
+				VolumeType = "OnPlane"
+				Rhino.Print "Note: AbovePlane Volume option cannot be used with curves, using OnPlane bounding instead !"
+			ElseIf VolumeType = "OnSource" And SourceType = "Point" Then
+				VolumeType = "OnPlane"
+				Rhino.Print "Note: OnSource Volume option should be used with a curve or surface, please select a Source object first !"
+			Else
+				Rhino.Print VolumeType & " bounding enabled."
+				' save setting
+				If VolumeType <> "OnSource" Then
+					Rhino.SetDocumentData "RandomBubbles", "VolumeType", CStr(VolumeType)
+				End If
+			End If
+
+		Case "Collision"
+		     If CollisionDetection = 1 Then
+		     	CollisionDetection = 0
+		     	Rhino.Print "Collision detection disabled. (collisions allowed)"
+		     Else
+		     	CollisionDetection = 1
+		     	Rhino.Print "Collision detection enabled. (collisions NOT allowed)"
+		     End If
+
+		Case "Options"
+			arrNewCustomOptions = GET_UserCustomOptions (arrCustomOptions, Dimension)
+			If IsArray(arrNewCustomOptions) Then
+				' store new options, overwrite old
+				For X = 0 To UBound(arrNewCustomOptions)
+					arrCustomOptions(X) = arrNewCustomOptions(X)
+				Next
+			End If
+
+		' - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+		' Create some bubbles from the default values or the picked items
+		' - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+		Case "Preview"
+		     Rhino.Prompt "Preview in process please wait...Press Esc to cancel"
+
+ 			 If arrCustomOptions(2) = 0 Then Rhino.EnableRedraw vbFalse
+		     ' delete the old preview bubbles if there are some ...
+		     If count <> 0 Then Rhino.DeleteObjects StrSphere
+
+		     ' reset counters
+		     count = 0 : Skipped = 0
+
+		     'MsgBox "Count: " & count & vbNewLine & "BubbleCount: " & BubbleCount
+
+		     ' create some new bubbles until the bubblecount is reached or 100 * BubbleCount failed
+		     Do While count < BubbleCount ' And skipped < BubbleCount * 100
+
+				' define the sphere radius randomly but within min/max
+		     	SphereSize = ((MaxSize - MinSize) * Rnd) + MinSize
+
+				' define a random point source
+				If SourceType = "Point" Then BasePt = BasePt
+
+				' define a random point source on curve
+				If SourceType = "Curve" Then
+					BasePtAndPlane = GET_RandomPointOnCurve (BaseCrv, SphereSize, Dimension, VolumeType)
+					BasePt = BasePtAndPlane(0)
+					arrCurvePlane = Array(BasePtAndPlane(1),BasePtAndPlane(2),BasePtAndPlane(3))
+				End If
+
+				' define a random point source on surface
+				If SourceType = "Surface" Then
+					BasePtAndPlane = GET_RandomPointOnSurface (BaseSrf, Dimension, VolumeType)
+					If VolumeType = "OnCircle" Or VolumeType = "OnPlane" Or VolumeType = "AbovePlane" Or VolumeType = "OnSource" Then
+						BasePt = BasePtAndPlane(0)
+					Else
+						TempPt = BasePtAndPlane(0)
+						BasePt = Str2Pt( TempPt(0) & "," & TempPt(1) & "," & TempPt(2) + Dimension / 2)
+					End If
+					arrSurfacePlane = Array(BasePtAndPlane(1),BasePtAndPlane(2),BasePtAndPlane(3),BasePtAndPlane(4))
+				End If
+
+				' define a random point inside the custom volume including the sphere Size
+				If SourceType = "CustomVolume" Then
+					BasePt = GET_RandomPointInCustomVolume (BaseVol, SphereSize, arrBaseBBVolume)
+					VolumeType = "OnSource"
+				End If
+
+				' define random sphere center within distance (cubic volume)
+			    If VolumeType = "Spherical" Then Pt = GET_RandomPointInSphericVolume (BasePt, SphereSize, Dimension)
+				If VolumeType = "Cubic" Then Pt = GET_RandomPointInCubicVolume (BasePt, SphereSize, Dimension)
+				If VolumeType = "Cylindrical" Then Pt = GET_RandomPointInCylindricVolume (BasePt, SphereSize, Dimension)
+				If VolumeType = "OnSphere" Then Pt = GET_RandomPointOnSphere (BasePt, Dimension)
+				If VolumeType = "OnCircle" Then Pt = GET_RandomPointOnCircle (BasePt, SphereSize, Dimension)
+				If VolumeType = "OnPlane" Then Pt = GET_RandomPointOnPlane (BasePt, SphereSize, Dimension)
+				If VolumeType = "AbovePlane" And Not SourceType = "Surface" Then Pt = GET_RandomPointAbovePlane (BasePt, SphereSize, Dimension)
+				If VolumeType = "AbovePlane" And SourceType = "Surface" Then Pt = Str2Pt(BasePt(0) & "," & BasePt(1) & "," & BasePt(2) + SphereSize + arrCustomOptions(3) )
+				If VolumeType = "OnSource" Then Pt = BasePt
+
+				' transform the picked point to CPlane coordinates or relative to a source object
+				If SourceType = "Point" Then Pt = Rhino.XFormCPlaneToWorld (Pt, Rhino.ViewCPlane)
+				If SourceType = "Curve" Then Pt = Rhino.XFormCPlaneToWorld (Pt, arrCurvePlane)
+				If SourceType = "Surface" Then Pt = Rhino.XFormCPlaneToWorld (Pt, arrSurfacePlane)
+
+		     	' add the first sphere directly
+				If count = 0 Then
+					Redim Preserve StrSphere(count)
+					If arrCustomOptions(4) = "Sphere" Then StrSphere(count) = Rhino.AddSphere (Pt, SphereSize)
+					If arrCustomOptions(4) = "Point" Then StrSphere(count) = Rhino.AddPoint (Pt)
+					' add ellipsoid
+					If arrCustomOptions(4) = "Ellipsoid" Then StrSphere(count) = ADD_Ellipsoid(Pt, SphereSize, 1)
+					If arrCustomOptions(4) = "Drop" Then StrSphere(count) = ADD_Ellipsoid(Pt, SphereSize, 2)
+					ADD_BubbleUserData StrSphere(count), Pt, SphereSize, arrCustomOptions(6)
+					count = count + 1
+				Else
+				    If CollisionDetection = 1 Then
+                        ' add sphere in collision mode
+                        If GET_SphereCollision (StrSphere, Pt, SphereSize, arrCustomOptions(0) ) = 0 Then
+                            Redim Preserve StrSphere(count)
+                            If arrCustomOptions(4) = "Sphere" Then StrSphere(count) = Rhino.AddSphere (Pt, SphereSize)
+                            If arrCustomOptions(4) = "Point" Then StrSphere(count) = Rhino.AddPoint (Pt)
+                            ' add ellipsoid
+                            If arrCustomOptions(4) = "Ellipsoid" Then StrSphere(count) = ADD_Ellipsoid(Pt, SphereSize, 1)
+                            If arrCustomOptions(4) = "Drop" Then StrSphere(count) = ADD_Ellipsoid(Pt, SphereSize, 2)
+                            ' assign user data (strObject,arrCenter,dblRadius,RiInfluence)
+                            ADD_BubbleUserData StrSphere(count), Pt, SphereSize, arrCustomOptions(6)
+                            count = count + 1
+                            Rhino.StatusBarMessage " " & count & "/" & BubbleCount & " bubbles created.... (" & skipped & ")"
+                        Else
+                            skipped = skipped + 1
+                            ' avoid delays / do something with the skip information if the skip limiter option is enabled
+                            If arrCustomOptions(1) = 1 Then
+                                If VolumeType = "OnCircle" And skipped > (BubbleCount * 3) Then Rhino.MessageBeep 4 : Exit Do
+                                If VolumeType = "OnSource" And skipped > (BubbleCount * 5) Then Rhino.MessageBeep 4 : Exit Do
+                                If VolumeType = "AbovePlane" And SourceType = "Surface" And skipped > (BubbleCount * 5) Then Rhino.MessageBeep 4 : Exit Do
+                            End If
+                        End If
+                    Else
+                        ' add sphere in non collision mode (without user data)
+                        Redim Preserve StrSphere(count)
+                        If arrCustomOptions(4) = "Sphere" Then StrSphere(count) = Rhino.AddSphere (Pt, SphereSize)
+                        If arrCustomOptions(4) = "Point" Then StrSphere(count) = Rhino.AddPoint (Pt)
+                        ' add ellipsoid
+                        If arrCustomOptions(4) = "Ellipsoid" Then StrSphere(count) = ADD_Ellipsoid(Pt, SphereSize, 1)
+                        If arrCustomOptions(4) = "Drop" Then StrSphere(count) = ADD_Ellipsoid(Pt, SphereSize, 2)
+                        ADD_BubbleUserData StrSphere(count), Pt, SphereSize, arrCustomOptions(6)
+                        count = count + 1
+                        Rhino.StatusBarMessage " " & count & "/" & BubbleCount & " bubbles created...."
+                    End If
+		    	End If
+
+			 Loop
+		     If arrCustomOptions(2) = 0 Then Rhino.EnableRedraw vbTrue
+
+		     Rhino.Print "Preview ready, created " & count & " bubbles...Press Enter to accept"
+
+		Case "Keep"
+			' keep created spheres without exit
+			If count <> 0 Then Rhino.Print "Added " & count & " bubbles to scene" Else Rhino.Print "Please click on Preview first !"
+			count = 0
+		Case "X", "x"
+			' delete all bubbles and exit
+			If count <> 0 Then Rhino.DeleteObjects StrSphere
+			Rhino.Print "Canceled." : Exit Sub
+		Case "T", "t"
+			Rhino.Command "_Turntable" ' ... :o)
+        Case Else
+            Rhino.Print "ready...go !"
+            If SourceType = "Surface" Then Rhino.UnselectObject BaseSrf
+            If SourceType = "CustomVolume" Then Rhino.UnselectObject BaseVol
+            If count <> 0 Then Rhino.SelectObjects StrSphere
+            Ready = 1
+    End Select
+Loop
+
+' reset locale
+SetLocale(intLCID)
+
+End Sub
+
+' function to create a random ellipsoid or drop from a max radius and origin
+Private Function ADD_Ellipsoid(arrCenter, dblRadius, IntMode)
+Dim arrTemp, arrXAxis, arrYAxis
+Dim arrPoints, arrPt, arrKnotsU, arrKnotsV, arrWeights
+Dim arrXForm, arrResult(), count
+' create a random point in the spheric space around the center with the radius as distance
+arrXAxis = GET_RandomPointOnSphere (arrCenter, 2)
+arrTemp = Array(Rnd(1),Rnd(1),0)
+arrYAxis = Rhino.XFormCPlaneToWorld(Str2Pt("0,1,0"), Array(arrCenter, arrXAxis, arrTemp))
+' Rhino.AddTextDot "0", arrCenter : Rhino.AddTextDot "X", arrXAxis : Rhino.AddTextDot "Y", arrYAxis
+' create a virtual sphere with radius 0 at the world origin
+arrPoints = Str2PtArray("0,0,-1 1,0,-1 1,0,0 1,0,1 0,0,1 0,0,-1 1,1,-1 1,1,0 1,1,1 0,0,1 0,0,-1 0,1,-1 0,1,0 0,1,1 0,0,1 0,0,-1 -1,1,-1 -1,1,0 -1,1,1 0,0,1 0,0,-1 -1,0,-1 -1,0,0 -1,0,1 0,0,1 0,0,-1 -1,-1,-1 -1,-1,0 -1,-1,1 0,0,1 0,0,-1 0,-1,-1 0,-1,0 0,-1,1 0,0,1 0,0,-1 1,-1,-1 1,-1,0 1,-1,1 0,0,1 0,0,-1 1,0,-1 1,0,0 1,0,1 0,0,1")
+arrWeights = Array(1,0.7071,1,0.7071,1,0.7071,0.5,0.7071,0.5,0.7071,1,0.7071,1,0.7071,1,0.7071,0.5,0.7071,0.5,0.7071,1,0.7071,1,0.7071,1,0.7071,0.5,0.7071,0.5,0.7071,1,0.7071,1,0.7071,1,0.7071,0.5,0.7071,0.5,0.7071,1,0.7071,1,0.7071,1)
+arrKnotsU = Array(0,0,1.5708,1.5708,3.1416,3.1416,4.7124,4.7124,6.2832,6.2832)
+arrKnotsV = Array(-1.5708,-1.5708,0,0,1.5708,1.5708)
+' transform the unit sphere to an ellipsoid
+count = 0
+For Each arrPt In arrPoints
+	If IntMode = 1 Then
+		' create an ellipsoid (rx = radius, ry = radius*0.75, rz = radius*0.5
+	    arrXForm = Str2Pt(arrPt(0)*(dblRadius) & "," & arrPt(1)*(dblRadius*0.75) & "," & arrPt(2)*(dblRadius* 0.5) )
+    Else
+    	' create a drop like ellipsoid (rx = radius, ry = radius, rz = radius*0.4
+	    arrXForm = Str2Pt(arrPt(0) * dblRadius & "," & arrPt(1) * dblRadius & "," & arrPt(2) * (dblRadius * 0.4))
+    End If
+	Redim Preserve arrResult(count)
+	arrResult(count) = Rhino.XFormCPlaneToWorld(arrXForm, Array(arrCenter, arrXAxis, arrYAxis))
+	count = count + 1
+Next
+' form a surface from transformed points
+ADD_Ellipsoid = Rhino.AddNurbsSurface(Array(9,5), arrResult, arrKnotsU ,arrKnotsV, Array(2,2), arrWeights)
+End Function
+
+' function to get a single base point source
+Private Function GET_SinglePointSource (PreviousPt, arrCPlane)
+Dim arrBasePt
+arrBasePt = Rhino.GetPoint("Pick a base point for bubble creation <" & Pt2Str(PreviousPt, 3) & ">")
+If Not IsArray(arrBasePt) Then arrBasePt = PreviousPt
+Rhino.Print "Base point for bubble creation: " & Rhino.Pt2Str(arrBasePt, 3)
+arrBasePt = Rhino.XformWorldToCPlane (arrBasePt, arrCPlane)
+Get_SinglePointSource = arrBasePt
+End Function
+
+' function to get a single curve source
+Private Function GET_SingleCurveSource
+Dim StrCurve
+StrCurve = Rhino.GetObject("Select a curve for bubble creation", 4, vbFalse, vbFalse)
+If IsNull(StrCurve) Then
+	GET_SingleCurveSource = -1
+	Exit Function
+Else
+	Rhino.Command "_Reparameterize _Automatic", vbFalse
+	GET_SingleCurveSource = StrCurve
+End If
+End Function
+
+' function to get the single surface source
+Public Function GET_SingleSurfaceSource
+Dim StrSurface, arrSaveData, arrDomainU, arrDomainV, U, V
+Dim StrStored, arrTemp
+StrSurface = Rhino.GetObject("Select a Surface for bubble creation", 8, vbTrue, vbTrue)
+If IsNull(StrSurface) Then
+	GET_SingleSurfaceSource = -1
+	Exit Function
+Else
+	' get domain 0 and 1 for each U and V
+	arrDomainU = Rhino.SurfaceDomain(strSurface, 0)
+	arrDomainV = Rhino.SurfaceDomain(strSurface, 1)
+	' change the domain values to values from 0 to range
+	If arrDomainU(0) <> 0 Or arrDomainV(0) <> 0 Then
+		'save the user data to restore it later
+		If Rhino.IsObjectData(StrSurface) Then StrStored = Rhino.CopyObject(StrSurface)
+		U = - arrDomainU(0) + arrDomainU(1)
+		V = - arrDomainV(0) + arrDomainV(1)
+		' reparameterize accordingly
+		Rhino.Command "_Reparameterize 0 " & (U) & " 0 " & (V), vbFalse
+		arrTemp = Rhino.SelectedObjects
+		' copy the user data from the old object to the new one if the old one had user data
+		StrSurface = COPY_ObjectData(StrStored, arrTemp(0))
+		' delete old object
+		If Not IsNull(StrStored) Then Rhino.DeleteObject StrStored
+	End If
+	GET_SingleSurfaceSource = StrSurface
+End If
+End Function
+
+' function to copy all user data from one object to another
+Private Function COPY_ObjectData(ByVal StrSource, ByVal StrDestination)
+Dim arrApps, strApp, arrKeys, strKey, strValue
+
+If IsNull(StrSource) Then MsgBox "StrSource = Empty" : COPY_ObjectData = StrDestination : Exit Function
+If IsNull(StrDestination) Then MsgBox "StrDestination = Empty" : COPY_ObjectData = StrSource : Exit Function
+
+' return dest obj if source has no obj data
+If Not Rhino.IsObjectData (StrSource) Then
+	COPY_ObjectData = StrDestination
+	Exit Function
+End If
+arrApps = Rhino.GetObjectData(StrSource)
+If IsArray(arrApps) Then
+	For Each strApp In arrApps
+		arrKeys = Rhino.GetObjectData(StrSource, strApp)
+		If IsArray(arrKeys) Then
+			For Each strKey In arrKeys
+				strValue = Rhino.GetObjectData(StrSource,strApp, strKey)
+				If Not IsNull(strValue) Then
+					Rhino.SetObjectData StrDestination, strApp, strKey, strValue
+				End If
+			Next
+		End If
+	Next
+End If
+COPY_ObjectData = StrDestination
+End Function
+
+' function to select (get) the custom volume to fill with bubbles
+Private Function GET_CustomVolumeSource
+Dim arrAllowedObjects, xcount, arrTemp(), StrObject
+arrAllowedObjects = Rhino.NormalObjects
+' do something if the scene has no objects
+If Not IsArray(arrAllowedObjects) Then GET_CustomVolumeSource = -1 : Exit Function
+' make an array of allowed (closed) objects if there are some
+xcount = 0
+For Each StrObject In arrAllowedObjects
+	If Rhino.IsObjectSolid (StrObject) Then
+		Redim Preserve arrTemp(xcount)
+		arrTemp(xcount) = StrObject
+		xcount = xcount + 1
+	End If
+Next
+' if no solids have been found
+If xcount = 0 Then GET_CustomVolumeSource = -1 : Exit Function
+' pick the solid automatically if only one solid is found
+If xcount = 1 Then
+	Rhino.SelectObject(arrTemp(0))
+	GET_CustomVolumeSource = arrTemp(0)
+	Rhino.Print "One custom bounding volume automatically selected"
+	Exit Function
+End If
+' constrain possible selection to all found solids if multiple where found
+arrAllowedObjects = arrTemp
+StrObject = Rhino.GetObject("Select a closed surface or polysurface to fill with bubbles", 8+16, vbFalse, vbTrue, arrAllowedObjects)
+If IsNull(StrObject) Then
+	Rhino.MessageBeep 5
+	GET_CustomVolumeSource = -1
+	Exit Function
+Else
+	GET_CustomVolumeSource = StrObject
+	Rhino.Print "One custom bounding volume selected"
+End If
+End Function
+
+' / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / /
+' function to get a random pt perpendicular on curve with respect to a subraction value
+' result = 4 points: array ( arrRandomPoint, arrPlaneOrigin, arrX, arrY )
+' / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / /
+
+Public Function GET_RandomPointOnCurve (StrCurve, dblSphereSize, dblDimension, strVolumeType)
+Dim arrDomain, dblParam, arrPoint, MinDomain, MaxDomain
+Dim arrNormal, arrTemp, X, Y, Z, arrData
+arrDomain = Rhino.CurveDomain(StrCurve)
+' get a random value between curve start and end points
+dblParam = arrDomain(1) * Rnd
+' subtract dimension for open curves
+If Not Rhino.IsCurveClosed(StrCurve) And arrDomain(1) >= (dblDimension) And strVolumeType <> "OnCircle" And strVolumeType <> "OnPlane" And strVolumeType <> "OnSource" Then
+	MinDomain = dblDimension / 2
+	MaxDomain = arrDomain(1) - dblDimension / 2
+	If dblParam < MinDomain Then dblParam = MinDomain
+	If dblParam > MaxDomain Then dblParam = MaxDomain
+End If
+' add or subtract the sphere size from curve if oncircle option is used
+If strVolumeType = "OnCircle" Or StrVolumeType = "OnPlane" Or StrVolumeType = "OnSource" And Not Rhino.IsCurveClosed(StrCurve) Then
+	If dblParam < dblSpheresize Then dblParam = dblSphereSize
+	If dblParam > (arrDomain(1) - dblSphereSize) Then dblParam = (arrDomain(1) - dblSphereSize)
+End If
+' get the random point on curve:
+arrPoint = Rhino.EvaluateCurve(StrCurve, dblParam)
+' find the tangent line (normal) to this point
+arrNormal = Rhino.CurveTangent(StrCurve, dblParam) ' Z-Axis = arrNormal(0),arrNormal(1)
+' find the Center of radius of curvature or a parallel pt if a linear curve
+arrData = Rhino.CurveCurvature(StrCurve, dblParam)
+If IsArray(arrData) Then arrTemp = arrData(2) Else arrTemp = Array(0,0,0) ' center of curvature or a temp point
+' get the X and Y axis
+X = Rhino.XFormCPlaneToWorld( Array(0,0,1), Array( arrNormal(0),arrNormal(1),arrTemp )) ' X-Axis
+' avoid the 45 degree rotation if a line is vertical on 0,0,0
+If IsNull(X) Then X = Array(arrPoint(0)+1,arrPoint(1),arrPoint(2))
+Y = Rhino.XFormCPlaneToWorld( Array(0,0,1), Array( arrNormal(0),arrNormal(1), X )) ' Y-Axis
+' give out this point in cplane coordinates
+arrPoint = Rhino.XFormWorldToCPlane (arrPoint, Array(arrNormal(0),X,Y))
+' return the point and the curve plane perpendicular to this point
+GET_RandomPointOnCurve = Array(arrPoint,arrNormal(0),X,Y) ' array of 4 points (rndpt, planepts)!
+End Function
+
+' / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / /
+' function to get a random point on a surface with respect to a subtraction value
+' result = 4 points : array ( arrRandomPoint, arrPlaneOrigin, arrX, arrY )
+' / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / /
+
+Private Function GET_RandomPointOnSurface (StrSurface, dblDimension, strType)
+Dim arrDomainU, arrDomainV, arrParam(1), arrPoint, Ready
+Dim arrNormal, X, Y, X_Axis, Y_Axis
+Dim MinUDomain, MaxUDomain, MinVDomain, MaxVDomain
+
+arrDomainU = Rhino.SurfaceDomain(strSurface, 0)
+arrDomainV = Rhino.SurfaceDomain(strSurface, 1)
+
+' reloop until a point inside the trimmed boundary is found
+Do While Ready = 0
+	arrParam(0) = arrDomainU(1) * Rnd
+	arrParam(1) = arrDomainV(1) * Rnd
+	' limit to surface borders if the surface is unclosed, untrimmed
+	If Not Rhino.IsSurfaceTrimmed(StrSurface) And Not Rhino.IsSurfaceClosed(StrSurface, 0) And Not Rhino.IsSurfaceClosed(StrSurface, 1) Then
+		'Rhino.Print "Case 1"
+		' ....and bigger than dimension along u or v
+		If arrDomainU(1) > dblDimension And arrDomainV(1) > dblDimension And Not StrType = "OnSource" And Not StrType = "AbovePlane" Then
+			'Rhino.Print "Case 2"
+			' limit borders in U direction
+			MinUDomain = dblDimension / 2
+			MaxUDomain = arrDomainU(1) - dblDimension / 2
+			If arrParam(0) < MinUDomain Then arrParam(0) = MinUDomain
+			If arrParam(0) > MaxUDomain Then arrParam(0) = MaxUDomain
+			' limit borders in V direction
+			MinVDomain = dblDimension / 2
+			MaxVDomain = arrDomainV(1) - dblDimension / 2
+			If arrParam(1) < MinVDomain Then arrParam(1) = MinVDomain
+			If arrParam(1) > MaxVDomain Then arrParam(1) = MaxVDomain
+		End If
+	End If
+	' make the random point
+	arrPoint = Rhino.EvaluateSurface(strSurface, arrParam) ' a random point on untrimmed srf
+	' check if the point is on a trimmed area
+	If Rhino.IsSurfaceTrimmed(StrSurface) Then
+		If Rhino.IsPointOnSurface(StrSurface, arrPoint) Then Ready = 1
+	Else
+		' accept the point if srf is not trimmed
+		Ready = 1
+	End If
+Loop
+' Rhino.AddPoint arrPoint
+' get the plane relative to this point, (z-axis = plane normal)
+arrNormal = Rhino.SurfaceNormal(strSurface, arrParam)
+' Rhino.AddLine arrNormal(0), arrNormal(1)
+' Rhino.AddPoint arrNormal(0) ' plane Origin
+' Rhino.AddPoint arrNormal(1) ' Z - Axis direction
+' find an offset point to the random point along U (+X)
+X = Rhino.EvaluateSurface(strSurface, Array( arrParam(0)+ arrDomainU(1)/100, arrParam(1) ) ) ' X -Axis direction
+' Rhino.AddTextDot "X", X
+' Rhino.AddLine arrNormal(0), X
+' find an offset point to the random point along V (+Y)
+Y = Rhino.EvaluateSurface(strSurface, Array( arrParam(0), arrParam(1)+ arrDomainV(1)/100 )) ' Y -Axis direction
+' Rhino.AddTextDot "Y", Y
+' Rhino.AddLine arrNormal(0), Y
+X_Axis = Rhino.XFormCPlaneToWorld(Array(1,0,0), Array(arrNormal(0), X, Y))
+' Rhino.AddTextDot "a", X_Axis
+' Rhino.AddLine arrNormal(0), X_Axis
+Y_Axis = Rhino.XFormCPlaneToWorld(Array(0,0,1), Array(arrNormal(0), arrNormal(1), X_Axis))
+' Rhino.AddTextDot "b", Y_Axis
+' Rhino.AddLine arrNormal(0), Y_Axis
+arrPoint = Rhino.XFormWorldToCPlane (arrNormal(0), Array(arrNormal(0), X_Axis, Y_Axis))
+GET_RandomPointOnSurface = Array(arrPoint, arrNormal(0), X_Axis, Y_Axis, arrNormal(1))
+End Function
+
+' / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / /
+' ' function to find a random point inside a solid with respect to a bubble radius (spheresize)
+' result = 1 point (bubble) inside the custom volume with a virtual sphere radius
+' / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / / /
+
+Private Function GET_RandomPointInCustomVolume (StrBaseVolume, dblSphereSize, arrBaseBoundingBox)
+Dim diagonalDistance, arrBBCentroid, Dimension(2), MaxDistance(2), arrPt(2), IntCheck
+
+' define the diagonal distance / 2
+diagonalDistance = Rhino.Distance ( arrBaseBoundingBox(0), arrBaseBoundingBox(6) ) / 2
+' add the centroid of this bounding box
+arrBBCentroid = Rhino.XFormCPlaneToWorld ( Str2Pt(diagonalDistance & ",0,0"), Array( arrBaseBoundingBox(0), arrBaseBoundingBox(6), arrBaseBoundingBox(7) ) )
+If IsNull(arrBBCentroid) Then MsgBox "Cannot calculate centroid of this volume !", vbOkOnly, "CustomVolume Error" : Exit Function
+' define the dimensions for X,Y and Z
+Dimension(0) = Rhino.Distance (arrBaseBoundingBox(0), arrBaseBoundingBox(1))
+Dimension(1) = Rhino.Distance (arrBaseBoundingBox(0), arrBaseBoundingBox(3))
+Dimension(2) = Rhino.Distance (arrBaseBoundingBox(0), arrBaseBoundingBox(4))
+' define maximum distance in respect to bounding box dimension and spheresize
+MaxDistance(0) = Dimension(0) - dblSphereSize * 2
+MaxDistance(1) = Dimension(1) - dblSphereSize * 2
+MaxDistance(2) = Dimension(2) - dblSphereSize * 2
+
+Do
+' get a random sphere (center) point inside the bounding box from these variables
+arrPt(0) = (arrBBCentroid(0) + dblSphereSize - Dimension(0) / 2) + (MaxDistance(0) * Rnd)
+arrPt(1) = (arrBBCentroid(1) + dblSphereSize - Dimension(1) / 2) + (MaxDistance(1) * Rnd)
+arrPt(2) = (arrBBCentroid(2) + dblSphereSize - Dimension(2) / 2) + (MaxDistance(2) * Rnd)
+'Rhino.AddPoint arrPt
+If Rhino.IsPointInSurface (StrBaseVolume, arrPt) = vbTrue Then
+	IntCheck = GET_SphereUserVolumeCollision (StrBaseVolume, arrPt, dblSphereSize)
+	If IntCheck = 0 Then
+		'Rhino.AddPoint arrPt
+		Exit Do
+	End If
+End If
+Loop
+GET_RandomPointInCustomVolume = arrPt
+End Function
+
+Private Function GET_SphereUserVolumeCollision (StrUserVolume, arrCenterPt, dblSphereSize)
+Dim D, TestPoint(13), index
+
+D = Sqr ( dblSphereSize ^ 2 / 3) + dblSphereSize * 0.1
+
+' + x, - x, + y, - y, + z, - z
+TestPoint(0) = Str2Pt( arrCenterPt(0) + dblSphereSize & "," & arrCenterPt(1) & "," & arrCenterPt(2) )
+TestPoint(1) = Str2Pt( arrCenterPt(0) - dblSphereSize & "," & arrCenterPt(1) & "," & arrCenterPt(2) )
+TestPoint(2) = Str2Pt( arrCenterPt(0) & "," & arrCenterPt(1) + dblSphereSize & "," & arrCenterPt(2) )
+TestPoint(3) = Str2Pt( arrCenterPt(0) & "," & arrCenterPt(1) - dblSphereSize & "," & arrCenterPt(2) )
+TestPoint(4) = Str2Pt( arrCenterPt(0) & "," & arrCenterPt(1) & "," & arrCenterPt(2) + dblSphereSize )
+TestPoint(5) = Str2Pt( arrCenterPt(0) & "," & arrCenterPt(1) & "," & arrCenterPt(2) - dblSphereSize )
+' get some more points on the bubble sphere (+z)
+TestPoint(6) = Str2Pt ( arrCenterPt(0) + D & "," & arrCenterPt(1) + D & "," & arrCenterPt(2) + D )
+TestPoint(7) = Str2Pt ( arrCenterPt(0) - D & "," & arrCenterPt(1) + D & "," & arrCenterPt(2) + D )
+TestPoint(8) = Str2Pt ( arrCenterPt(0) - D & "," & arrCenterPt(1) - D & "," & arrCenterPt(2) + D )
+TestPoint(9) = Str2Pt ( arrCenterPt(0) + D & "," & arrCenterPt(1) - D & "," & arrCenterPt(2) + D )
+' mirror these (-z)
+TestPoint(10) = Str2Pt ( arrCenterPt(0) + D & "," & arrCenterPt(1) + D & "," & arrCenterPt(2) - D )
+TestPoint(11) = Str2Pt ( arrCenterPt(0) - D & "," & arrCenterPt(1) + D & "," & arrCenterPt(2) - D )
+TestPoint(12) = Str2Pt ( arrCenterPt(0) - D & "," & arrCenterPt(1) - D & "," & arrCenterPt(2) - D )
+TestPoint(13) = Str2Pt ( arrCenterPt(0) + D & "," & arrCenterPt(1) - D & "," & arrCenterPt(2) - D )
+
+For index = 0 To UBound(TestPoint)
+	'Rhino.AddPoint TestPoint(Index)
+ 	If Rhino.IsPointInSurface(StrUserVolume, TestPoint(index) ) = vbFalse Then
+ 		GET_SphereUserVolumeCollision = 1
+	   	Exit Function
+ 	End If
+Next
+
+GET_SphereUserVolumeCollision = 0
+
+End Function
+
+' function to choose a creation base
+Private Function GET_CreationSource (StrSource)
+Dim Result
+Result = Rhino.GetString("Choose a source object type", StrSource, Array("Point","Curve","Surface","CustomVolume"))
+If Result = "Point" Or Result = "Curve" Or Result = "Surface" Or Result = "CustomVolume" Then
+	GET_CreationSource = Result
+Else
+	GET_CreationSource = StrSource
+End If
+End Function
+
+' function to choose a volume type and plane elevation mode
+Private Function GET_VolumeType (StrType)
+Dim Result
+Result = Rhino.GetString("Choose a bounding volume type", StrType, Array("Cubic","Spherical","Cylindrical","OnSphere","OnCircle","OnPlane","AbovePlane","OnSource"))
+If Result = "Spherical" Or Result = "Cubic" Or Result = "Cylindrical" Or Result = "OnSphere" Or Result = "OnCircle" Or Result = "OnPlane" Or Result = "AbovePlane" Or Result = "OnSource" Then
+	GET_VolumeType = Result
+Else
+	If Not IsNull(Result) Then
+		GET_VolumeType = StrType
+	Else
+		GET_VolumeType = "Cubic"
+	End If
+End If
+End Function
+
+' function to choose one of the custom user options
+Public Function GET_UserCustomOptions (arrCurrentOptions, dblDimension)
+Dim Result, Ready, dblColOffset, dblAPOffset, StrOutputType
+Dim RiMsg, RiMsgResult, StrInfluence
+
+Ready = 0
+Rhino.Print "Info: CollisionOffset and SkipLimiter settings only apply if collision detection mode is enabled"
+Do While Ready = 0
+Result = Rhino.GetString("Custom Options", , Array("CollisionOffset","SkipLimiter","Redraw","AbovePlaneOffset","OutputType","RiBlobby") )
+	Select Case Result
+
+	Case "CollisionOffset"
+		Rhino.Print "Info: This value controls the minimum allowed distance between bubbles before detecting a collision"
+		dblColOffset = Rhino.GetReal ("Enter the minimum allowed space between bubbles", arrCurrentOptions(0), , dblDimension / 2 )
+		If Not IsNull(dblColOffset) Then arrCurrentOptions(0) = dblColOffset
+
+	Case "SkipLimiter"
+		If arrCurrentOptions(1) = 1 Then
+	     	arrCurrentOptions(1) = 0
+	     	Rhino.Print "Limit for failed calculations in collision mode disabled (slower)"
+	     Else
+	     	arrCurrentOptions(1) = 1
+	     	Rhino.Print "Limit for failed calculations in collision mode enabled (faster)"
+	     End If
+
+	Case "Redraw"
+			Rhino.EnableRedraw (vbTrue)
+	     If arrCurrentOptions(2) = 1 Then
+	     	arrCurrentOptions(2) = 0
+	     	Rhino.Print "Dynamic scene redraw disabled (faster)"
+	     Else
+	     	arrCurrentOptions(2) = 1
+	     	Rhino.Print "Dynamic scene redraw enabled. (slower)"
+	     End If
+
+	Case "AbovePlaneOffset"
+		Rhino.Print "Info: Use this value to control the offset for the AbovePlane volume option, only works with a surface as source ! "
+		dblAPOffset = Rhino.GetReal ("Enter the amount to shift bubbles above plane", arrCurrentOptions(3), 0, 100000 )
+		If Not IsNull(dblAPOffset) Then arrCurrentOptions(3) = dblAPOffset
+
+	Case "OutputType"
+		StrOutputType = Rhino.GetString("Choose an OutputType: ", arrCurrentOptions(4), Array("Sphere","Ellipsoid","Drop","Point") )
+		If Not IsNull(StrOutputType) Then
+			If StrOutputType = "Sphere" Or StrOutputType = "Ellipsoid" Or StrOutputType = "Drop" Or StrOutputType = "Point" Then
+				arrCurrentOptions(4) = StrOutputType
+				Rhino.SetDocumentData "RandomBubbles", "OutputType", CStr(StrOutputType)
+			End If
+		Else
+			arrCurrentOptions(4) = "Sphere"
+		End If
+
+	Case "RiBlobby"
+		' if not enabled, ask to enable
+		If arrCurrentOptions(5) = 0 Then
+			RiMsg = "This option only applies if you are using AIR to" & vbNewLine
+			RiMsg = RiMsg & "Render RandomBubbles as RiBlobby objects." & vbNewLine & vbNewLine
+			RiMsg = RiMsg & "Enable Influence Data assignments ?"
+			' ask to enable influence data saving
+			RiMsgResult = MsgBox (RiMsg, vbOkCancel, "RiBlobby Data assignments")
+			If RiMsgResult = 1 Then arrCurrentOptions(5) = 1 Else GET_UserCustomOptions = arrCurrentOptions : Exit Function
+		End If
+		' if enabled
+		If arrCurrentOptions(5) = 1 Then
+			If arrCurrentOptions(6) = 1 Then StrInfluence = "Positive" Else StrInfluence = "Negative"
+			Rhino.Print CHR(34) & "Positive" & CHR(34) & " adds objects together, " & CHR(34) & "Negative" & CHR(34) & " subtracts negative from positive objects."
+			StrInfluence = Rhino.GetString("Select influence mode to assign to RandomBubbles", StrInfluence, Array("Positive","Negative"))
+			If IsNull(StrInfluence) Then arrCurrentOptions(6) = 1
+			If StrInfluence = "Positive" Then
+				arrCurrentOptions(6) = 1
+			Else
+				arrCurrentOptions(6) = -1
+			End If
+			GET_UserCustomOptions = arrCurrentOptions
+			Exit Function
+		End If
+
+	Case Else
+		Ready = 1
+	End Select
+Loop
+
+' revert all new options
+GET_UserCustomOptions = arrCurrentOptions
+End Function
+
+'function to get random point in cubic volume
+Private Function GET_RandomPointInCubicVolume (arrBasePt, dblSphereSize, dblDimension)
+Dim arrPt(2), MaxDistance
+MaxDistance = dblDimension - dblSphereSize * 2
+arrPt(0) = (arrBasePt(0) + dblSphereSize - dblDimension / 2) + (MaxDistance * Rnd)
+arrPt(1) = (arrBasePt(1) + dblSphereSize - dblDimension / 2) + (MaxDistance * Rnd)
+arrPt(2) = (arrBasePt(2) + dblSphereSize - dblDimension / 2) + (MaxDistance * Rnd)
+GET_RandomPointInCubicVolume = arrPt
+End Function
+
+' function to get random point in spheric volume
+Private Function GET_RandomPointInSphericVolume (arrBasePt, dblSphereSize, dblDimension)
+Dim arrPt(2), theta, phi, delta, MaxDistance
+theta = Rnd * 8 * Atn(1)
+phi   = Sqr(Rnd) * 2 * Atn(1)
+delta = 10 * Rnd : If delta > 5 Then delta = 1 Else delta = -1
+MaxDistance = dblDimension / 2 * Rnd - dblSphereSize
+arrPt(0) = Sin(phi) * Cos(theta) * MaxDistance + arrBasePt(0)
+arrPt(1) = Sin(phi) * Sin(theta) * MaxDistance + arrBasePt(1)
+arrPt(2) = Cos(phi) * delta	* MaxDistance + arrBasePt(2)
+GET_RandomPointInSphericVolume = arrPt
+End Function
+
+' function to get random point in cylindrical volume
+Private Function GET_RandomPointInCylindricVolume (arrBasePt, dblSphereSize, dblDimension)
+Dim arrPt(2), theta, phi, MaxDistance(1)
+theta = Rnd * 8 * Atn(1)
+phi   = Sqr(Rnd) * 2 * Atn(1)
+MaxDistance(0) = dblDimension / 2 * Rnd - dblSphereSize
+MaxDistance(1) = dblDimension - dblSphereSize * 2
+arrPt(0) = Sin(phi) * Cos(theta) * MaxDistance(0) + arrBasePt(0)
+arrPt(1) = Sin(phi) * Sin(theta) * MaxDistance(0) + arrBasePt(1)
+arrPt(2) = (arrBasePt(2) + dblSphereSize - dblDimension / 2) + (MaxDistance(1) * Rnd)
+GET_RandomPointInCylindricVolume  = arrPt
+End Function
+
+' function to find a random point on a virtual sphere (bubble center on sphere hull)
+Private Function GET_RandomPointOnSphere (arrBasePt, dblDimension)
+Dim arrPt(2), theta, phi, delta
+theta = Rnd * 8 * Atn(1)
+phi   = Sqr(Rnd) * 2 * Atn(1)
+delta = 10 * Rnd : If delta > 5 Then delta = 1 Else delta = -1
+arrPt(0) = Sin(phi) * Cos(theta) * dblDimension / 2 + arrBasePt(0)
+arrPt(1) = Sin(phi) * Sin(theta) * dblDimension / 2 + arrBasePt(1)
+arrPt(2) = Cos(phi) * delta * dblDimension / 2 + arrBasePt(2)
+GET_RandomPointOnSphere = arrPt
+End Function
+
+' function to get a random point on a virtual circle
+Private Function GET_RandomPointOnCircle (arrBasePt, dblSphereSize, dblDimension)
+Dim arrPt(2), theta, phi, MaxDistance
+theta = Rnd * 8 * Atn(1)
+phi   = Atn(1) * 2 ' # * Sqr(Rnd) ' use this instead for PointInCircle
+MaxDistance = dblDimension / 2 '# use this instead for PointInCircle
+arrPt(0) = Sin(phi) * Cos(theta) * MaxDistance + arrBasePt(0)
+arrPt(1) = Sin(phi) * Sin(theta) * MaxDistance + arrBasePt(1)
+arrPt(2) = arrBasePt(2)
+GET_RandomPointOnCircle = arrPt
+End Function
+
+' function to get a random point inside a virtual plane
+Private Function GET_RandomPointOnPlane (arrBasePt, dblSphereSize, dblDimension)
+Dim arrPt(2), MaxDistance
+MaxDistance = dblDimension - dblSphereSize * 2
+arrPt(0) = (arrBasePt(0) + dblSphereSize - dblDimension / 2) + (MaxDistance * Rnd)
+arrPt(1) = (arrBasePt(1) + dblSphereSize - dblDimension / 2) + (MaxDistance * Rnd)
+arrPt(2) = arrBasePt(2)
+GET_RandomPointOnPlane = arrPt
+End Function
+
+' function to get a random point above a virtual plane
+Private Function GET_RandomPointAbovePlane (arrBasePt, dblSphereSize, dblDimension)
+Dim arrPt(2), MaxDistance
+MaxDistance = dblDimension - dblSphereSize * 2
+arrPt(0) = (arrBasePt(0) + dblSphereSize - dblDimension / 2) + (MaxDistance * Rnd)
+arrPt(1) = (arrBasePt(1) + dblSphereSize - dblDimension / 2) + (MaxDistance * Rnd)
+arrPt(2) = arrBasePt(2) + dblSphereSize
+GET_RandomPointAbovePlane = arrPt
+End Function
+
+' function to get a random point around but on a random choosen, existing bubble
+Private Function GET_RandomPointOnExistingBubbles
+' clustermode under construction
+End Function
+
+' collision detection
+Private Function GET_SphereCollision (arrObjects, TestCenter, TestRadius, dblOffset)
+Dim bound, i, Center, Radius, CenterDistance, RadiusAddition
+' get the amount of spheres to check for intersection
+bound = UBound(arrObjects)
+For i = 0 To bound
+    ' get the center and radius of sphere to test
+    Center = Rhino.Str2Pt(Rhino.GetObjectData (arrObjects(i), "RandomBubbles", "Center"))
+    Radius = Rhino.GetObjectData(arrObjects(i), "RandomBubbles", "Radius")
+    CenterDistance = Rhino.Distance(TestCenter, Center)
+	RadiusAddition = TestRadius + Radius + dblOffset
+	' check for intersection
+	If CenterDistance < RadiusAddition Then GET_SphereCollision = 1
+Next
+End Function
+
+' Function to add bubble user data to sphere for collision detection
+Private Function ADD_BubbleUserData (StrObject, arrPt, dblSphereSize, intRiBlobbyInfluence)
+' display the data values to assign
+' Rhino.Print "Ri_Opcode: " & 1001 &  "  CenterPt: " & Pt2Str(arrPt) & "  Radius: " & dblSphereSize & "  Influence: " & intRiBlobbyInfluence
+' store the sphere center point and radius for collision detection
+Rhino.SetObjectData  StrObject, "RandomBubbles", "Radius", CStr(dblSphereSize)
+Rhino.SetObjectData  StrObject, "RandomBubbles", "Center", Rhino.Pt2Str(arrPt)
+' store the type of influence for the RiBlobby exporter (1 = positive, -1 = negative)
+Rhino.SetObjectData StrObject, "RandomBubbles", "RiInfluence", intRiBlobbyInfluence
+' store the "Opcode" to include this object as 1001 (ellipsoid) = spherical
+Rhino.SetObjectData StrObject, "RandomBubbles", "RiOpcode", 1001
+End Function
+
+RandomBubbles

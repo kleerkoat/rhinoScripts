@@ -1,0 +1,57 @@
+Option explicit
+
+'Rhino.AddStartUpScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "ExportLayers", "_NoEcho _-Runscript (ExportLayers)"
+
+
+Private OldFolder, oldExt
+If isEmpty(oldFolder) Then
+	OldFolder = Rhino.WorkingFolder()
+End If
+
+If isEmpty(oldExt) Then
+	OldExt = ".3dm"
+End If
+
+
+
+'Call ExportLayers()
+Sub ExportLayers()
+  
+	Dim arrLayers, strFileName, strPath
+	Dim intExt, strCurrent
+	Dim strExt: StrExt = Rhino.GetString("Export file type", oldExt, array(".3dm", ".dae", ".obj", ".3ds",".dwg", ".dxf"))
+	
+	If isNull(strExt) Then Exit Sub
+	OldExt = strExt
+	
+	arrLayers = Rhino.LayerNames
+	strCurrent = Rhino.CurrentLayer()
+	strFilename = Rhino.DocumentName()
+	If isNull(strFileName) Then strFileName = "Untitled.3dm"
+	intExt = InStrRev(strFileName, ".3dm")
+	strFileName = Left(strFileName, intExt - 1)
+	'strPath = Rhino.DocumentPath
+
+	strPath = Rhino.BrowseForFolder(OldFolder, "Select folder:", "Export layers")
+	If  IsNull(strpath) Then Exit Sub
+	OldFolder = strPath
+	
+	Rhino.EnableRedraw(False)
+	Dim i, str, arrObj, sLayer
+	For i=0 To UBound(arrLayers)
+		Rhino.UnselectAllObjects
+		arrObj = Rhino.ObjectsByLayer(arrLayers(i), True)
+            
+		If IsArray(arrObj) Then
+			Rhino.CurrentLayer(arrlayers(i))
+			sLayer = replace(arrlayers(i), "::", "_")
+			str = Chr(34) & strPath & strFileName & "_" & slayer & strExt & Chr(34)
+			Rhino.Command "-Export " & str & " Enter"
+		End If
+      
+	Next
+	Rhino.EnableRedraw(True)
+ 
+	Rhino.CurrentLayer(strCurrent)
+End Sub

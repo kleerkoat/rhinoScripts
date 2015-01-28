@@ -1,0 +1,519 @@
+Option Explicit
+'Script written by Pascal
+'Script copyrighted by RMA
+'Script version Thursday, October 18, 2007
+
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "ConicBlendSrf","noEcho _-Runscript (ConicBlendSrf)"
+'Rhino.AddAlias "ConicBlendFromSrf","noEcho _-Runscript (ConicBlendFromSrf)"
+
+'Call ConicBlendFromSrf()
+
+Sub ConicBlendSrf()
+	
+	'Make  degree 1 or two surface into a conic blend between two
+	'other surfaces.
+	
+	Dim sLoft: sLoft = Rhino.GetObject("Select an untrimmed, degree 1 or 2 by X surface",8,True)
+	
+	If isNull(sLoft) then Exit Sub
+	
+	Dim aKnots : aKnots = Rhino.SurfaceKnots(sLoft) 
+	
+	If UBound(aKnots(0)) > 3 Then 
+		If	UBound(aKnots(1)) <= 3 then
+			Rhino.EnableRedraw  False
+			Rhino.SelectObject sLoft
+			Rhino.Command "_Dir _SwapUV _Enter"
+			Rhino.UnselectAllObjects
+			Rhino.EnableRedraw  True
+		Else 
+			MsgBox "Surface must be single span and degree 2 or less in the blend direction"
+			Exit Sub
+		End If
+	End If
+	
+	Dim intVDeg: intVDeg =  Rhino.SurfaceDegree(sLoft,1)
+	
+	Dim sSrf1: sSrf1 = Rhino.GetObject("Select first tangent surface", 8)
+		
+	If isNull(sSrf1) Then Exit Sub
+		
+	Dim sSrf2: sSrf2 = Rhino.GetObject("Select second tangent surface", 8)
+	
+	If isNull(sSrf2) Then Exit Sub
+	
+	Rhino.EnableRedraw False
+	
+	Rhino.EnableObjectGrips sLoft, False
+	Rhino.UnselectAllObjects
+	Rhino.SelectObject sLoft
+	Rhino.Command "_ChangeDegree 2 " & intVDeg & " _Enter"
+	Rhino.EnableObjectGrips sLoft, True
+	
+	Dim sTempLoft: sTempLoft = Rhino.CopyObject (sLoft)
+	Rhino.EnableObjectGrips sTempLoft, false
+	Rhino.HideObject sTempLoft
+	
+	Rhino.UnselectallObjects
+	
+	Dim aLoc: aLoc = Rhino.ObjectGripLocations(sLoft)
+	
+	Dim intV: intV = (UBound(aLoc) + 1)/3
+	Dim Idx1, idx2, apt3, i, aTarg
+	
+	For i = IntV To 2*IntV-1
+		
+		idx1 = i-intv
+		idx2 = i+intV
+	
+		aTarg = ConicBlendPts (sSrf1, sSrf2, sLoft,idx1,idx2,i)
+		
+		If isArray(aTarg) then 
+			Rhino.ObjectGripLocation sLoft, array(i), aTarg
+		Else 
+			Rhino.EnableObjectGrips sLoft, false
+			Rhino.ShowObject stempLoft
+			Rhino.Deleteobject sTempLoft
+			Rhino.EnableRedraw True
+			msgbox "The script could not find a solution with this surface arrangement."
+			Exit Sub
+		End If
+			
+	Next
+		
+	Rhino.EnableObjectGrips sLoft, False
+	Rhino.EnableRedraw True
+	
+	Dim AOK: AOK = Rhino.GetBoolean("Flip direction?",array("Flip","No","Yes"),array(False))
+	
+	If AOK(0) = True then 
+		Rhino.EnableRedraw False
+		Rhino.DeleteObject sLoft
+		Rhino.ShowObject sTempLoft
+
+		Rhino.EnableObjectGrips sTempLoft, True
+		
+		For i = Intv To 2*IntV-1
+		
+			idx1 = i-intv
+			idx2 = i+intV
+	
+			atarg = ConicBlendPts (sSrf2, sSrf1, sTempLoft,idx1,idx2,i)
+			If isArray(aTarg) then 
+				Rhino.ObjectGripLocation sTempLoft, array(i), aTarg
+			Else 
+				Rhino.Deleteobject sTempLoft
+				Rhino.EnableRedraw True
+				msgbox "The script could not find a solution with this surface arrangement."
+				Exit Sub
+			End If
+			
+		Next
+				
+		Rhino.EnableObjectGrips sTempLoft, False
+	Else 
+		Rhino.DeleteObject sTempLoft
+	End If
+
+	Rhino.EnableRedraw True
+	
+End Sub
+
+'Call ConicBlendSrf()
+
+
+Sub ConicBlendSrf()
+	'make a 3 point blend surface tangent-ish to two surfaces.
+	
+	dim sCrv1: sCrv1 = Rhino.GetObject("Select the first curve",4,true)
+	If isNull(sCrv1) then exit sub
+	
+	Dim sSrf1: sSrf1 = Rhino.GetObject("Select the first surface",8)
+	If isNull(sSrf1) then Exit Sub
+	
+	dim sCrv2: sCrv2 = Rhino.GetObject("Select the second curve",4,true)
+	If isNull(sCrv2) then exit sub
+	
+	Dim sSrf2: sSrf2 = Rhino.GetObject("Select the second surface",8)
+	If isNull(sSrf2) then Exit Sub
+
+	dim Cop1, Cop2
+	Cop1 = Rhino.CopyObject(sCrv1)
+	Cop2 = Rhino.CopyObject(sCrv2)
+	
+	
+	MatchUpCurves Cop1, Cop2
+	
+	Rhino.EnableRedraw False
+	
+	dim SrfCop1: SrfCop1 = GetUntrimmedSrf(sSrf1)
+	dim SrfCop2: SrfCop2 = GetUntrimmedSrf(sSrf2)
+	dim IntDir1:intDir1 = ParallelDirectionSrf(SrfCop1, sCrv1)
+	dim IntDir2:intDir2 = ParallelDirectionSrf(SrfCop2, sCrv2)
+	
+	'Dim sLoft: sLoft = Rhino.AddLoftSrf(array(Cop1, Cop2),,,2,0,,False)(0)
+	Dim sNew: sNew = MakeDeg2Srf( srfCop1, srfCop2,Cop1,Cop2, intDir1, intDir2)
+	
+	Rhino.UnselectAllObjects
+	Rhino.DeleteObjects array(Cop1, Cop2)
+	Rhino.DeleteObjects array(SrfCop1, srfCop2)
+	Rhino.UnselectAllObjects
+	Rhino.EnableRedraw True
+	
+End Sub
+
+
+Function ConicBlendPts(Srf1,Srf2,Crv1, Crv2, idx1, idx2, blnIso, intDir1, intDir2)
+	'find the location os the middle point of three to make a 
+	'conic blend
+
+	Dim apt1, apt2, aParam1, aParam2, aPlane1, aPlane2
+	
+	Dim list1: List1 = Rhino.CurvePoints(Crv1)
+	Dim List2: List2 = Rhino.CurvePoints(Crv2)
+	
+	
+	apt1 = List1(idx1)
+	apt2 = List2(idx2)
+	
+	aParam1 = Rhino.SurfaceClosestPoint(Srf1,apt1)
+	aParam2 = Rhino.SurfaceClosestPoint(Srf2,aPt2)
+
+	aPlane1 = Rhino.PlaneFromNormal(aPt1,Rhino.SurfaceNormal(Srf1, aParam1))
+	aPlane1(0) = aPt1
+	
+	aPlane2 = Rhino.PlaneFromNormal(apt2,Rhino.SurfaceNormal(Srf2, aParam2))
+	aPlane2(0) = aPt2
+	
+	if blnIso = true then
+		
+		dim Iso1, Iso2, IsoPar1, IsoPar2, Vectan1, VecTan2,IsoPt1, IsoPt2
+		Iso1 = Rhino.ExtractIsoCurve(Srf1,aParam1,intDir1)
+		Iso2 = Rhino.ExtractIsoCurve(Srf2,aParam2,intDir2)
+		
+		'	Rhino.ObjectColor Iso2, vbred
+		
+		IsoPar1 = Rhino.CurveClosestPoint(Iso1(0),apt1)
+		IsoPar2 = Rhino.CurveClosestPoint(Iso2(0),apt2)
+		Vectan1 = Rhino.CurveTangent(Iso1(0), IsoPar1)
+		Vectan2 = Rhino.CurveTangent(Iso2(0),IsoPar2)
+		IsoPt1 = Rhino.EvaluateCurve(Iso1(0),isopar1)
+		IsoPt2 = Rhino.EvaluateCurve(Iso2(0),IsoPar2)
+		
+		Rhino.DeleteObjects array(Iso1(0), Iso2(0))
+		
+		Dim D1, D2, Line1, Line2,intInfo
+		D1 =  qDistance(Rhino.PointAdd(IsoPt1,VecTan1),IsoPt2)
+		D2 =  qDistance(Rhino.PointAdd(IsoPt1,Rhino.VectorReverse(VecTan1)),IsoPt2)
+
+		If D1 > D2 then Vectan1 = Rhino.VectorReverse(VecTan1)
+		
+		D1 =  qDistance(Rhino.PointAdd(IsoPt2,VecTan2),IsoPt1)
+		D2 =  qDistance(Rhino.PointAdd(IsoPt2,Rhino.VectorReverse(VecTan2)),IsoPt1)
+
+		If D1 > D2 then Vectan2 = Rhino.VectorReverse(VecTan2)
+		
+		Line1 =array(isoPt1, Rhino.PointAdd(IsoPt1,Vectan1))
+		Line2 = array(IsoPt2, Rhino.PointAdd(IsoPt2,Vectan2))
+		intInfo = Rhino.LineLineIntersection(Line1,Line2, False)
+		ConicBlendPts = AveragePoints(IntInfo)
+		Exit Function
+	End If
+	
+	Dim PlaneInt: PlaneInt = Rhino.PlanePlaneIntersection(aPlane1,aPlane2)
+	
+	Dim aPts: aPts  = Rhino.LineLineIntersection(PlaneInt,array(aPt1, aPt2), false)
+
+	If isArray(aPts) then ConicBlendPts =  aPts(0)
+	
+End Function
+
+Function PointClosestCrv(aPt,aCrv)
+	
+	'find the closest curve to a point
+	Dim X,i,tempparam,testpt,Dist,tempDist
+	Dim K:K = False
+	
+	For i = 0 To UBound(aCrv)
+	
+		If K = False Then
+			tempParam = Rhino.CurveClosestPoint(aCrv(i),apt)
+			testPt = Rhino.EvaluateCurve(aCrv(i),tempParam)
+			Dist = Rhino.Distance (aPt,testpt)
+			K = True
+			X = 0
+		Else
+			tempParam = Rhino.CurveClosestPoint(aCrv(i),apt)
+			testPt = Rhino.EvaluateCurve(aCrv(i),tempParam)
+			tempDist = Rhino.Distance (aPt,testPt)
+			If tempDist<Dist Then
+				Dist = tempDist
+				X = i
+			End If
+		End If
+		
+	Next
+			
+	PointClosestCrv = aCrv(X)
+	
+End Function
+
+Sub MatchUpCurves(sCrv1, sCrv2)
+	
+	dim deg1, deg2, Un1, Un2
+	deg1 = Rhino.CurveDegree(sCrv1)
+	deg2 = Rhino.CurveDegree(sCrv2)
+	
+	if deg1 <> deg2 then
+		
+		if Deg1> Deg2 then
+			Rhino.UnselectAllObjects()
+			Rhino.SelectObject sCrv2
+			Rhino.Command "_ChangeDegree " & deg1 & " _Enter"
+		else
+			Rhino.UnselectAllObjects()
+			Rhino.SelectObject sCrv1
+			Rhino.Command "_ChangeDegree " & deg2 & " _Enter"
+			Rhino.UnselectAllObjects()
+		End if
+		
+	End If
+	
+	Rhino.SelectObjects array(sCrv1, sCrv2)
+	Rhino.Command "_Reparamterize _Automatic "
+
+	dim s1, s2
+	S1 = -1
+	S2 = -1
+	Dim K1: K1 = Rhino.CurveKnotCount (sCrv1)
+	If K1 = 2*Rhino.CurveDegree(sCrv1) then S1 = Rhino.CurveDegree(sCrv1)
+		
+		
+	Dim K2: K2 = Rhino.CurveKnotCount (sCrv2)
+	If K2 = 2*Rhino.CurveDegree(sCrv2) then S2 = Rhino.CurveDegree(sCrv2)
+	
+	if K1 <> K2 then
+		dim strMsg: strMsg = "Curves cannot be fully matched up in a script. Would you like to rebuild?"
+		
+		If S1 <>-1 then 
+			strMsg = strMsg & vbNewLine & "It looks like Degree " & s1 & " and " & s1+1 & " points will work."
+		elseif s2 <> -1 then
+			strMsg = strMsg & vbNewLine & "It looks like Degree " & s2 & " and " & s2+1 & " points will work."
+		End if
+		
+		dim intReb: intreb = MsgBox (strMsg, 1)
+		if intReb = 1 then 
+			
+			Rhino.UnselectAllObjects()
+			Rhino.SelectObjects array(sCrv1, sCrv2)
+			Rhino.Command "_Rebuild"
+			
+		End If
+	End if
+	If not Rhino.CurveDirectionsMatch(sCrv1, sCrv2) then Rhino.ReverseCurve(sCrv1)
+	
+End Sub
+
+Function ParallelDirectionSrf(sSrf, sCrv)
+	
+	ParallelDirectionSrf = 1
+	
+	dim aPt: aPt = Rhino.CurveMidPoint(sCrv)
+	dim aparam: aparam = Rhino.SurfaceClosestPoint(sSrf, apt)
+	Dim aIso: aIso = Rhino.ExtractIsoCurve(sSrf,aParam,2)
+	
+	Dim tanTest, TanU, TanV
+	
+	tanTest = Rhino.CurveTangent(sCrv,Rhino.CurveClosestPoint(sCrv, aPt))
+	tanU = Rhino.CurveTangent(aIso(0),Rhino.CurveClosestPoint(aIso(0), aPt))
+	tanV = Rhino.CurveTangent(aIso(1),Rhino.CurveClosestPoint(aIso(1), aPt))
+	
+	dim test: test =  MostParallel(TanTest,array(TanU,TanV))
+
+	If test = 1 then ParallelDirectionSrf = 0
+	Rhino.DeleteObjects aIso
+	
+End Function
+
+Function MostParallel(vec,avec)
+	
+	Dim i, n, idx, ang, tempAng
+	idx = 0
+	i = 0
+	ang = VectorAngle(Vec, aVec(0), True)
+	
+	For i = 1 to UBound(aVec)
+		
+		tempang = VectorAngle(Vec, aVec(i), true)
+
+		If abs(Cos(tempAng)) > abs(Cos(ang)) then
+			ang = tempang
+			idx = i
+		end if
+	Next
+	
+	MostParallel = idx
+	
+End Function
+
+Function VectorAngle(Vec1, vec2, blnRadians)
+	
+	Vec1 = Rhino.VectorUnitize(Vec1)
+	Vec2 = Rhino.VectorUnitize (Vec2)
+	
+	Dim DP: DP = Vec1(0) * Vec2(0) + Vec1(1) * Vec2(1) +  Vec1(2) * Vec2(2)
+	
+	If DP  > .999999 then
+		VectorAngle = 0
+	ElseIf DP < -.999999 then 
+		if blnRadians = true then
+			vectorAngle = Rhino.Pi()
+		Else
+			VectorAngle = Rhino.ToDegrees(Rhino.Pi())
+		End if
+		
+	Else
+		VectorAngle = arcos(DP, blnRadians)
+	End If
+	
+End Function
+
+Function Arcos(dblAng, blnRad)
+	'dblAng input in radians
+	
+	If BlnRad = True then 'output in radians
+		Arcos = Atn(-dblAng / Sqr(-dblAng * dblAng + 1)) + 2 * Atn(1)
+	Else 'output in degrees
+		Arcos = Rhino.ToDegrees(  Atn(-dblAng / Sqr(-dblAng * dblAng + 1)) + 2 * Atn(1))
+	End if
+	
+End Function
+
+Function QDistance(aPtA,aPtB)
+	QDistance = Sqr( (aPtA(0 )- aPtB(0))^2 + (aPtA(1)- aPtB(1))^2 + (aPtA(2) - aPtB(2))^2 )
+End Function
+
+Function AveragePoints(aPts)
+	'Finds the average location of an array
+	'of points.
+
+	Dim X, Y, Z
+	Dim i
+	
+	X = 0
+	Y = 0
+	Z = 0
+
+	For i=0 To UBound (aPts)
+			
+		'add all the X values
+		X = X+aPts(i)(0)
+	
+		'add all th Y values
+		Y = Y+aPts(i)(1)			
+	
+		'add all the Z values
+		Z = Z+apts(i)(2)
+	Next
+	
+	'Divide by the number of points to
+	'get the average  for each
+	'create the output array from the 3 averages
+	AveragePoints  =array(X/(UBound(aPts)+1), Y/(UBound(aPts)+1), Z/(UBound(aPts)+1))
+
+End Function
+
+Function GetUntrimmedSrf(sSrf)
+	'returns the untrimmed version of the selected surface
+	'for analytical surfaces the entire shape is returned.
+	Dim aPlane,dblRad,dblHeight
+	
+	If Rhino.IsSphere(sSrf) then
+		'get sphere info
+		'make a new sphere
+		
+		Dim aSphere: aSphere = Rhino.SurfaceSphere(sSrf)
+		aPlane = aSphere(0)
+		dblRad = aSphere(1)
+		GetUntrimmedSrf = Rhino.AddSphere(aPlane,dblrad)
+		
+		'ElseIf Rhino.IsPlaneSurface(sSrf) Then
+		'get plane info
+		'make a new plane
+		
+	ElseIf Rhino.IsCone(sSrf) Then
+		'get cone info
+		'make a new cone
+		
+		Dim aCone: aCone = Rhino.SurfaceCone(sSrf)
+		aPlane = aCone(0)
+		dblHeight = aCone(1)
+		dblrad = aCone(2)
+		GetUntrimmedSrf = Rhino.AddCone(aPlane, dblHeight,dblRad, False)
+		
+	ElseIf Rhino.IsTorus(sSrf) Then
+		'get torus info
+		'make a new torus
+		
+		Dim aTorus: aTorus = Rhino.SurfaceTorus(sSrf)
+		aPlane = aTorus(0)
+		dblrad = atorus(1)
+		Dim dblrad1: dblRad1 = aTorus(2)
+		GetUntrimmedSrf = Rhino.AddTorus(aPlane, dblRad, dblRad1,aPlane(3))
+		
+	Else 
+		'get surface info
+		'make a new surface
+		
+		Dim aPtCount: aptCount = Rhino.SurfacePointCount(sSrf)
+		Dim aPts: aPts = Rhino.SurfacePoints(sSrf)
+		
+		Dim aKnotCount: aKnotCount = Rhino.SurfaceKnotCount(sSrf)
+		Dim aKnots: aKnots = Rhino.SurfaceKnots(sSrf)
+		
+		Dim aKnotsU: aKnotsU = aKnots(0)
+		Dim aKnotsV: aKnotsV =  aKnots(1)
+		
+		Dim aDegree:aDegree = Rhino.SurfaceDegree(sSrf)
+		Dim aWeights:aWeights = Rhino.SurfaceWeights (sSrf)
+		
+		GetUntrimmedSrf = Rhino.AddNurbsSurface(aPtCount, aPts, aKnotsU, aKnotsV, aDegree, aWeights)
+
+	End If
+	
+End Function
+
+Function makedeg2Srf( srf1, srf2,Crv1, Crv2, intDir1, intDir2)
+
+	dim Row1, Row2, Row3, Bound, i
+
+	Row1 = Rhino.CurvePoints(crv1)
+	Row3 = Rhino.CurvePoints(Crv2)
+	Bound = UBound(Row1)
+
+	redim Row2 (Bound)
+	
+	for i = 0 to Bound
+		Row2(i) =  ConicBlendPts(Srf1, Srf2, Crv1, Crv2 ,i,i, True, intDir1, intDir2)
+	Next
+	
+	dim arr: arr = Rhino.JoinArrays(Row1, Row2)
+	arr = Rhino.JoinArrays(arr, Row3)
+	
+	dim aKu, aKv, aW
+	aKu = array(0,0,1,1)
+	aKv = Rhino.CurveKnots(Crv1)
+	Redim aW(((Bound+1) * 3)-1)
+	for i = 0 to (((Bound+1) * 3)-1)
+		
+		aW(i) = 1
+		
+	Next
+	makedeg2Srf = Rhino.AddNurbsSurface(array(3,Bound+1),arr,aKu, aKv,array(2,Rhino.CurveDegree(Crv1)), aW)
+	'Rhino.AddPoints Row2
+	
+	
+
+End Function

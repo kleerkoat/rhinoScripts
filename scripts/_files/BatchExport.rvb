@@ -1,0 +1,210 @@
+' Written by Peter Harris, 2003
+' Version 1
+' OBJ export Added - Adrian McKenna 30/7/2003
+
+Option Explicit
+
+'ChooseLayers
+
+Sub ChooseLayers()
+Dim arrLayers, arrStates(), arrResults, intCount, strLayer, i, arrLayersToExport()
+Dim strUnlockCode, blnRedraw, strEmptyLayerTest, blnEmptyOrNot
+intCount = 0
+arrLayers = Rhino.LayerNames
+  If IsArray(arrLayers ) Then
+    For Each strLayer In arrLayers
+    ReDim Preserve arrStates(intCount)
+    arrStates(intCount) = Rhino.IsLayerOn(strLayer)
+    intCount = intCount + 1
+    Next
+  arrResults = Rhino.CheckListBox (arrLayers, arrStates, "Choose layers to export", "Export Layers")
+    If IsArray(arrResults) Then
+    intCount = 0
+      For i = 0 To UBound(arrLayers)
+          If arrResults(i) = vbTrue Then
+          strEmptyLayerTest = arrLayers(i)
+          blnEmptyOrNot = Rhino.IsLayerEmpty(strEmptyLayerTest)
+            If blnEmptyOrNot <> True Then
+              ReDim Preserve arrLayersToExport(intCount)
+              arrLayersToExport(intCount) = arrLayers(i)
+              Rhino.LayerMode arrLayers(i), 0
+              blnRedraw = Rhino.EnableRedraw(vbFalse)
+              strUnlockCode = "_UnlockSelected -SelLayer " & Chr(34) & arrLayersToExport(intCount) & Chr(34) & " enter"
+              Rhino.Command strUnlockCode, vbFalse
+              Rhino.Command "_selnone", vbFalse
+              intCount = intCount + 1
+              End If
+            End If
+      Next
+      blnRedraw = Rhino.EnableRedraw(vbTrue)
+      If IsArray(arrLayersToExport) Then
+      GetFormat arrLayersToExport
+      End If
+    End If
+  End If
+
+End Sub
+
+
+Sub GetFormat (arrLayersToExport)
+Dim arrFormatOptions(5), strFormatResult, strExportFormat
+Dim strFlavorString, strExportPath
+arrFormatOptions(0) = "IGES"
+arrFormatOptions(1) = "STEP"
+arrFormatOptions(2) = "STL"
+arrFormatOptions(3) = "3DM"
+arrFormatOptions(4) = "OBJ"
+arrFormatOptions(5) = "SAT"
+strFlavorString = ""
+strFormatResult = Rhino.ListBox(arrFormatOptions, "Pick export format:", "FP Batch Export")
+If Not IsNull(strFormatResult) Then
+  Select Case strFormatResult
+         Case "IGES"
+              strExportFormat = "igs"
+              strFlavorString = strIGESFlavorStringFunction
+         Case "STEP"
+              strExportFormat = "stp"
+              strFlavorString = strSTEPFlavorStringFunction
+         Case "STL"
+              strExportFormat = "stl"
+              strFlavorString = strStlFlavorStringFunction
+         Case "3DM"
+              strExportFormat = "3dm"
+              strFlavorString = str3dmFlavorStringFunction
+         Case "OBJ"
+              strExportFormat = "obj"
+              strFlavorString = strOBJFlavorStringFunction
+	       Case "SAT"
+              strExportFormat = "sat"
+              strFlavorString = strSatFlavorStringFunction
+
+  End Select
+    If strFlavorString <> "" Then
+    strExportPath = strPath
+      If strExportPath <> "" Then
+      ExportFiles strExportFormat, strFlavorString, strExportPath, arrLayersToExport
+
+      End If
+    End If
+End If
+End Sub
+
+'----------SAT-------------
+Function strSATFlavorStringFunction
+'strOBJFlavorStringFunction = " Geometry=Mesh Trims=Polylines ExportLayerNames=Yes YUp=Yes _enter _enter"
+
+End Function
+
+
+'----------OBJ-------------
+Function strOBJFlavorStringFunction
+'Dim strMeshWarning
+'strMeshWarning = Rhino.MessageBox ("Please note - only mesh objects will be exported!", 1)
+'If strMeshWarning <> 2 then
+'Rhino.Command "_point 0,0,0 _SelMesh _Invert _Lock", vbfalse
+strOBJFlavorStringFunction = " Geometry=Mesh Trims=Polylines ExportLayerNames=Yes YUp=Yes _enter _enter"
+'strOBJFlavorStringFunction = " ExportFileAs=Binary  ExportUnfinishedObjects=Yes _enter _enter"
+'End If
+End Function
+
+'----------STL-------------
+Function strStlFlavorStringFunction
+Dim strMeshWarning
+strMeshWarning = Rhino.MessageBox ("Please note - only mesh objects will be exported!", 1)
+If strMeshWarning <> 2 Then
+Rhino.Command "_point 0,0,0 _SelMesh _Invert _Lock", vbFalse
+strStlFlavorStringFunction = " ExportFileAs=Binary  ExportUnfinishedObjects=Yes _enter _enter"
+End If
+End Function
+
+'----------3DM-------------
+Function str3dmFlavorStringFunction
+str3dmFlavorStringFunction = " "
+End Function
+
+'----------STEP-------------
+Function strSTEPFlavorStringFunction
+Dim arrStepFlavors(2), strExportResult, RunTheScript, strStepFlavor, strStepLetterCode
+arrStepFlavors(0) = "AP203ConfigControlDesign"
+arrStepFlavors(1) = "AP214AutomotiveDesign"
+arrStepFlavors(2) = "AP214AutomotiveDesignCC2"
+strStepFlavor = Rhino.ListBox(arrStepFlavors, "Pick STEP flavor:", "Batch Export")
+If Not IsNull(strStepFlavor) Then
+  Select Case strStepFlavor
+         Case "AP203ConfigControlDesign"
+              strStepLetterCode = "A"
+         Case "AP214AutomotiveDesign"
+              strStepLetterCode = "P"
+         Case "AP214AutomotiveDesignCC2"
+              strStepLetterCode = "U"
+  End Select
+strSTEPFlavorStringFunction = " s " & strStepLetterCode & " _enter"
+End If
+End Function
+
+'----------IGES-------------
+Function strIGESFlavorStringFunction
+Dim arrIgesFlavors(8), strExportResult, RunTheScript, strIgesFlavor
+arrIgesFlavors(0) = "Default"
+arrIgesFlavors(1) = "Pro/E Windows solids"
+arrIgesFlavors(2) = "Pro/E Windows surfaces"
+arrIgesFlavors(3) = "SolidWorks Solids"
+arrIgesFlavors(4) = "SolidWorks Surfaces"
+arrIgesFlavors(5) = "Alias V8.x"
+arrIgesFlavors(6) = "Maya"
+arrIgesFlavors(7) = "Mastercam"
+arrIgesFlavors(8) = "Ashlar Vellum"
+strIgesFlavor = Rhino.ListBox(arrIgesFlavors, "Pick IGES flavor:", "Batch Export")
+If Not IsNull(strIgesFlavor) Then
+strIGESFlavorStringFunction = " " & Chr(34) & strIgesFlavor & Chr(34) & " _enter"
+End If
+End Function
+
+'----------Get the path-------------
+Function strPath
+Dim strFilename
+strFilename = Rhino.SaveFileName ("Pick a folder and create a name prefix")
+If Not IsNull(strFilename) Then
+strPath = strFilename
+End If
+End Function
+
+'----------Export-------------
+Sub ExportFiles (strExportFormat, strFlavorString, strExportPath, arrLayersToExport)
+Dim strLayerX, strNumOfFiles
+strNumOfFiles = 0
+
+For Each strLayerX In arrLayersToExport
+
+strNumOfFiles = strNumOfFiles + 1
+
+Rhino.Command "_selnone", vbFalse
+Rhino.command "-sellayer " & Chr(34) & strLayerX & Chr(34)', vbfalse
+Rhino.command "-export " & Chr(34) & strExportPath & "-" & strLayerX & "." & strExportFormat & Chr(34) & strFlavorString', vbfalse
+Next
+Rhino.command "_selnone", vbFalse
+Rhino.Print "Use Undo to get back to where you were before the export, if needed.  Export info has also been sent to clipboard."
+
+WriteShopInfoToClipboard strNumOfFiles, strExportPath
+End Sub
+
+
+' ---------------------------- write info to clipboard --------------------------------------
+Sub WriteShopInfoToClipboard (strNumOfFiles, strExportPath)
+Dim FindSlash, strFileNameForClipboard, strCropped, LengthOfString, CounterX, strRunPath
+
+strRunPath = strExportPath
+CounterX = 0
+While CounterX < 9
+  FindSlash = InStr(strExportPath,"\")
+  LengthOfString = Len(strExportPath) - FindSlash
+  strCropped = Right(strExportPath,LengthOfString)
+  strExportPath = strCropped
+  If FindSlash = 0 Then
+     CounterX = 9
+  End If
+Wend
+
+Rhino.ClipboardText ("All " & strNumOfFiles & " files with the prefix " & Chr(34) & strExportPath & Chr(34))
+'Rhino.Command "_-Run " & CHR(34) & strRunPath & CHR(34)
+End Sub

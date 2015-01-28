@@ -1,0 +1,261 @@
+Option Explicit
+'Script written by Pascal
+' RMA
+'Script version Monday, November 07, 2011
+
+'Rhino.AddStartUpScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "FilletNonPlanar", "_NoEcho _-Runscript (FilletNonPlanar)"
+
+
+'fillet two non-coplanar curves with
+' a fillet arc deformed in the arc plane normal
+
+Private oldrad
+
+If isEmpty(oldrad) Then
+	oldrad = 1
+End If
+
+'Call FilletNonPlanar()
+
+
+Sub FilletNonPlanar()
+	
+	Dim dblRad: dblrad = Rhino.GetReal("Fillet radius.", OldRad)
+	If isNull(dblRad) Then Exit Sub
+	Oldrad = dblrad
+	
+	Dim aCrvs(1)
+	
+	'keep track of curve flipping so direction can be restored at the end.
+	Dim flip1, flip2
+	flip1 = False
+	flip2 = False
+	
+	'get the curves and pick parameters
+	aCrvs(0) = Rhino.GetCurveObject("Select the first curve near the end to fillet.", False)
+	If Not isArray(aCrvs(0)) Then  Exit Sub
+	
+	Dim sCrv1: sCrv1 = aCrvs(0)(0)
+	
+	'find which end of the curve was picked and
+	'if the start point, flip the curve.
+	Dim CrvEnd1:CrvEnd1 = GetCrvEnd(sCrv1, aCrvs(0)(4))
+	If CrvEnd1 = 0 Then 
+		Rhino.ReverseCurve sCrv1
+		flip1 = True
+	End If
+	
+	aCrvs(1) = Rhino.GetCurveObject("Select the second curve near the end to fillet.", False)
+	If Not isArray(aCrvs(1)) Then  Exit Sub
+	
+	Dim sCrv2: sCrv2 = aCrvs(1)(0)
+	Dim CrvEnd2:CrvEnd2 = GetCrvEnd(sCrv2, aCrvs(1)(4))
+	
+	If CrvEnd2 = 0 Then 
+		Rhino.ReverseCurve sCrv2
+		flip2 = True
+	End If
+	
+	Rhino.EnableRedraw False
+	
+	'find a best fit plane from the input curve tangents.
+	Dim Plane, vecDir
+	': Plane = Rhino.ViewCPlane()
+	Plane = AutoPlane(array(sCrv1, sCrv2))
+	vecDir = Plane(3)
+	'make a transform to project the inputs to the plane
+	Dim XForm: xform = Rhino.XformPlanarProjection(Plane)
+	
+	
+	'Project copies to the plane
+	Dim Flat1, Flat2
+	Flat1 = Rhino.TransformObject(sCrv1, Xform, True)
+	
+	Flat2 = Rhino.TransformObject(sCrv2, Xform, True)
+	
+	Dim ftPts
+	
+	'find fillet points and add the fillet arc to the 2d curves.
+	ftPts = Rhino.CurveFilletPoints(Flat1, Flat2, dblrad, aCrvs(0)(3), aCrvs(1)(3))
+	
+	Dim sFt: sFt = Rhino.AddFilletCurve(Flat1, Flat2, dblRad, aCrvs(0)(3), aCrvs(1)(3))
+	
+	'bail if the fillet cannot be made
+	If  isNull(sFt) Then
+		
+		Rhino.EnableRedraw True
+		If Flip1 = True Then Rhino.ReverseCurve sCrv1
+		If Flip2 = True Then Rhino.ReverseCurve sCrv2
+		Exit Sub
+		
+	End If
+	
+	'change the fillet curve degree to 3 to ensure at least 4 points.
+	Rhino.UnselectAllObjects()
+	Rhino.SelectObject sFt
+	Rhino.Command "_NoEcho _ChangeDegree " & 3 
+	
+	'delete the 2d inputs
+	Rhino.DeleteObjects array(Flat1, Flat2)
+	
+	Dim Line1, Line2
+	'find lines normal to the plane at the 2d input curve end points.
+	Line1 = array(ftPts(0), Rhino.PointAdd(ftPts(0), VecDir))
+	Line2 = array(ftPts(1), Rhino.PointAdd(ftPts(1), VecDir))
+
+	Dim aInt1, aint2
+	
+	'intersect the lines and the curves. This is a projection
+	'of the 2d fillet ends to the 3d inputs, in the plane normal
+	aInt1 = Rhino.LineCurveIntersection(Line1, sCrv1)
+	aInt2 = Rhino.LineCurveIntersection(Line2, sCrv2)
+	
+	If  Not isArray(aInt1) Or Not IsArray(aInt2) Then
+		
+		Rhino.EnableRedraw True
+		If Flip1 = True Then Rhino.ReverseCurve sCrv1
+		If Flip2 = True Then Rhino.ReverseCurve sCrv2
+		Exit Sub
+		
+	End If
+	
+	Dim aSplit1, aSplit2
+	
+	'split the input curves with the line-curve intersectioin.
+	aSplit1 = Rhino.SplitCurve(sCrv1, aInt1(0, 7))
+	aSplit2 = Rhino.SplitCurve(sCrv2, aInt2(0, 7))
+
+	'delete the parts of the curve that are not needed.
+	sCrv1 = DeleteCurveEnd(aSplit1, 1)
+	sCrv2 = DeleteCurveEnd(aSplit2, 1)
+	
+	Dim ftStart, ftEnd
+	
+	'the fillet curve end points
+	ftStart = Rhino.CurveStartPoint(sFt)
+	ftEnd = Rhino.CurveEndPoint(sFt)
+	
+	'the trimmed input curve end points
+	Dim targ1, targ2
+	targ1 = aInt1(0, 3)
+	targ2 = aInt2(0, 3)
+	
+	Dim vecTan1, vecTan2, dist1, dist2
+	
+	'the input curve tangent vectors
+	vectan1 = Rhino.CurveTangent(sCrv1, Rhino.CurveDomain(sCrv1)(1))
+	vectan2 = Rhino.CurveTangent(sCrv2, Rhino.CurveDomain(sCrv2)(1))
+	
+	
+	'get the 2d fillet curve point locations
+	Dim ftCV: ftCV = Rhino.CurvePoints(sFt)
+	Dim Bound: Bound = Ubound(ftCV)
+	
+	'find the current distance from the 2d fillet ends to the second points.
+	'find a corresponding  location off the ends of the 3d inputs
+	dist1 = Rhino.Distance(ftCV(0), ftCV(1))
+	targ1 = Rhino.PointAdd(Rhino.CurveEndPoint(sCrv1), Rhino.VectorScale(vectan1, dist1))
+	
+	dist2 = Rhino.Distance(ftCV(Bound), ftCV(bound - 1))
+	targ2 = Rhino.PointAdd(Rhino.CurveEndPoint(sCrv2), Rhino.VectorScale(vecTan2, dist2))	
+	
+	'turn on the fillet control points
+	Rhino.EnableObjectGrips sFt
+	
+	'an array of points for the fillet end and second points as
+	'well as inputs to a best fit plane.
+	Dim aLoc: aLoc = array(Rhino.CurveEndPoint(sCrv1), targ1,, targ2, Rhino.CurveEndPoint(sCrv2))
+
+	'move the fillet end snd tangent points
+	Rhino.ObjectGripLocation sFt, 0, Rhino.CurveEndPoint(sCrv1)
+	Rhino.ObjectGripLocation sFt, 1, targ1
+	Rhino.ObjectGripLocation sFt, Bound, Rhino.CurveEndPoint(sCrv2)
+	Rhino.ObjectGripLocation sFt, Bound - 1, targ2
+	
+	'if the fillet has more than 4 points (angle<90) then
+	'move the middle points to the best fit plane of the 
+	'end and tangent points.
+	
+	If Bound > 3 Then
+
+		Dim i
+		Dim testPlane: testPlane = Rhino.PlaneFitFromPoints(aLoc)
+		
+		For i = 2 To bound - 2
+			
+			Rhino.ObjectGripLocation sFt, i, Rhino.PlaneClosestPoint(testPlane, Rhino.ObjectGripLocation(sFt, i))
+			
+		Next
+		
+	End If
+	
+	'turn off ther fillet grips, clean up, and redraw.
+	Rhino.EnableObjectGrips sFt, False
+	If Flip1 = True Then Rhino.ReverseCurve sCrv1
+	If Flip2 = True Then Rhino.ReverseCurve sCrv2
+	Rhino.EnableRedraw True
+	
+End Sub
+
+
+Function GetCrvEnd(crv, t)
+	'0 = Start, 1 = End
+	Dim Dom: dom = Rhino.CurveDomain(crv)
+	If Abs(t - dom(0)) > Abs(t - dom(1)) Then
+		GetCrvEnd = 1
+	Else
+		GetCrvEnd = 0
+	End If
+End Function
+
+
+Function DeleteCurveEnd(aCrv, IntEnd)
+	
+	Dim aDom1, aDom2
+
+	aDom1 = Rhino.CurveDomain(acrv(0))
+	aDom2 = Rhino.CurveDomain(acrv(1))	
+
+	If aDom1(1) < aDom2(1) Then
+		If intEnd = 1 Then
+			Rhino.DeleteObject(aCrv(1))
+			DeleteCurveEnd = aCrv(0)
+		Else
+			Rhino.DeleteObject(aCrv(0))
+			DeleteCurveEnd = aCrv(1)
+		End If
+	Else
+		If intEnd = 1 Then
+			Rhino.DeleteObject(aCrv(0))
+			DeleteCurveEnd = aCrv(1)
+		Else
+			Rhino.DeleteObject(aCrv(1))
+			DeleteCurveEnd = aCrv(0)
+		End If
+		
+	End If
+
+End Function
+
+
+Function AutoPlane(acrvs)
+	Dim aPt(3), aLines(1)
+	
+	Dim i, t, n, p
+	n = 0
+	p = 0
+	
+	For i = 0 To 3 Step 2
+	
+		t = Rhino.CurveDomain(aCrvs(n))(1)
+		apt(p) = Rhino.CurveEndPoint(aCrvs(n))
+		apt(p + 1) = Rhino.PointAdd(apt(p), (Rhino.VectorReverse(Rhino.CurveTangent(aCrvs(n), t))))
+		n = n + 1
+		p = p + 2
+		
+	Next
+	
+	autoPlane = Rhino.PlaneFitFromPoints(aPt)
+
+End Function

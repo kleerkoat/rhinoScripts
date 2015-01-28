@@ -1,0 +1,38 @@
+Option Explicit
+Sub ViewRotate()
+	Dim arrOptions(0), strResult, intDegree, intDirection, boolCycle, strViewName
+	
+	intDegree = 90
+	arrOptions(0) = "CW"
+	intDirection = 0
+	
+	boolCycle = True
+	Do While boolCycle
+		strResult = Rhino.GetString("Enter degrees and direction", Cstr(intDegree), arrOptions)
+		If IsNull(strResult) Then
+			Exit Sub
+		Elseif IsNumeric(strResult) Then
+			If Clng(strResult) > 0 And Clng(strResult) < 360 Then
+				intDegree = Cint(strResult)
+				boolCycle = False
+			Else
+				MsgBox "Please enter a rotation degree bigger than 0 and smaller than 360"
+			End If
+		Elseif Left(UCase(strResult), 1) = "C" And Len(strResult) < 4 Then
+			If arrOptions(0) = "CW" Then
+				arrOptions(0) = "CCW"
+				intDirection = 1
+			Elseif arrOptions(0) = "CCW" Then
+				arrOptions(0) = "CW"
+				intDirection = 0
+			End If
+		End If
+	Loop
+	Rhino.RotateView Rhino.CurrentView, intDirection, intDegree
+	
+	strViewName = Rhino.CurrentView & " - " & Cstr(intDegree) & "° " & arrOptions(0)
+	Rhino.AddNamedView strViewName
+	Rhino.RestoreNamedView strViewName
+	Rhino.DeleteNamedView strViewName
+End Sub
+ViewRotate

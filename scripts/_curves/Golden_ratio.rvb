@@ -1,0 +1,83 @@
+﻿Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version Wednesday, April 08, 2009 6:11:49 PM
+
+Call Main()
+Sub Main()
+	Rhino.UnselectAllObjects
+	Rhino.Command ("line")  				'Start a line.
+	Rhino.FirstObject(True) 				'Select it.
+	Dim strObject							'Name it.
+	strObject = Rhino.GetObject(,4,True)  	'Assign it to the name.
+	Dim  arrPointEnd, arrPointStart			'Name it's end points.
+	
+	If Rhino.IsCurve(strObject) Then		'Check.
+
+		arrPointEnd = Rhino.CurveEndPoint(strObject)		'Get end point coords.
+		arrPointStart=Rhino.CurveStartPoint(strObject)		'Get end point coords.
+		Rhino.AddPoint arrPointEnd							'Option. Add each point to the drawing.
+		Rhino.AddPoint arrPointStart						'Option. Add each point to the drawing.
+
+		
+		
+		'Copy and translate the line vectorally from its end.		
+		Dim  arrVector, arrXform, arrObject
+	
+		arrObject = Rhino.GetObjects(,4,,True)
+	
+		arrVector = Rhino.VectorCreate(arrPointEnd, arrPointStart)
+			
+		arrXform = Rhino.XformTranslation(arrVector)
+
+		Rhino.TransformObjects arrObject, arrXform, True
+		
+	
+		'Copy and rotate the translated line 90 degrees.		
+		Dim arrLine
+		
+		arrLine=Rhino.FirstObject
+		
+		arrPointStart=Rhino.CurveStartPoint(arrLine)
+		
+		Dim dblAngle: dblAngle=-90
+		
+		arrObject=Rhino.GetObjects(,4,,True)
+		
+		arrXform=Rhino.XformRotation(dblAngle,Array(0,0,1),arrPointEnd)
+		
+		Rhino.TransformObjects arrObject, arrXform, True
+		
+		
+		'Delete the translated copy and deselect the original input line.		
+		Rhino.DeleteObject(arrLine)
+		Rhino.UnselectAllObjects
+		
+		
+		'Select the rotated line.
+		arrLine=Rhino.FirstObject(True)
+		
+		
+		'Scale the rotated line.
+		arrObject=Rhino.GetObjects(,4,,True)
+		
+		Dim dblScale: dblScale=.618
+		
+		arrXform=Rhino.XformScale(arrPointStart,dblScale)
+		
+		Rhino.TransformObjects arrObject, arrXform, True
+		
+		
+		'Add final point to the drawing.
+		strObject=Rhino.FirstObject
+		arrPointStart=Rhino.CurveStartPoint (strObject)
+		Rhino.AddPoint arrPointStart
+		
+		
+		'Delete the original rotated line.
+		Rhino.DeleteObject(arrLine)
+		
+		
+	End If
+	
+End Sub

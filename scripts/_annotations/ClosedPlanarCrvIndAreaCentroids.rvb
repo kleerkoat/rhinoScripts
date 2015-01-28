@@ -1,0 +1,45 @@
+﻿!_NoEcho 
+-_Runscript (
+
+Option Explicit
+' Script written by Guilherme C. Webster, June/2005, for Rhinoceros 3.0
+' Rhinoscript February 11, 2005
+' Designed to simply create individual area centroids for each closed planar curve selected.
+
+Sub ClosedPlanarCrvIndAreaCentroids
+
+Dim arrCrv, strCrv
+Dim arrSrf, strSrf
+Dim arrCentroid
+
+arrCrv = Rhino.GetObjects ("Select closed planar curves for area centroids calculation", 4, True, True, True)
+
+       If IsNull (arrCrv) Then
+          Exit Sub
+       Else
+           
+           Rhino.EnableReDraw(vbFalse)
+           arrSrf = Rhino.AddPlanarSrf (arrCrv)
+                  If IsNull (arrSrf) Then
+                     Rhino.EnableReDraw(vbTrue)
+                     Exit Sub
+                  Else
+
+                      For each strSrf in arrSrf
+                          arrCentroid = Rhino.SurfaceAreaCentroid (strSrf)
+                                      If IsArray(arrCentroid) Then
+                                         Rhino.AddPoint arrCentroid(0)
+                                      End If
+                      Next
+
+                      End If
+
+           Rhino.DeleteObjects (arrSrf)
+           Rhino.EnableReDraw(vbTrue)
+           
+       End If
+
+End Sub
+
+ClosedPlanarCrvIndAreaCentroids
+)

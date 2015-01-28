@@ -1,0 +1,111 @@
+Option Explicit
+
+'Call CLBlob()
+Sub CLBlob()
+	
+	Dim sCrv : scrv = Rhino.GetObject("select curve",4,True)
+	
+	If isNull(sCrv) Then Exit Sub
+	
+	Dim Cplane: CPlane = Rhino.ViewCPlane
+	
+	Dim aCent: aCent = Rhino.CurveAreaCentroid(sCrv)
+	If isNull(aCent) Then 
+		msgbox "Unable to find the curve center. Curve may be open or non-planar"
+		
+		Exit Sub
+	End If
+	Dim Plane: Plane = array(aCent(0),cplane(1),cplane(2), cplane(3))
+	
+	'*********************************************************
+	Dim Steps: Steps = 91 'the number of samples in 90 degrees
+	'*********************************************************
+	
+	Rhino.EnableRedraw(False)
+	Rhino.ViewCPlane Rhino.CurrentView, Plane
+	
+	Dim aBB: aBB = Rhino.BoundingBox(sCrv,Rhino.CurrentView)
+	
+	Dim Ratio
+	Dim aRatio(), n
+	
+	Dim inc: inc = 90/Steps 'the angle increment in degrees
+	
+	Dim AxisPt: AxisPt = Rhino.PointAdd(aCent(0),Plane(3))
+	Dim aVec: aVec =Plane(3)
+	
+	For n = 0 To Steps
+		
+		Plane =	Rhino.RotatePlane (CPlane,n*inc, aVec)	
+		Rhino.ViewCPlane Rhino.CurrentView, Plane
+		aBB = Rhino.BoundingBox(sCrv,Rhino.CurrentView)
+		Ratio = Rhino.Distance (aBB(0),aBB(1))/Rhino.Distance (aBB(0),aBB(3))
+			
+		ReDim Preserve aRatio(n)
+		aRatio(n) = Ratio
+		
+	Next
+	
+	Rhino.ViewCPlane Rhino.CurrentView, CPlane
+	Dim p:p =  FindLargestInArray(aRatio)
+	Plane = Rhino.MovePlane(Cplane, aCent(0))
+	Plane =	Rhino.RotatePlane (Plane,p*inc, aVec)
+
+	Rhino.ViewCPlane Rhino.CurrentView, Plane
+
+	aBB = Rhino.BoundingBox(sCrv,Rhino.CurrentView)
+	Dim vecLine, Line
+	
+	If Rhino.Distance(aBB(0),aBB(1))> Rhino.Distance(aBB(0),aBB(3))Then
+		vecLine = Rhino.VectorUnitize(Rhino.VectorCreate( aBB(0),aBB(1)))
+	Else Vecline =Rhino.VectorUnitize(Rhino.VectorCreate(aBB(0),aBB(3)))
+	End If
+	
+	Dim dist:	dist = Rhino.Distance (abb(0), aBB(2))
+	vecline = rhino.VectorScale (vecLine,dist)
+	
+	Dim addLine: addLine =	Rhino.AddLine (abb(0), Rhino.PointAdd(aBB(0), vecLine))
+	
+	Rhino.MoveObject addLine,Rhino.CurveMidPoint(addLine),aCent(0)
+
+	Rhino.ViewCPlane Rhino.CurrentView,Cplane
+
+	Rhino.EnableRedraw(True)
+	
+End Sub
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "CLBlob", "_NoEcho _-Runscript CLBlob"
+
+Function FindLargestInArray(arr)
+	
+	'The result is the index of the most extreme
+	'number in the array, checking for the largest number And
+	'the inverse of the smallest number
+	'This is checking aspect ratio of a 
+	'rectangle, so the inverse of the
+	'smallest is valid as well.
+	
+	Dim  n, p, arr2
+	p = 0
+	arr2 = Rhino.SortNumbers(arr, True)
+
+	Dim bound: Bound = Ubound(arr)
+	Dim num
+	
+	If arr2(0)< 1/arr2(Bound) Then
+		num = arr2(0)
+	Else num = arr2(Bound)
+	End If
+	
+	
+	For Each n In arr 
+		If n = num Then
+			Exit For
+		End If
+		p = p +1
+	Next
+	
+	FindLargestInArray = p
+	
+End Function

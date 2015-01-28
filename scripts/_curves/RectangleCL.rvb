@@ -1,0 +1,39 @@
+Option Explicit
+'Script written by Pascal
+' RMA
+'Script version Thursday, May 17, 2012
+
+'Rhino.AddStartUpScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "RectangleCL", "_NoEcho _-Runscript (RectangleCL)"
+
+'Call RectangleCL()
+Sub RectangleCL()
+	
+	Dim apts: aPts = Rhino.GetPoints(True,, "Start of rectangle centerline.", "End of rectangle centerline", 2)
+	If Not isArray(aPts) Then Exit Sub
+	If Ubound(apts) <> 1 Then Exit Sub
+	Dim tempLine: tempLine = Rhino.AddLine(apts(0), aPts(1))
+	Rhino.UnselectAllObjects()
+	Rhino.SelectObject templine
+	Rhino.Command "_Offset _BothSides _ThroughPoint _Cap=_None"
+	
+	Dim Rounded: Rounded = Rhino.GetBoolean("Rounded?", array("Rounded", "No", "Yes"), array(True))
+
+	Rhino.DeleteObject tempLine
+	If Rhino.LastCommandResult <> 0 Then Exit Sub
+	Dim aLines: aLines = Rhino.LastCreatedObjects()
+	Dim P1, p2, P3
+	
+	P1 = "W" & Rhino.Pt2Str(Rhino.CurveStartPoint(aLines(0)),, True)
+	p2 = "W" & Rhino.Pt2Str(Rhino.CurveStartPoint(aLines(1)),, True)
+	P3 = "W" & Rhino.Pt2Str(Rhino.CurveEndPoint(aLines(1)),, True)
+	Rhino.DeleteObjects aLines
+	
+	If Rounded(0) Then
+		Rhino.Command "_Rectangle _3Point _Rounded " & P1 & P2 & P3
+	Else
+		Rhino.Command "_Rectangle _3Point " & P1 & P2 & P3
+	End If
+	
+	
+End Sub

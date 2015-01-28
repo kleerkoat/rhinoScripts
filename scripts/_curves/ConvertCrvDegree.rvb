@@ -1,0 +1,72 @@
+Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version Monday, September 20, 2010
+
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "ConvertCrvDegree","_-Runscript (ConvertCrvDegree)"
+
+Call ConvertCrvDegree()
+
+Sub ConvertCrvDegree()
+	Dim sCrv: sCrv = Rhino.GetObject("Select a non-rational curve.",4,true)
+	If isNull(sCrv) then exit sub
+	
+	If Rhino.IsCurverational(sCrv) then 
+		MsgBox "Sorry, the script is not handling rational curves yet."
+		Exit sub
+	End If
+	
+	Dim intDeg: intDeg = Rhino.CurveDegree(sCrv)
+	Dim Crvpts: Crvpts = Rhino.CurvePoints(sCrv)
+	
+	Dim intmax: intmax = UBound(CrvPts)
+	If intmax > 11 then intmax = 11
+	Dim targDeg: targDeg = Rhino.GetInteger("New curve degree less than "& cstr(intmax +1),intDeg,,intMax)
+	If isNull(targDeg) then exit sub
+	
+	Dim NewCrv: NewCrv = Rhino.AddCurve ( CrvPts,targDeg)
+	If isNull(newCrv) then exit sub
+	
+	MatchProperties newCrv, sCrv
+	Rhino.DeleteObject sCrv
+	
+End Sub
+
+Sub MatchProperties(sObj1, sObj2)
+	'needs to match material properties and user data as well
+	'To be useful in general
+
+	Rhino.ObjectLayer sobj1,Rhino.ObjectLayer(sObj2)
+	
+	If Not isnull(Rhino.ObjectName(sObj2)) Then
+		Rhino.ObjectName sObj1,Rhino.ObjectName(sObj2)
+	End If
+	
+	Rhino.ObjectColorSource sObj1,Rhino.ObjectColorSource(sObj2)
+	Rhino.ObjectColor sObj1,(Rhino.ObjectColor(sobj2))
+	
+	Rhino.ObjectLinetypeSource sObj1,Rhino.ObjectLinetypeSource (sObj2)
+	Rhino.ObjectLinetype sObj1,Rhino.ObjectLinetype(sObj2)
+	
+	Rhino.ObjectPrintColorSource sobj1, Rhino.ObjectPrintColorSource(sobj2)
+	Rhino.ObjectPrintColor sObj1, Rhino.ObjectPrintColor(sObj2)
+	
+	Rhino.ObjectPrintWidthSource sobj1, Rhino.ObjectPrintWidthSource(sobj2)
+	Rhino.ObjectPrintWidth sobj1, Rhino.ObjectPrintWidth(sObj2)
+	
+	Rhino.ObjectURL sObj1, Rhino.ObjectURL (sObj2)
+	
+	If Rhino.ObjectGripsOn(sObj1) Then Rhino.EnableObjectGrips(sObj2)
+	
+	Dim aGroups: aGroups =	Rhino.ObjectGroups (sObj2)
+	Dim SGrp
+	If isArray(aGroups) then 
+		For Each sGrp In aGroups
+			Rhino.AddObjectToGroup sObj1,sGrp
+		Next
+	End If
+	
+
+End Sub

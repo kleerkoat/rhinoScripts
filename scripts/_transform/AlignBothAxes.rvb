@@ -1,0 +1,12 @@
+Option Explicit 
+
+'Call AlignBothAxes()
+Sub AlignBothAxes()
+Dim arrObjs
+arrObjs=Rhino.GetObjects("Select objects to align",,,True,True)
+If not IsArray(arrObjs) Then Exit Sub
+Call Rhino.EnableRedraw(False)
+Call Rhino.Command("_Align _VertCenter",False)
+Call Rhino.Command("_Align _HorizCenter",False)
+Call Rhino.EnableRedraw(True)
+End Sub

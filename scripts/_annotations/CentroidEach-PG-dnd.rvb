@@ -1,0 +1,219 @@
+Option Explicit
+'Script written by Pascal
+' Monday, August 18, 2008 
+
+Private aOldStates
+If isEmpty(aOldStates) Then
+	aOldStates = array(1,1,1,1)
+End If
+
+
+Sub CentroidEach()
+
+	Dim aObj: aObj = Rhino.GetObjects("Select curves",4+8+16+32,True,True)
+	If Not IsArray(aObj) Then Exit Sub
+	
+	Dim aItems: aItems = array("Points", "Labels", "Curve", "Report")
+	Dim aStates: aStates =Rhino.CheckListBox(aItems,aOldStates, "Choose output" , "Centroid Output")
+	
+	If Not isArray(aStates) Then Exit Sub' exit if there is no valid input from the box
+	
+	Dim AddPts: Addpts = aStates(0)
+	Dim MarkPts: markPts = aStates(1)
+	Dim AddCrv : AddCrv = aStates(2)
+	Dim TextOut: TextOut = aStates(3)
+
+	
+	'check that at least one state is True.
+	Dim B, State
+	B = False
+	For Each State In aStates
+		If State =True Then
+			B = True
+		End If
+	Next
+	'otherwise exit
+	If B = False Then Exit Sub
+	
+	'keep track of ther states for the next run of the script
+	aOldStates = array(AddPts, MarkPts,addCrv,textOut)
+
+
+	Dim sObj, aPts(), i
+	i = 0
+	Dim TempPt, area, aArea(), aPtLoc()
+	Rhino.EnableRedraw(False)
+	
+	For Each sObj In aObj
+		If Rhino.IsCurve(sObj) Then
+			If Rhino.IsCurveClosed(sObj) Then
+				If Rhino.IsCurvePlanar(sObj) Then
+				
+					tempPt = Rhino.CurveAreaCentroid(sObj)(0)
+					If Addpts = True Then
+						ReDim Preserve apts(i) 
+						aPts(i) = Rhino.AddPoint(temppt)
+					End If
+					ReDim Preserve aPtLoc(i)
+					aptLoc(i) = tempPt
+					If MarkPts = True Then
+						Rhino.AddTextDot Rhino.Pt2Str(tempPt, 3),tempPt
+					End If
+					
+					'***********************
+					'Here's where I get the area of the curve
+					'and add it to an array called "aArea"
+					'which was declared above the top of the 'For' loop.
+					'note that Rhino.CurveAreareturns an array of dats
+					'the bit we are interested In Is only the first element
+					'In the array, which Is why there Is a (0) at the End of the 
+					'line With Rhino.CurveArea.
+					'IN order that the array 'aArea' be properly filled out by the
+					'other elements in the script, (Surfaces and meshes) I
+					'also need to add something in those parts of the 
+					'script. If I do not, and the user asks for a report
+					' and then semelects surfaces etc, the report part
+					'of the script will choke when it looks for data in
+					'aArea to report about.
+					'
+					If TextOut = True Then
+						area = Rhino.CurveArea(sObj)(0)
+						ReDim Preserve aArea(i)
+						aArea(i) = area
+					End If
+					'***********************
+					
+					i = i +1
+				End If
+			End If
+			
+		ElseIf Rhino.IsPolysurface(sObj) Or Rhino.IsSurface(sObj) Then
+			If IsObjectSolid(sobj) Then
+
+				tempPt = Rhino.SurfaceVolumeCentroid(sObj)(0)
+				If Addpts = True Then
+					ReDim Preserve apts(i) 
+					aPts(i) = Rhino.AddPoint(temppt)
+				End If
+				ReDim Preserve aPtLoc(i)
+				aptLoc(i) = tempPt
+				If MarkPts = True Then
+					Rhino.AddTextDot Rhino.Pt2Str(tempPt, 3),tempPt
+				End If
+				
+				'fill in a value for area for a surface or polysurface
+				'I used volume, bit area, makes more sense I think.
+				'***********************
+				If TextOut = True Then
+					area = Rhino.SurfaceVolume(sObj)(0)
+					ReDim Preserve aArea(i)
+					aArea(i) = area
+				End If
+				'***********************
+					
+				
+				i = i +1
+			End If
+		
+		ElseIf Rhino.IsMesh(sObj) Then
+			If Rhino.IsMeshClosed(sObj) Then
+				
+				'mesh volume centroid only returns the point array,
+				'unlike the other volume centroid methods which
+				'return an error bound as well as a point location. 
+				'So this does Not need To specify
+				'that we only want the first, point, element in the array, 
+				'so , no (0) at the end of the line- the desired result is the 
+				'entire output from MeshVolumeCentroid
+				tempPt = Rhino.MeshVolumeCentroid(sObj)
+				
+				If Addpts = True Then
+					ReDim Preserve apts(i) 
+					aPts(i) = Rhino.AddPoint(tempPt)
+				End If
+				
+				ReDim Preserve aPtLoc(i)
+				aptLoc(i) = tempPt
+				If MarkPts = True Then
+					Rhino.AddTextDot Rhino.Pt2Str(tempPt, 3),tempPt
+				End If
+				
+				'fill in a value for area for a mesh
+				'I used volume, bit area, makes more sense I think.
+				' in this case the result we need is the *second* element
+				'in the array of data returned, so there is a (1) at
+				'the end of the line.
+				'***********************
+				If TextOut = True Then
+					area = Rhino.MeshVolume(sObj)(1)
+					ReDim Preserve aArea(i)
+					aArea(i) = area
+				End If
+				'***********************
+				i = i +1
+			End If
+			
+		End If
+		
+	Next
+	
+	
+	'select the point output if there is any
+	If IsUpperBound(aPts) Then
+		Rhino.SelectObjects apts
+	End If
+	
+	Dim X : X = False'a checker to make sure the curve has a list of points to work with
+	
+
+	If isUpperBound(aPtLoc) Then
+		Dim aSort: aSort = Rhino.SortPointList(aPtLoc)
+		X = True
+	End If
+	
+	'if the user wants a curve, then add declare a variable for that and 
+	'then use the variable to get at the curve length. Print the curve length.
+	If AddCrv = True Then
+		If X = True Then
+			Dim sCrv: sCrv = Rhino.AddInterpCurveEx (aSort,3,0)
+			If Not isNull(sCrv) Then
+				Rhino.Print "Centroid curve length: " & round( Rhino.CurveLength(sCrv),3) & " " & Rhino.UnitSystemName( False,False,True)
+			End If		
+		End If
+	End If
+	
+	Rhino.EnableRedraw
+	
+	'Declare the variable to build a string 'str' for the report.
+	'The string is built in the 'For' loop below.
+	'The report goes out in a 'text out' box.
+	If textOut = True Then
+		Dim str : str = ""
+		If X = True Then
+			For i = 0 To ubound(aSort)
+				str = str & (i +1)& ": " & round(aArea(i), 3) & ";  "& Rhino.Pt2str(aSort(i),3,True) & vbNewLine
+			Next
+			Rhino.TextOut str
+		End If
+		
+	End If
+End Sub
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "CentroidEach","_NoEcho _-Runscript (CentroidEach)"
+
+Function IsUpperBound(ByRef arr)
+
+	IsUpperBound = False
+
+	If IsArray(arr) Then
+
+		On Error Resume Next
+
+		UBound arr
+
+		If Err.Number = 0 Then IsUpperBound = True
+
+	End If
+
+End Function

@@ -1,0 +1,106 @@
+Option Explicit
+
+Sub SelNameList()
+ 
+	Dim arrObjNames()
+	Dim i, A
+	Dim arrAll, strName, arrSelName, strObj
+  
+	i = 0
+	A = False
+	'  arrOptions =Array("List")
+	arrAll = Rhino.NormalObjects
+
+	If IsArray(arrAll) Then
+		A = True
+		For Each strObj In arrAll
+			If Not IsNull (Rhino.ObjectName(strObj)) Then
+				ReDim Preserve arrObjNames(i)
+				arrObjNames(i) = Rhino.ObjectName(strObj)
+				i = i +1
+			End If 
+		Next
+	End If
+  
+	If i = 0 Or A = False Then 
+		MsgBox "No named objects found."
+		Exit Sub
+	End If
+   
+	If IsUpperBound(arrObjNames) Then
+		Dim arrObjName
+		arrObjName =  Rhino.CullDuplicateStrings (arrObjNames)
+		arrObjName = Rhino.SortStrings (arrObjName)
+	Else Exit Sub
+	End If
+	
+	Dim aValues()
+	
+	For i = 0 To UBound(arrObjName)
+		ReDim Preserve aValues(i) 
+		aValues(i) = 0
+	Next
+      
+	Dim	arrSelState : arrSelState = Rhino.CheckListBox (arrObjName,aValues, "Available objects" , "Select Named Objects")
+
+	
+	If IsArray(arrSelState) Then
+		Rhino.EnableRedraw(False)
+		For i = 0 To Ubound(arrSelState)
+			If arrSelState(i) = True Then
+				strName = arrObjName(i)
+				Rhino.ObjectsByName strName, True
+			End If
+			
+		Next
+		Rhino.Enableredraw(True)
+	Else Exit Sub
+	End If
+
+End Sub
+
+'/////////////////////////////////////////////////////////
+'/////////////////////////////////////////////////////////    
+
+Function CheckValidArray(arrCheck, strToCheck)
+  
+	Dim blnStatus, strCheck, str
+  
+	blnStatus =False
+	If IsArray(arrCheck) Then
+		For Each strCheck In arrCheck
+			If strToCheck = strCheck Or strToCheck = ""Then
+				blnStatus = True
+				Exit For
+			End If
+		Next  
+	End If
+	CheckValidArray = blnStatus
+  
+End Function 
+
+
+'/////////////////////////////////////////////////////////
+'///////////////////////////////////////////////////////// 
+
+Function IsUpperBound(ByRef arr)
+
+	IsUpperBound = False
+
+	If IsArray(arr) Then
+
+		On Error Resume Next
+
+		UBound arr
+
+		If Err.Number = 0 Then IsUpperBound = True
+
+	End If
+
+End Function
+
+'/////////////////////////////////////////////////////////
+'/////////////////////////////////////////////////////////   
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "SelNameList", "-Runscript SelNameList"

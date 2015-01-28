@@ -1,0 +1,27 @@
+Option Explicit
+'Finds max deviation between two curves.  Adds two points and two text dots noting the deviation.
+'Call DeviationTextDot()
+Sub DeviationTextDot()
+	Dim strCurveA, strCurveB, arrDeviation
+	Dim dblParameterA,dblParameterB,arrCurveAEvaluate,arrCurveBEvaluate,strText
+	
+	strCurveA = Rhino.GetObject("Select first curve to test", 4)
+	If IsNull(strCurveA) Then Exit Sub
+	
+	strCurveB = Rhino.GetObject("Select second curve to test", 4)
+	If IsNull(strCurveB) Then Exit Sub
+	
+	arrDeviation = Rhino.CurveDeviation(strCurveA, strCurveB)
+	dblParameterA=arrDeviation(0)
+	dblParameterB=arrDeviation(1)
+	arrCurveAEvaluate=Rhino.CurveEvaluate(strCurveA, dblParameterA,0)
+	arrCurveBEvaluate=Rhino.CurveEvaluate(strCurveB, dblParameterB, 0)
+
+	Call Rhino.AddPoint(arrCurveAEvaluate(0))
+	Call Rhino.AddPoint(arrCurveBEvaluate(0))
+	
+	strText=arrDeviation(2)
+	Call Rhino.AddTextDot(strText, arrCurveAEvaluate(0))
+	Call Rhino.AddTextDot(strText, arrCurveBEvaluate(0))
+	
+End Sub

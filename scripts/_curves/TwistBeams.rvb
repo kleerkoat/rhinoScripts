@@ -1,0 +1,40 @@
+﻿Option Explicit
+
+' by Lorenz Lachauer, 15.5.2009
+
+Function TwistedBeams  
+  Dim i,j,b,h, k,L, NTeile, Teile,  CornerPnts(4), Dir, Breite, Section, arrObjects, surf, PntS, PntC
+  Dim Tangent, Normal, Cross, Profil(3)
+  surf  = Rhino.GetSurfaceObject("Select surface")(0)
+  arrObjects = Rhino.GetObjects("Select curves on surface", 4)
+  b= Rhino.GetReal("Beam width", .1)
+  h= Rhino.GetReal("Beam height", .1)
+  Profil(0)=Array( b/2,0,0)
+  Profil(1)=Array(-b/2,0,0)
+  Profil(2)=Array(-b/2,h,0)
+  Profil(3)=Array( b/2,h,0)  
+  NTeile=30
+  Rhino.EnableRedraw(vbFalse)
+  ReDim Section(NTeile)
+  For i=0 To UBound(arrObjects)  
+    Teile = Rhino.DivideCurve(arrObjects(i),NTeile)
+    For j=0 To NTeile 
+      PntC       = Rhino.CurveClosestPoint  (arrObjects(i), Teile(j))
+      Tangent    = Rhino.CurveTangent (arrObjects(i), PntC)
+      PntS       = Rhino.SurfaceClosestPoint (surf, Teile(j))
+      Normal     = Rhino.SurfaceNormal (surf, PntS) 
+      Cross      = Rhino.VectorUnitize(Rhino.VectorCrossProduct(Tangent,Normal))
+      For k=0 To 3
+        CornerPnts(k) = Rhino.VectorAdd (Teile(j), Rhino.VectorAdd( Rhino.VectorScale(Cross, Profil(k)(0)), Rhino.VectorScale(Normal, Profil(k)(1)) ))
+      Next
+      CornerPnts(4)=CornerPnts(0)
+      Section(j) = Rhino.AddPolyline(CornerPnts)
+    Next
+    Rhino.AddLoftSrf Section
+    Rhino.DeleteObjects Section
+  Next
+  Rhino.EnableRedraw(vbTrue)
+End Function
+
+TwistedBeams  
+

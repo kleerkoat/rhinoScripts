@@ -1,0 +1,111 @@
+Option Explicit
+'Script by Mitch Heynick
+'Tuesday, 05 January, 2010
+
+Private oldOff,oldConn,oldTrans
+If IsEmpty(oldOff) Then oldOff=1
+If IsEmpty(oldConn) Then oldConn="None"
+If IsEmpty(oldTrans) Then oldTrans="Sharp"
+
+'Call OffsetMultipleCrvsWEnds()
+Sub OffsetMultipleCrvsWEnds()
+	
+	Dim strcrv,arrCrvs,dblOdist,strEndType,arrEChoice,strTrans,arrTChoice,intCrvs
+	Dim dblTol : dblTol=Rhino.UnitAbsoluteTolerance	
+	arrEChoice=Array("None","Straight","Arc")
+	arrTChoice=Array("Sharp","Round","Smooth","Chamfer")
+
+	arrCrvs=Rhino.GetObjects("Select curve(s) to offset both sides",4,True,True)
+	If Not IsArray(arrCrvs) Then Exit Sub
+	intCrvs=Ubound(arrCrvs)+1
+		
+	dblODist=Rhino.GetReal("Distance to offset",oldOff,dblTol)
+	If IsNull(dblODist) Then Exit Sub
+	oldOff=dblODist
+	
+	strTrans=Rhino.GetString("Offset transition?",oldTrans,arrTChoice)
+	If IsNull(strTrans) Then Exit Sub
+	oldTrans=strTrans
+	
+	strEndType=Rhino.GetString("End connection type?",oldConn,arrEChoice)
+	If IsNull(strEndType) Then Exit Sub
+	oldConn=strEndType
+	
+	Dim intConn
+	Select Case strEndType
+		Case "Straight"
+			intConn=0
+		Case "Arc"
+			intConn=1
+		Case Else
+			intConn=-1
+	End Select
+	
+	Dim arrBB,strPt,arrData
+	Dim mil : mil=Array(1000000,0,0) ' this value unreliable
+	arrBB=Rhino.BoundingBox(arrcrvs)
+	strPt=Rhino.Pt2Str(Rhino.PointAdd(arrBB(2),mil))
+	arrData=Array(dblODist,strTrans,intConn,strPt)
+	
+	'Call Rhino.EnableRedraw(False)
+	
+	Dim intCount,blnSuccess : intCount=0
+	For Each strCrv in arrCrvs
+		
+		blnSuccess=OffsetCurve2Sides(strCrv,arrData)
+		
+		If Not IsNull(blnSuccess) Then intCount=intCount+1
+		
+	Next
+	Call Rhino.EnableRedraw(True)
+  Rhino.SelectObject(strCrv)
+	Call Rhino.Print("Successfully offset "&intCount&" of "&intCrvs&" curves")	
+End Sub	
+	
+Function OffsetCurve2Sides (strCrv,arrData)
+	
+	OffsetCurve2Sides=Null
+	Dim arrOffset,strComm
+	strComm="_-Offset Distance "&arrData(0)&" Corner "&arrData(1)
+	strComm=strComm&" BothSides "&arrData(3)&" _Enter"
+	
+	Call Rhino.SelectObject(strCrv)
+	Call Rhino.Command(strComm)
+	arrOffset=Rhino.LastCreatedObjects
+	Call Rhino.UnselectObject(strCrv)
+	
+	If Not IsArray(arrOffset) Then
+		Exit Function	'error message	
+	ElseIf Ubound(arrOffset)<>1 Then
+		Exit Function
+	End If
+	
+	If (arrData(2))>=0 and Not Rhino.IsCurveClosed(strcrv) Then
+		Call AddEndsToOffset(arrOffset, arrData)
+	End If
+	OffsetCurve2Sides=True
+	
+End Function
+
+Sub AddEndsToOffset(arrOffset, arrData)	
+	
+	Dim arrOC1SP,arrOC2SP,arrOC1EP,arrOC2EP,arrResult()	
+	arrOC1SP=Rhino.CurveStartPoint(arrOffset(0))
+	arrOC2SP=Rhino.CurveStartPoint(arrOffset(1))
+	arrOC1EP=Rhino.CurveEndPoint(arrOffset(0))
+	arrOC2EP=Rhino.CurveEndPoint(arrOffset(1))
+	
+	If arrData(2)=0 Then		
+		Redim arrResult(3)
+		arrResult(0)=arrOffset(0)
+		arrResult(1)=arrOffset(1)
+		arrResult(2)=Rhino.AddLine(arrOC1SP,arrOC2SP)
+		arrResult(3)=Rhino.AddLine(arrOC1EP,arrOC2EP)
+	ElseIf arrData(2)=1 Then
+		ReDim arrResult(1)
+		arrResult(0)=Rhino.ExtendCurvePoint (arrOffset(0),0,arrOC2SP,1)
+		arrResult(1)=Rhino.ExtendCurvePoint (arrOffset(1),1,arrOC1EP,1)
+	End If
+	
+	Call Rhino.JoinCurves(arrResult,True)	
+End Sub

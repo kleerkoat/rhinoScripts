@@ -1,0 +1,72 @@
+﻿Option Explicit
+' Script written by G. C. Webster� (aka Guilherme Cozer Webster) in Jan/2006, for Rhinoceros 3.0
+' Contact: gcwebster@pop.com.br
+' RhinoScript June 16, 2005
+' Designed to use orient2pt with a pivot point (same first point on both reference and target)
+
+Sub Orient2pt_pivot
+
+Dim arrObj
+Dim arrPvtPt, arrRefPt, arrTrgPt
+Dim arrCopy(), strCopy
+Dim arrScale(), strScale
+
+arrObj = Rhino.GetObjects ("Select objects to orient", ,True, True)
+If IsNull (arrObj) Then Exit Sub
+
+arrPvtPt = Rhino.GetPoint ("Pivot point")
+If IsNull (arrPvtPt) Then Exit Sub
+arrRefPt = Rhino.GetPoint ("Reference point")
+If IsNull (arrRefPt) Then Exit Sub
+arrTrgPt = Rhino.GetPoint ("Target point")
+If IsNull (arrTrgPt) Then Exit Sub
+
+ReDim arrCopy(1)
+arrCopy(0) = "Yes"
+arrCopy(1) = "No"
+
+strCopy = Rhino.GetString ("Copy", "No", arrCopy)
+If IsNull (strCopy) Then Exit Sub
+
+ReDim arrScale(1)
+arrScale(0) = "Yes"
+arrScale(1) = "No"
+
+strScale = Rhino.GetString ("Scale", "Yes", arrCopy)
+If IsNull (strScale) Then Exit Sub
+
+Rhino.EnableRedraw vbFalse
+
+Rhino.UnselectAllObjects
+Rhino.SelectObjects arrObj
+
+Select Case strCopy
+       Case "Yes"
+            Select Case strScale
+                   Case "Yes"
+                        Rhino.command "orient copy=yes scale=yes "&Rhino.Pt2Str(arrPvtPt)&" "&Rhino.Pt2Str(arrRefPt)&" "&Rhino.Pt2Str(arrPvtPt)&_
+                        " "&Rhino.Pt2Str(arrTrgPt)&" enter"
+                   Case "No"
+                        Rhino.command "orient copy=yes scale=no "&Rhino.Pt2Str(arrPvtPt)&" "&Rhino.Pt2Str(arrRefPt)&" "&Rhino.Pt2Str(arrPvtPt)&_
+                        " "&Rhino.Pt2Str(arrTrgPt)&" enter"
+            End Select
+       Case "No"
+            Select Case strScale
+                   Case "Yes"
+                        Rhino.command "orient copy=no scale=yes "&Rhino.Pt2Str(arrPvtPt)&" "&Rhino.Pt2Str(arrRefPt)&" "&Rhino.Pt2Str(arrPvtPt)&_
+                        " "&Rhino.Pt2Str(arrTrgPt)&" enter"
+                   Case "No"
+                        Rhino.command "orient copy=no scale=no "&Rhino.Pt2Str(arrPvtPt)&" "&Rhino.Pt2Str(arrRefPt)&" "&Rhino.Pt2Str(arrPvtPt)&_
+                        " "&Rhino.Pt2Str(arrTrgPt)&" enter"
+            End Select
+End Select
+
+Rhino.UnselectAllObjects
+Rhino.command "SelLast"
+
+Rhino.EnableRedraw vbTrue
+
+End Sub
+
+Orient2pt_pivot
+)

@@ -1,0 +1,67 @@
+Option Explicit
+'Script by Mitch (with help from Emilio Morello, thanks!)
+'Version 09 April, 2010
+
+' THIS VERSION IS FOR RHINO 5
+'converts text objects into single stroke curves for engraving or laser cutting
+'requires the single stroke font(s) named below to be installed
+'another font can be substituted, font name must be changed in script
+
+Sub ConvertAllTextToStick()
+	
+	Dim arrAnn,str1,str2,str3,strFont,vMult,arrVCP
+	vMult=1.6 'this value can be changed to match the multiline spacing
+		
+	str1="! _-TextObject _GroupOutput=_Yes _FontName="
+	'strFont=chr(34)&"Machine Tool Gothic"&chr(34) 'alternate font
+	strFont=chr(34)&"Machine Tool SanSerif"&chr(34) 'matches Arial font closely
+	str2=" _Italic=_No _Bold=_No _Height="
+	str3=" _Output=_Curves _AllowOpenCurves=_Yes "
+	
+	'arrAnn=Rhino.GetObjects("Select text to convert",512,true)	'user select
+	arrAnn=Rhino.ObjectsByType(512) 'gets all selectable text objects
+	If Not IsArray(arrAnn) Then Exit Sub
+	arrVCP=Rhino.ViewCplane
+	
+	Call Rhino.EnableRedraw(False)	
+	Dim arrTPlane,strObj,arrPt,dblHt,strHt,strTxt,arrTxt,arrNTxt
+	Dim blnTest,strPt,strLayer,intTColor,strComm,i,j
+	
+	For each strObj In arrAnn		
+		If Rhino.IsObjectSelectable(strObj) and Rhino.IsText(strObj) Then
+			intTColor=Rhino.ObjectColor(strObj)
+			strLayer=Rhino.ObjectLayer(strObj)
+			arrPt=Rhino.TextObjectPoint(strObj)	'absolute coordinates...		
+			arrTPlane=Rhino.TextObjectPlane(strObj)
+			arrPt=Rhino.XformWorldToCPlane(arrPt,arrTPlane)
+			dblHt=Rhino.TextObjectHeight(strObj)
+			strHt=Cstr(dblHt)
+			strTxt=Rhino.TextObjectText(strObj)
+			arrTxt=Rhino.Strtok(strTxt,vbNewLine)				
+			'each line of text in strObj should now be an element in arrTxt
+			
+			'execute the TextObject command and test for completion, delete originals			
+			Call Rhino.ViewCPlane( ,arrTPlane)
+			blnTest=False : i=-1
+			For j=Ubound(arrTxt) to 0 step -1
+				strTxt=arrTxt(j)				
+				strPt=Rhino.Pt2Str(arrPt)
+				strComm=(str1&strFont&str2&strHt&str3&chr(34)&strTxt&chr(34)&" "&strPt)
+				blnTest=Rhino.Command(strComm,False)
+				arrNTxt=Rhino.LastCreatedObjects
+				If IsArray(arrNTxt) Then 
+					Call Rhino.ObjectLayer(arrNTxt,strLayer)
+					Call Rhino.ObjectColor(arrNTxt,intTColor)
+				End If				
+				If blnTest Then i=i+1
+				arrPt(1)=arrPt(1)+(dblHt*vMult)				
+			Next
+			If i=Ubound(arrTxt) Then Call Rhino.DeleteObject(strObj)
+			Redim arrTxt(-1)
+		End If		
+	Next
+	Call Rhino.ViewCPlane( ,arrVCP)
+	Call Rhino.EnableRedraw(True)
+	
+End Sub
+Call ConvertAllTextToStick()

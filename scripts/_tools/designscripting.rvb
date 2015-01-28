@@ -1,0 +1,4640 @@
+''#notice Notice
+  ''#license Copyright
+    ''
+    ''  Scripting Library version 1 release 10
+    ''  Copyright (C) 2003-2005 Stylianos Dritsas
+    ''
+    ''  License:
+    ''  http://creativecommons.org/licenses/by/2.5/
+    ''
+    ''  Contact:
+    ''  dritsas [at] alum [dot] mit [dot] edu
+    ''
+  ''#endlicense
+  ''#section History
+  ''#endsection
+  ''#log Log 9
+    ''  Changes since release 9
+    ''  1. Rewritten array_allocate( )
+    ''  2. Added startswith
+    ''  3. Formatted the libary to work with documentation engine
+  ''#endlog
+  ''#log Log 8
+    ''  Changes since release 8
+    ''  1. Added color_coldhot color palette/ramp
+    ''  2. Added bounds_begin
+    ''  3. Added bounds_make
+  ''#endlog
+  ''#log Log 7
+    ''  Changes since release 7
+    ''  1. Added triple plane intersection
+  ''#endlog
+  ''#log Log 6
+    ''  Changes since release 6
+    ''  1. Added vertex_local
+    ''  2. Added vertex_global
+    ''  3. Added ellipse_conjugate
+    ''  4. Added bounds_delta
+    ''  5. Added bounds_center
+  ''#endlog
+  ''#log Log 5
+    ''  Changes since release 5
+    ''  1. Added array_swap
+  ''#endlog
+  ''#log Log 4
+    ''  Changes since release 4
+    ''  1. Added Container Class!!!
+    ''  2. Fixed bounds_create
+  ''#endlog
+  ''#log Log 3
+    ''  Changes since release 3
+    ''  1. Added intersect_lineline
+    ''  2. Added intersect_lineplane
+    ''  3. Added intersect_linesphere
+    ''  4. Added matrix_rotate
+    ''  5. Added matrix_transpose
+    ''  6. Added matrix_invert
+    ''  7. Added matrix_addition
+    ''  8. Added matrix_multiplication
+    ''  9. Added matrix_vector
+    '' 10. Added vertex_inside
+    '' 11. Added vertex_between
+    '' 12. Fixed vertex_convert to match number_convert
+    '' 13. Added vertex_print
+    '' 14. Added bounds_inside
+    '' 15. Added stl_new
+    '' 16. Added stl_begin
+    '' 17. Added stl_face
+    '' 18. Added stl_end
+  ''#endlog
+  ''#log Log 2
+    ''  Changes since release 2
+    ''  1. Added vertex_reflect
+    ''  2. Added vertex_mirror
+    ''  3. Added vector_reflect
+    ''  4. Added vector_mirror
+    ''  5. Added vector_bisector
+  ''#endlog
+  ''#log Log 1
+    ''  Changes since release 1
+    ''  1. Fixed arc_sin function to avoid divisions by zero
+    ''  2. Added quicksort function for better sorting performance
+  ''#endlog
+''#endnotice
+''#block Classes
+  ''#block Language
+    ''#fields language
+      '' Language Information
+      ''''
+      ''''
+      '''' Variable serialization delimiter
+      ''''
+      dim VAR_DELIMITER: VAR_DELIMITER = "~"
+    ''#endfields
+    ''#method iif( )
+      '' Inline conditional
+      '' in:  An expression pre evaluated in a boolean,
+      ''      The result to return on true
+      ''      The result to return on false
+      '' out: The true_result or false_result
+      '' rem: The interpreter will evaluate all three parameters!
+      ''      Use when you can pass values for the result parameters
+      ''      to eliminate overhead.
+      function iif( test_expression, true_result, false_result )
+        if( test_expression ) then
+          iif = true_result
+        else
+          iif = false_result
+        end if
+      end function
+    ''#endmethod
+    ''#method convert( )
+      '' Generic variable conversion to string
+      '' in:  any variable
+      '' out: a string representation
+      '' rem: this function is like php's var_dump. It dumps a
+      ''      any kind of variable in a string format. There are
+      ''      a couple of limitations about the data types, such
+      ''      multidimensional arrays (but not jagged arrays) and
+      ''      objects (since there is not default <i>toString( )</i> in vbs).
+      function convert( variable )
+        select case vartype( variable )
+          case vbempty:      convert = "[empty]"
+          case vbnull:       convert = "[null]"
+          case vbinteger:    convert = cstr( variable )
+          case vblong:       convert = cstr( variable )
+          case vbsingle:     convert = formatnumber( variable, 2 )
+          case vbdouble:     convert = formatnumber( variable, 2 )
+          case vbcurrency:   convert = cstr( variable )
+          case vbdate:       convert = cstr( variable )
+          case vbstring:     convert = variable
+          case vbobject:     convert = "[object]"
+          case vberror:      convert = "[error]"
+          case vbboolean:    convert = cstr( variable )
+          case vbbyte:       convert = cstr( variable )
+          case vbdataobject: convert = "[dataobject]"
+          case else:         convert = array_convert( variable )
+        end select
+      end function
+    ''#endmethod
+    ''#method echo( )
+      '' Generic variable dumping on message box
+      '' in:  any variable
+      '' out: a message box dump
+      '' rem: see also the <i>convert( )</i> function for more details
+      function echo( variable )
+        call msgbox( convert( variable ), vbinformation, "Design Scripting" )
+      end function
+    ''#endmethod
+    ''#method defined( )
+      '' Is pseudo-preprocessor thingy
+      '' in:  a variable
+      '' out: if it has been set before
+      ''
+      function defined( variable )
+        defined = ( vartype( variable ) <> vbempty )
+      end function
+    ''#endmethod
+    ''#method valid( )
+      '' Pseudo validity test
+      '' in:  a pseudo-object array
+      '' out: true only its valid?
+      '' rem: this function is useful is you return invalid results
+      ''      from functions expressed as <i>vbnull</i> or you don't
+      ''      bother to even set them
+      ''
+      function valid( object )
+        valid =( vartype( object ) <> vbnull  ) and _
+               ( vartype( object ) <> vbempty )
+      end function
+    ''#endmethod
+    ''#method pack( )
+      '' Variable packing/serialization
+      '' in:  any variable
+      '' out: an encoded version to string
+      ''
+      function pack( variable )
+        if( isarray( variable ) ) then
+          dim length: length = array_length( variable )
+          pack = "a" + cstr( length ) + VAR_DELIMITER
+          dim index: index = 0
+          do while( index < length )
+            pack = pack + pack( variable( index ) )
+            index = index + 1
+          loop
+        else
+          select case vartype( variable )
+            case vbbyte, vbinteger, vblong
+              pack = "i" + cstr( variable ) + VAR_DELIMITER
+            case vbsingle, vbdouble
+              pack = "f" + formatnumber( variable ) + VAR_DELIMITER
+            case vbboolean
+              pack = "b" + cstr( abs( int( variable ) ) )
+            case vbstring
+              pack = "s" + cstr( len( variable ) ) + VAR_DELIMITER + variable
+            case else
+              pack = ""
+          end select
+        end if
+      end function
+    ''#endmethod
+    ''#method unpack( )
+      '' Variable unpacking/deserialization
+      '' in:  a variable encoding in a string
+      '' out: the decoded variable
+      ''
+      function unpack( variable )
+        dim char, index, length
+        dim type_: type_ = left( variable, 1 )
+        select case type_
+          case "a"
+            char = instr( variable, VAR_DELIMITER )
+            length = eval( mid( variable, 2, char - 2 ) )
+            variable = mid( variable, char + 1 )
+            dim result: result = array_allocate( length )
+            for index = 0 to length - 1
+              result( index ) = unpack( variable )
+            next
+            unpack = result
+          case "i"
+            char = instr( variable, VAR_DELIMITER )
+            unpack = cint( eval( mid( variable, 2, char - 2 ) ) )
+            variable = mid( variable, char + 1 )
+          case "f"
+            char = instr( variable, VAR_DELIMITER )
+            unpack = cdbl( eval( mid( variable, 2, char - 2 ) ) )
+            variable = mid( variable, char + 1 )
+          case "s"
+            char = instr( variable, VAR_DELIMITER )
+            length = eval( mid( variable, 2, char - 2 ) )
+            unpack = mid( variable, char + 1, length )
+            variable = mid( variable, char + length + 1 )
+          case "b"
+            unpack = ( eval( mid( variable, 2, 1 ) ) = 1 )
+            variable = mid( variable, 3 )
+        end select
+      end function
+    ''#endmethod
+  ''#endblock
+  ''#block String
+    ''#method string_lpad( )
+      '' Left pad a string
+      '' in:  a string
+      ''      the padding character
+      ''      the length of the final string with padding
+      '' out: a left padded string
+      '' exp:<pre>
+      '''' This will output string like: "001", "002", ...
+      '' for index = 0 to 20
+      ''   echo string_lpad( cstr( index ), "0", 3 )
+      '' next
+      ''</pre>
+      function string_lpad( string_, char, pad )
+        dim padding: padding = pad - len( string_ )
+        if( padding > 0 ) then
+          string_lpad = string( padding, char ) + string_
+        else
+          string_lpad = string_
+        end if
+      end function
+    ''#endmethod
+    ''#method string_rpad( )
+      '' Right pad a string
+      '' in:  a string
+      ''      the padding character
+      ''      the length of the final string with padding
+      '' out: a right padded string
+      ''
+      function string_rpad( string_, char, pad )
+        dim padding: padding = pad - len( string_ )
+        if( padding > 0 ) then
+          string_rpad = string_ + string( padding, char )
+        else
+          string_rpad = string_
+        end if
+      end function
+    ''#endmethod
+    ''#method string_replacechars( )
+      '' String character substitution
+      '' in:  The string to search
+      ''      A string with the chacters to replace
+      ''      A substitution string of characters
+      '' out: A string with all input chars replaced by
+      ''      the substitution characters
+      function string_replacechars( string_, chars, subchar )
+        dim result: result = vbnullstring
+        for index = 1 to len( string_ )
+          char = mid( string_, index, 1 )
+          if( instr( chars, char ) > 0 ) then
+            result = result + subchar
+          else
+            result = result + char
+          end if
+        next
+        string_replacechars = result
+      end function
+    ''#endmethod
+    ''#method string_startswith( )
+      '' Starts With
+      '' in:  a string
+      ''      a prefix
+      '' out: true if the string starts with the prefix
+      ''
+      function string_startswith( string_, prefix )
+        if( ( string_ = vbnullstring ) or _
+            ( prefix  = vbnullstring ) ) then
+          string_startswith = false
+          exit function
+        end if
+
+        dim length: length = len( prefix )
+        if( len( string_ ) < length ) then
+          string_startswith = false
+          exit function
+        end if
+
+        string_startswith = ( mid( string_, 1, length ) = string_ )
+      end function
+    ''#endmethod
+    ''#method string_haschar( )
+      '' String character search
+      '' in:  The search string
+      ''      The characters to look for
+      '' out: true if any of the characters is found
+      ''
+      function string_haschar( string_, chars )
+        if( string_ = vbnullstring ) then exit function
+        dim index: index = 1
+        dim count: count = len( chars )
+        do while( index <= count )
+          if( instr( string_, mid( chars, index, 1 ) ) > 0 ) then
+            string_haschar = true
+            exit function
+          end if
+        loop
+        string_haschar = false
+      end function
+    ''#endmethod
+  ''#endblock
+  ''#block Number
+    ''#fields number
+      '' Number Information
+      ''''
+      '''' Constants
+      ''''
+      dim NUMBER_PI:       NUMBER_PI       = 4.0 * atn( 1.0 )
+      dim NUMBER_MAX_BYTE: NUMBER_MAX_BYTE = 255
+      dim NUMBER_MAX_WORD: NUMBER_MAX_WORD = 65535
+      dim NUMBER_LEN_BYTE: NUMBER_LEN_BYTE = 256
+      dim NUMBER_LEN_WORD: NUMBER_LEN_WORD = 65536
+      dim NUMBER_REAL:     NUMBER_REAL     = 0
+      dim NUMBER_IMAG:     NUMBER_IMAG     = 1
+      dim NUMBER_ZERO:     NUMBER_ZERO     = 0.0001
+      dim NUMBER_NAN:      NUMBER_NAN      = vbnullstring
+      dim NUMBER_MAXIMUM:  NUMBER_MAXIMUM  = 1.0e308
+      dim NUMBER_MINIMUM:  NUMBER_MINIMUM  =-1.0e308
+      dim NUMBER_LOG_10:   NUMBER_LOG_10   = log( 10 )
+    ''#endfields
+    ''#method number_mini( )
+      '' The minimum value
+      '' in:  two numbers
+      '' out: the lowest
+      ''
+      function number_mini( a, b )
+        if( a < b ) then
+          number_mini = a
+        else
+          number_mini = b
+        end if
+      end function
+    ''#endmethod
+    ''#method number_maxi( )
+      '' The maximum value
+      '' in:  two numbers
+      '' out: the highest
+      ''
+        function number_maxi( a, b )
+          if( a > b ) then
+            number_maxi = a
+          else
+            number_maxi = b
+          end if
+        end function
+    ''#endmethod
+    ''#method number_new( )
+      '' Create complex number
+      '' in:  the real and imaginary parts
+      '' out: a comprex number object
+      ''
+      function number_new( real, imaginary )
+        number_new = array( real, imaginary )
+      end function
+    ''#endmethod
+    ''#method number_invert( )
+      '' Invert complex number
+      '' in:  a complex number
+      '' out: its inverted counterpart
+      ''
+      function number_invert( number )
+        number_invert = number_new( _
+          -number( NUMBER_REAL ), _
+          -number( NUMBER_IMAG )  _
+        )
+      end function
+    ''#endmethod
+    ''#method number_conjugate( )
+      '' Conjugate complex number
+      '' in:  a complex number
+      '' out: the conjugate counterpart
+      ''
+      function number_conjugate( number )
+        number_conjugate = number_new( _
+           number( NUMBER_REAL ), _
+          -number( NUMBER_IMAG )  _
+        )
+      end function
+    ''#endmethod
+    ''#method number_add( )
+      '' Complex numbers addition
+      '' in:  two complex number
+      '' out: the sum of them
+      ''
+      function number_add( na, nb )
+        number_add = number_new( _
+          na( NUMBER_REAL ) + nb( NUMBER_REAL ), _
+          na( NUMBER_IMAG ) + nb( NUMBER_IMAG )  _
+        )
+      end function
+    ''#endmethod
+    ''#method number_subtract( )
+      '' Complex numbers subtraction
+      '' in:  two complex number
+      '' out: the result of their subtraction
+      ''
+      function number_subtract( na, nb )
+        number_subtract = number_new( _
+          na( NUMBER_REAL ) - nb( NUMBER_REAL ), _
+          na( NUMBER_IMAG ) - nb( NUMBER_IMAG )  _
+        )
+      end function
+    ''#endmethod
+    ''#method number_multiply( )
+      '' Complex numbers multiplication
+      '' in:  two complex number
+      '' out: the result of their multiplication
+      ''
+      function number_multiply( na, nb )
+        number_multiply = number_new( _
+          na( NUMBER_REAL ) * nb( NUMBER_REAL ) - _
+          na( NUMBER_IMAG ) * nb( NUMBER_IMAG ),  _
+          na( NUMBER_IMAG ) * nb( NUMBER_REAL ) + _
+          na( NUMBER_REAL ) * nb( NUMBER_IMAG )   _
+        )
+      end function
+    ''#endmethod
+    ''#method number_scale( )
+      '' Complex numbers scalar multiplication
+      '' in:  a number and a complex number
+      '' out: the result of their scaling
+      ''
+      function number_scale( factor, number )
+        number_scale = number_new( _
+          number( NUMBER_REAL ) * factor, _
+          number( NUMBER_IMAG ) * factor  _
+        )
+      end function
+    ''#endmethod
+    ''#method number_divide( )
+      '' Complex numbers division
+      '' in:  two complex number
+      '' out: the result of their division
+      ''
+      function number_divide( na, nb )
+        dim div: div = nb( NUMBER_REAL ) * nb( NUMBER_REAL ) + _
+                       nb( NUMBER_IMAG ) * nb( NUMBER_IMAG )
+        if( div <> 0.0 ) then
+          number_divide = number_new( _
+            ( na( NUMBER_REAL ) * nb( NUMBER_REAL ) +        _
+              na( NUMBER_IMAG ) * nb( NUMBER_IMAG ) ) / div, _
+            ( na( NUMBER_IMAG ) * nb( NUMBER_REAL ) -        _
+              na( NUMBER_REAL ) * nb( NUMBER_IMAG ) ) / div  _
+          )
+        else
+          number_divide = number_new( _
+            NUMBER_NAN, _
+            NUMBER_NAN  _
+          )
+        end if
+      end function
+    ''#endmethod
+    ''#method number_absolute( )
+      '' Complex number absolute / modulus
+      '' in:  a complex number
+      '' out: the absolute value
+      ''
+      function number_absolute( number )
+        number_absolute = sqr( _
+          number( NUMBER_REAL ) * number( NUMBER_REAL ) + _
+          number( NUMBER_IMAG ) * number( NUMBER_IMAG )   _
+        )
+      end function
+    ''#endmethod
+    ''#method number_deg( )
+      '' Converts radians to degrees
+      '' in:  radians
+      '' out: degrees
+      ''
+      function number_deg( rad )
+        number_deg = rad * 180.0 / NUMBER_PI
+      end function
+    ''#endmethod
+    ''#method number_rad( )
+      '' Converts degrees to radians
+      '' in:  degrees
+      '' out: radians
+      ''
+      function number_rad( deg )
+        number_rad = deg * NUMBER_PI / 180.0
+      end function
+    ''#endmethod
+    ''#method number_word( )
+      '' Packs a word from two bytes
+      '' in:  two bytes
+      '' out: a word
+      ''
+      function number_word( lo, hi )
+        number_word = lo + hi * NUMBER_LEN_BYTE
+      end function
+    ''#endmethod
+    ''#method number_dword( )
+      '' Packs a dword from two words
+      '' in:  two words
+      '' out: a double word
+      ''
+      function number_dword( lo, hi )
+        number_dword = lo + hi * NUMBER_LEN_WORD
+      end function
+    ''#endmethod
+    ''#method number_lbyte( )
+      '' Extracts the low byte of a word
+      '' in:  a word
+      '' out: the lower byte
+      ''
+      function number_lbyte( word )
+        number_lbyte = word and NUMBER_MAX_BYTE
+      end function
+    ''#endmethod
+    ''#method number_hbyte( )
+      '' Extracts the high byte of a word
+      '' in:  a word
+      '' out: the higher byte
+      ''
+      function number_hbyte( word )
+        number_hbyte = ( word \ NUMBER_MAX_BYTE ) and NUMBER_MAX_BYTE
+      end function
+    ''#endmethod
+    ''#method number_lword( )
+      '' Extracts the low word of a dword
+      '' in:  a double word
+      '' out: the lower word
+      ''
+      function number_lword( dword )
+        number_lbyte = dword and NUMBER_MAX_WORD
+      end function
+    ''#endmethod
+    ''#method number_hword( )
+      '' Extracts the high word of a dword
+      '' in:  a double word
+      '' out: the higher word
+      ''
+      function number_hword( dword )
+        number_hword = ( dword \ NUMBER_MAX_WORD ) and NUMBER_MAX_WORD
+      end function
+    ''#endmethod
+    ''#method number_lshift( )
+      '' Left binary shift
+      '' in:  number, shift offset
+      '' out: a binary shifted number
+      ''
+      function number_lshift( number, offset )
+        number_lshift = number_lshift * ( 2 ^ offset )
+      end function
+    ''#endmethod
+    ''#method number_rshift( )
+      '' Right binary shift
+      '' in:  number, shift offset
+      '' out: a binary shifted number
+      ''
+      function number_rshift( number )
+        number_rshift = number_rshift \ ( 2 ^ offset )
+      end function
+    ''#endmethod
+    ''#method number_linear( )
+      '' Linear Interpolation
+      '' in:  two values and the interpolation factor
+      '' out: the interpolated value
+      ''
+      function number_linear( na, nb, factor )
+        dim inverse: inverse = 1.0 - factor
+        number_linear = na * inverse + nb * factor
+      end function
+    ''#endmethod
+    ''#method number_convert( )
+      '' Number Conversion to String Function
+      '' in:  a number
+      '' out: its string in the dot notation
+      ''
+      function number_convert( number )
+        number_convert = replace( cstr( number ), ",", "." )
+      end function
+    ''#endmethod
+    ''#method number_random( )
+      '' Random Number Function
+      '' in:  two boundary values
+      '' out: a random number between
+      ''
+      function number_random( min, max )
+        number_random = ( max - min ) * rnd( ) + min
+      end function
+    ''#endmethod
+    ''#method number_arcsin( )
+      '' Arc Sine Function
+      '' in:  a number
+      '' out: its arc-sine
+      ''
+      function number_arcsin( number )
+        if( number = 1.0 ) then
+          number_arcsin = NUMBER_PI / 2.0
+        elseif( number = -1.0 ) then
+          number_arcsin =-NUMBER_PI / 2.0
+        else
+          number_arcsin = atn( number / sqr( abs( 1.0 - number * number ) ) )
+        end if
+      end function
+    ''#endmethod
+    ''#method number_arccos( )
+      '' Arc Cosine Function
+      '' in:  a number
+      '' out: its arc-cosine
+      ''
+      function number_arccos( number )
+        if( number = 1.0 ) then
+          number_arccos = 0.0
+        elseif( number = -1.0 ) then
+          number_arccos = NUMBER_PI
+        else
+          number_arccos = atn( -number / sqr( abs( 1.0 - number * number ) ) ) + 2.0 * atn( 1.0 )
+        end if
+      end function
+    ''#endmethod
+    ''#method number_hypsin( )
+      '' Hyperbolic Sine Function
+      '' in:  a number
+      '' out: its hyperbolic arc-sine
+      ''
+      function number_hypsin( number )
+        number_hypsin = ( exp( number ) - exp( -number ) ) / 2.0
+      end function
+    ''#endmethod
+    ''#method number_hypcos( )
+      '' Hyperbolic Cosine Function
+      '' in:  a number
+      '' out: its hyperbolic arc-cosine
+      ''
+      function number_hypcos( number )
+        number_hypcos = ( exp( number ) + exp( -number ) ) / 2.0
+      end function
+    ''#endmethod
+    ''#method number_hyptan( )
+      '' Hyperbolic Tangent Function
+      '' in:  a number
+      '' out: its hyperbolic tangent
+      ''
+      function number_hyptan( number )
+        number_hyptan = ( exp( number ) - exp( -number ) ) / _
+                        ( exp( number ) + exp( -number ) )
+      end function
+    ''#endmethod
+    ''#method number_log10( )
+      '' Ten Based Log
+      '' in:  a number
+      '' out: its ten based logarithm
+      ''
+      function number_log10( number )
+        number_log10 = log( number ) / NUMBER_LOG_10
+      end function
+    ''#endmethod
+  ''#endblock
+  ''#block Array
+    ''#method array_length( )
+      '' Array Length
+      '' in:  an array
+      '' out: the number of elements
+      ''
+      function array_length( array_object )
+        array_length = ubound( array_object ) - lbound( array_object ) + 1
+      end function
+    ''#endmethod
+    ''#method array_sort( )
+      '' Array Bouble Sort (deprecated)
+      '' in:  an array of any kind
+      ''      a comparison function by name as string
+      ''      some optional user defined data (can be vbnull)
+      '' out: the same array sorted
+      ''
+      function array_sort( array_object, comparison_function, user_data )
+        dim i: i = array_length( array_object )
+        do while( i >= 0 )
+          i = i - 1
+          dim j: j = 0
+          do while( j < i )
+            dim a: a = array_object( j     )
+            dim b: b = array_object( j + 1 )
+            if( eval( comparison_function + "( a, b, user_data )" ) > 0 ) then
+              array_object( j     ) = b
+              array_object( j + 1 ) = a
+            end if
+            j = j + 1
+          loop
+        loop
+      end function
+    ''#endmethod
+    ''#method array_order( )
+      '' Array Bouble Sort
+      '' in:  an array of any kind
+      ''      a comparison function by name as string
+      ''      a swapping function by name as string
+      ''      some optional user defined data (can be vbnull)
+      '' out: the same array sorted
+      ''
+      function array_order( array_object, comparison_function, swap_function, user_data )
+        dim i: i = array_length( array_object )
+        do while( i >= 0 )
+          i = i - 1
+          dim j: j = 0
+          do while( j < i )
+            dim a: a = j
+            dim b: b = j + 1
+            if( eval( comparison_function + "( array_object, a, b, user_data )" ) > 0 ) then
+              call eval( swap_function + "( array_object, a, b, user_data )" )
+            end if
+            j = j + 1
+          loop
+        loop
+      end function
+    ''#endmethod
+    ''#method array_swap( )
+      '' Array Swap
+      '' in:  an array, the indices of the elements to swap and an ignored user thingy
+      '' out: nothing much
+      ''
+      function array_swap( array_object, index_a, index_b, user_data )
+        dim temp
+        temp = array_object( index_a )
+        array_object( index_a ) = array_object( index_b )
+        array_object( index_b ) = temp
+      end function
+    ''#endmethod
+    ''#method array_qsort( )
+      '' Array Quick Sort
+      '' in:  an array of any kind
+      ''      a comparison function by name as string
+      ''      a swapping function by name as string
+      ''      some optional user defined data (can be vbnull)
+      '' out: the same array sorted
+      ''
+      function array_qsort( array_object, comparison_function, swap_function, user_data )
+        call array_quicksort(     _
+          array_object,           _
+          lbound( array_object ), _
+          ubound( array_object ), _
+          comparison_function,    _
+          swap_function,          _
+          user_data               _
+        )
+      end function
+    ''#endmethod
+    ''#method array_quicksort( )
+      '' Array Quick Sort Inner Proc
+      '' (do not call directly)
+      ''
+      function array_quicksort( arr, lb, ub, cmp, swp, usr )
+        if( lb >= ub ) then exit function
+        dim lo: lo = lb + 1
+        dim hi: hi = ub
+        do while( lo <= hi )
+          if( eval( cmp + "( arr, lo, lb, usr )" ) <= 0 ) then
+            lo = lo + 1
+          else
+            call eval( swp + "( arr, lo, hi, usr )" )
+            hi = hi - 1
+          end if
+        loop
+        lo = lo - 1
+        call eval( swp + "( arr, lo, lb, usr )" )
+        call array_quicksort( arr, lb, lo - 1, cmp, swp, usr )
+        call array_quicksort( arr, hi + 1, ub, cmp, swp, usr )
+      end function
+    ''#endmethod
+    ''#method array_shuffle( )
+      '' Array Shuffle
+      '' in:  an array
+      '' out: the array shuffled
+      ''
+      function array_shuffle( array_object )
+        randomize
+        dim index
+        for index = lbound( array_object ) to ubound( array_object )
+          dim random: random = int( rnd( ) * ubound( array_object ) )
+          dim temp: temp = array_object( index )
+          array_object( index ) = array_object( random )
+          array_object( random ) = temp
+        next
+      end function
+    ''#endmethod
+    ''#method array_allocate( )
+      '' Dynamic Array Allocator
+      '' in:  the number of elements to allocate
+      '' out: a brand new fresh dynamic array
+      ''
+      function array_allocate( elements )
+        if( elements > 0 ) then
+          dim result: result = array( 0 )
+          redim result( elements - 1 )
+          array_allocate = result
+        else
+          array_allocate = vbnull
+        end if
+      end function
+    ''#endmethod
+    ''#method array_clone( )
+      '' Dynamic Clone
+      '' in:  the number of elements to allocate
+      '' out: a brand new fresh dynamic array
+      ''
+      function array_clone( array_object )
+        if( isarray( array_object ) ) then
+          dim result: result = array_allocate( array_length( array_object ) )
+          for index = lbound( array_object ) to ubound( array_object )
+            result( index ) = array_object( index )
+          next
+          array_clone = result
+        else
+          array_clone = vbnull
+        end if
+      end function
+    ''#endmethod
+    ''#method array_append( )
+      '' Dynamic Append
+      '' in:  the number of elements to allocate
+      '' out: a brand new fresh dynamic array
+      ''
+      function array_append( array_object, object )
+        if( isarray( array_object ) ) then
+          redim preserve array_object( ubound( array_object ) + 1 )
+          if( isobject( object ) ) then
+            set array_object( ubound( array_object ) ) = object
+          else
+            array_object( ubound( array_object ) ) = object
+          end if
+          array_append = array_object
+        else
+          array_append = vbnull
+        end if
+      end function
+    ''#endmethod
+    ''#method array_queue( )
+      '' Dynamic Queue
+      '' in:  the number of elements to allocate
+      '' out: a brand new fresh dynamic array
+      ''
+      function array_queue( array_object, object )
+        if( isarray( array_object ) ) then
+          result = array_allocate( array_length( array_object ) + 1 )
+          for index = lbound( array_object ) to ubound( array_object )
+            element = array_object( index )
+            if( isobject( element ) ) then
+              set result( index ) = element
+            else
+              result( index ) = element
+            end if
+          next
+          if( isobject( object ) ) then
+            set result( ubound( result ) ) = object
+          else
+            result( ubound( result ) ) = object
+          end if
+          array_queue = result
+        else
+          array_queue = vbnull
+        end if
+      end function
+    ''#endmethod
+    ''#method array_copy( )
+      '' Array Copying
+      '' in:  a source array
+      ''      the target array
+      ''      where to start copying
+      ''      how many to copy
+      '' out: nothing really
+      ''
+      function array_copy( source, target, index, count )
+        dim bound: bound = index + count
+        do while( index < bound )
+          target( index ) = source( index )
+          index = index + 1
+        loop
+      end function
+    ''#endmethod
+    ''#method array_initiallize( )
+      '' Array Initialization
+      '' in:  an array
+      '' out: a value to fill all elements with
+      ''
+      function array_initiallize( array_object, element )
+        dim index
+        for index = lbound( array_object ) to ubound( array_object )
+          array_object( index ) = element
+        next
+      end function
+    ''#endmethod
+    ''#method array_join( )
+      '' Arrays Joining
+      '' in:  two arrays
+      '' out: a joint array
+      ''
+      function array_join( aa, ab )
+        if( ( not isarray( aa ) ) or ( not isarray( ab ) ) ) then
+          array_join = vbnull
+          exit function
+        end if
+
+        dim result: result = array_allocate( _
+          array_length( aa ) +       _
+          array_length( ab )         _
+        )
+
+        dim index_out
+        index_out = lbound( result )
+
+        dim index_in
+        for index_in = lbound( aa ) to ubound( aa )
+          result( index_out ) = aa( index_in )
+          index_out = index_out + 1
+        next
+
+        for index_in = lbound( ab ) to ubound( ab )
+          result( index_out ) = ab( index_in )
+          index_out = index_out + 1
+        next
+
+        array_join = result
+      end function
+    ''#endmethod
+    ''#method array_convert( )
+      '' Array Convertion to String
+      '' in:  an array
+      '' out: its string prepresentation
+      ''
+      function array_convert( array_object )
+        dim index:  index = 0
+        dim count:  count = array_length( array_object )
+        dim result: result = "["
+        do while( index < count )
+          if( isarray( array_object( index ) ) ) then
+            result = result + array_convert( array_object( index ) ) + vbcrlf
+          elseif( isobject( array_object( index ) ) ) then
+            result = result + "<object>, "
+          elseif( isnull( array_object( index ) ) ) then
+            result = result + "<null>, "
+          else
+            result = result + cstr( array_object( index ) ) + ", "
+          end if
+          index = index + 1
+        loop
+        array_convert = left( result, len( result ) - 2 ) + "]"
+      end function
+    ''#endmethod
+    ''#method array_search( )
+      '' Array Binary Search
+      '' in:  a sorted! array
+      ''      the comparison function by name as string
+      ''      the item's value to look for
+      ''      some optional user data (can be vbnull)
+      '' out: the item's index in the array or -1 if not found
+      ''
+      function array_search( array_object, comparison_function, lookup_item, user_data )
+        dim lo: lo = lbound( array_object )
+        dim hi: hi = ubound( array_object )
+        do
+          dim half: half = lo + ( ( hi - lo ) \ 2 )
+          dim result: result = eval( comparison_function + "( array_object( half ), lookup_item, user_data )" ) > 0
+          if( result = 0 ) then
+            array_search = half
+            exit function
+          elseif( result > 0 ) then
+            hi = half
+            if( lo = hi ) then
+              exit do
+            end if
+          else
+            lo = half
+            if( lo > hi ) then
+              exit do
+            end if
+          end if
+        loop
+        array_search = -1
+      end function
+    ''#endmethod
+    ''#method array_process( )
+      '' Generic Array Iterator
+      '' in:  an array
+      ''      a function to apply to each element (by name as string)
+      ''      some optional user data (can be vbnull)
+      '' out: nothing at all
+      ''
+      function array_process( array_object, procedure, user_data )
+        dim index
+        for index = lbound( array_object ) to ubound( array_object )
+          array_object( index ) = eval( procedure + "( array_object( index ), user_data )" )
+        next
+      end function
+    ''#endmethod
+  ''#endblock
+  ''#block Bounding Box
+    ''#fields bounds
+      '' Bounding Box Information
+      ''''
+      '''' Bounding box mapping
+      ''''
+      dim BOUNDS_MIN: BOUNDS_MIN = 0
+      dim BOUNDS_MAX: BOUNDS_MAX = 1
+    ''#endfields
+    ''#method bounds_new( )
+      '' Bounding box constructor
+      '' in:  the minimum point
+      ''      the maximum point
+      '' out: a bounding box object
+      ''
+      function bounds_new( min, max )
+        bounds_new = array( min, max )
+      end function
+    ''#endmethod
+    ''#method bounds_begin( )
+      '' Bounding box constructor
+      '' in:  nothing
+      '' out: an invalid maximum inverted bounding box object
+      ''
+      function bounds_begin( )
+        bounds_begin = array( _
+          vertex_new( NUMBER_MAXIMUM, NUMBER_MAXIMUM, NUMBER_MAXIMUM ), _
+          vertex_new( NUMBER_MINIMUM, NUMBER_MINIMUM, NUMBER_MINIMUM )  _
+        )
+      end function
+    ''#endmethod
+    ''#method bounds_make( )
+      '' Bounding box constructor
+      '' in:  the points of a bounding box
+      '' out: a bounding box object
+      ''
+      function bounds_make( bbox )
+        bounds_make = array( bbox( 0 ), bbox( 6 ) )
+      end function
+    ''#endmethod
+    ''#method bounds_join( )
+      '' Joins two bounding boxes
+      '' in:  two b-boxes
+      '' out: their union
+      ''
+      function bounds_join( bo, bi )
+        bounds_join = bounds_new( _
+          vertex_new( _
+            iif( bo( BOUNDS_MIN )( VERTEX_X ) < bi( BOUNDS_MIN )( VERTEX_X ),   _
+                 bo( BOUNDS_MIN )( VERTEX_X ),  bi( BOUNDS_MIN )( VERTEX_X ) ), _
+            iif( bo( BOUNDS_MIN )( VERTEX_Y ) < bi( BOUNDS_MIN )( VERTEX_Y ),   _
+                 bo( BOUNDS_MIN )( VERTEX_Y ),  bi( BOUNDS_MIN )( VERTEX_Y ) ), _
+            iif( bo( BOUNDS_MIN )( VERTEX_Z ) < bi( BOUNDS_MIN )( VERTEX_Z ),   _
+                 bo( BOUNDS_MIN )( VERTEX_Z ),  bi( BOUNDS_MIN )( VERTEX_Z ) )  _
+          ), _
+          vertex_new( _
+            iif( bo( BOUNDS_MAX )( VERTEX_X ) > bi( BOUNDS_MAX )( VERTEX_X ),   _
+                 bo( BOUNDS_MAX )( VERTEX_X ),  bi( BOUNDS_MAX )( VERTEX_X ) ), _
+            iif( bo( BOUNDS_MAX )( VERTEX_Y ) > bi( BOUNDS_MAX )( VERTEX_Y ),   _
+                 bo( BOUNDS_MAX )( VERTEX_Y ),  bi( BOUNDS_MAX )( VERTEX_Y ) ), _
+            iif( bo( BOUNDS_MAX )( VERTEX_Z ) > bi( BOUNDS_MAX )( VERTEX_Z ),   _
+                 bo( BOUNDS_MAX )( VERTEX_Z ),  bi( BOUNDS_MAX )( VERTEX_Z ) )  _
+          ) _
+        )
+      end function
+    ''#endmethod
+    ''#method bounds_create( )
+      '' Bounding box from point cloud
+      '' in:  a point list
+      '' out: a bounding box object around them
+      ''
+      function bounds_create( pointlist )
+        dim min: min = vertex_clone( pointlist( lbound( pointlist ) ) )
+        dim max: max = vertex_clone( pointlist( lbound( pointlist ) ) )
+        dim index
+        for index = lbound( pointlist ) to ubound( pointlist )
+          if( isarray( pointlist( index ) ) ) then
+            if( pointlist( index )( VERTEX_X ) < min( VERTEX_X ) ) then
+                min( VERTEX_X ) = pointlist( index )( VERTEX_X )
+            end if
+            if( pointlist( index )( VERTEX_X ) > max( VERTEX_X ) ) then
+                max( VERTEX_X ) = pointlist( index )( VERTEX_X )
+            end if
+            if( pointlist( index )( VERTEX_Y ) < min( VERTEX_Y ) ) then
+                min( VERTEX_Y ) = pointlist( index )( VERTEX_Y )
+            end if
+            if( pointlist( index )( VERTEX_Y ) > max( VERTEX_Y ) ) then
+                max( VERTEX_Y ) = pointlist( index )( VERTEX_Y )
+            end if
+            if( pointlist( index )( VERTEX_Z ) < min( VERTEX_Z ) ) then
+                min( VERTEX_Z ) = pointlist( index )( VERTEX_Z )
+            end if
+            if( pointlist( index )( VERTEX_Z ) > max( VERTEX_Z ) ) then
+                max( VERTEX_Z ) = pointlist( index )( VERTEX_Z )
+            end if
+          end if
+        next
+        bounds_create = bounds_new( min, max )
+      end function
+    ''#endmethod
+    ''#method bounds_inside( )
+      '' Bounds Inside
+      '' in:  a bounding box and a vertex
+      '' out: true if the vertex is inside the bounding box
+      ''
+      function bounds_inside( bounds, vertex )
+        bounds_inside = ( vertex( VERTEX_X ) >= bounds( BOUNDS_MIN )( VERTEX_X ) ) and _
+                        ( vertex( VERTEX_X ) <= bounds( BOUNDS_MAX )( VERTEX_X ) ) and _
+                        ( vertex( VERTEX_Y ) >= bounds( BOUNDS_MIN )( VERTEX_Y ) ) and _
+                        ( vertex( VERTEX_Y ) <= bounds( BOUNDS_MAX )( VERTEX_Y ) ) and _
+                        ( vertex( VERTEX_Z ) >= bounds( BOUNDS_MIN )( VERTEX_Z ) ) and _
+                        ( vertex( VERTEX_Z ) <= bounds( BOUNDS_MAX )( VERTEX_Z ) )
+      end function
+    ''#endmethod
+    ''#method bounds_delta( )
+      '' Bounds Delta
+      '' in:  a bounding box
+      '' out: the diagonal vector or dimensions of the bounding box
+      ''
+      function bounds_delta( bounds )
+        bounds_delta = vector_create( bounds( BOUNDS_MIN ), bounds( BOUNDS_MAX ) )
+      end function
+    ''#endmethod
+    ''#method bounds_center( )
+      '' Bounds Center
+      '' in:  a bounding box
+      '' out: the centroid of the bounding box
+      ''
+      function bounds_center( bounds )
+        bounds_center = vertex_middle( bounds( BOUNDS_MIN ), bounds( BOUNDS_MAX ) )
+      end function
+    ''#endmethod
+    ''#method bounds_box( )
+      '' Bounds Box
+      '' in:  a bounding box
+      '' out: a mesh's vertex/index lists
+      ''
+      function bounds_box( bounds )
+        dim mx: mx = bounds( BOUNDS_MIN )( VERTEX_X )
+        dim my: my = bounds( BOUNDS_MIN )( VERTEX_Y )
+        dim mz: mz = bounds( BOUNDS_MIN )( VERTEX_Z )
+
+        dim nx: nx = bounds( BOUNDS_MAX )( VERTEX_X )
+        dim ny: ny = bounds( BOUNDS_MAX )( VERTEX_Y )
+        dim nz: nz = bounds( BOUNDS_MAX )( VERTEX_Z )
+
+        dim vertices: vertices = array( _
+          vertex_new( mx, my, mz ), _
+          vertex_new( nx, my, mz ), _
+          vertex_new( nx, ny, mz ), _
+          vertex_new( mx, ny, mz ), _
+          vertex_new( mx, my, nz ), _
+          vertex_new( nx, my, nz ), _
+          vertex_new( nx, ny, nz ), _
+          vertex_new( mx, ny, nz )  _
+        )
+
+        dim indices: indices = array( _
+          array( 0, 3, 2, 1 ), _
+          array( 4, 5, 6, 7 ), _
+          array( 0, 1, 5, 4 ), _
+          array( 3, 7, 6, 2 ), _
+          array( 0, 4, 7, 3 ), _
+          array( 1, 2, 6, 5 )  _
+        )
+
+        bounds_box = array( vertices, indices )
+      end function
+    ''#endmethod
+    ''#method bounds_scale( )
+      '' Bounds Scale
+      '' in:  a bounding box and a scale factor
+      '' out: a scaled bounding box
+      ''
+      function bounds_scale( bounds, factor )
+        dim min: min = bounds( BOUNDS_MIN )
+        dim max: max = bounds( BOUNDS_MAX )
+        dim cnt: cnt = vertex_middle( min, max )
+        bounds_scale = bounds_new( _
+          vertex_new( _
+            ( min( VERTEX_X ) - cnt( VERTEX_X ) ) * factor + cnt( VERTEX_X ), _
+            ( min( VERTEX_Y ) - cnt( VERTEX_Y ) ) * factor + cnt( VERTEX_Y ), _
+            ( min( VERTEX_Z ) - cnt( VERTEX_Z ) ) * factor + cnt( VERTEX_Z )  _
+          ), _
+          vertex_new( _
+            ( max( VERTEX_X ) - cnt( VERTEX_X ) ) * factor + cnt( VERTEX_X ), _
+            ( max( VERTEX_Y ) - cnt( VERTEX_Y ) ) * factor + cnt( VERTEX_Y ), _
+            ( max( VERTEX_Z ) - cnt( VERTEX_Z ) ) * factor + cnt( VERTEX_Z )  _
+          )  _
+        )
+      end function
+    ''#endmethod
+  ''#endblock
+  ''#block Color
+    ''#fields color
+      '' Color Information
+      ''''
+      '''' Color component constants
+      ''''
+      dim COLOR_R:       COLOR_R       = 0
+      dim COLOR_G:       COLOR_G       = 1
+      dim COLOR_B:       COLOR_B       = 2
+      dim COLOR_H:       COLOR_H       = 0
+      dim COLOR_S:       COLOR_S       = 1
+      dim COLOR_L:       COLOR_L       = 2
+      dim COLOR_C:       COLOR_C       = 0
+      dim COLOR_M:       COLOR_M       = 1
+      dim COLOR_Y:       COLOR_Y       = 2
+      dim COLOR_K:       COLOR_K       = 3
+
+      '''' Typical colors
+      ''''
+      dim COLOR_BLACK:   COLOR_BLACK   = rgb(   0,   0,   0 )
+      dim COLOR_WHITE:   COLOR_WHITE   = rgb( 255, 255, 255 )
+      dim COLOR_RED:     COLOR_RED     = rgb( 255,   0,   0 )
+      dim COLOR_GREEN:   COLOR_GREEN   = rgb(   0, 255,   0 )
+      dim COLOR_BLUE:    COLOR_BLUE    = rgb(   0,   0, 255 )
+      dim COLOR_YELLOW:  COLOR_YELLOW  = rgb( 255, 255,   0 )
+      dim COLOR_CYAN:    COLOR_CYAN    = rgb(   0, 255, 255 )
+      dim COLOR_MAGENTA: COLOR_MAGENTA = rgb( 255,   0, 255 )
+      dim COLOR_ORANGE:  COLOR_ORANGE  = rgb( 255, 128,  32 )
+      dim COLOR_BROWN:   COLOR_BROWN   = rgb( 128,  64,   0 )
+      dim COLOR_PURPLE:  COLOR_PURPLE  = rgb( 128,   0, 255 )
+      dim COLOR_DKGRAY:  COLOR_DKGRAY  = rgb( 128, 128, 128 )
+      dim COLOR_LTGRAY:  COLOR_LTGRAY  = rgb( 192, 192, 192 )
+    ''#endfields
+    ''#method color_rgb( )
+      '' Convert color to rgb
+      '' in:  a packed color value
+      '' out: a color rgb vector
+      ''
+      function color_rgb( color )
+        color_rgb = array( _
+          ( color                   ) and NUMBER_MAX_BYTE, _
+          ( color \ NUMBER_LEN_BYTE ) and NUMBER_MAX_BYTE, _
+          ( color \ NUMBER_LEN_WORD ) and NUMBER_MAX_BYTE  _
+        )
+      end function
+    ''#endmethod
+    ''#method rgb_color( )
+      '' Convert color to rgb
+      '' in:  a color rgb vector
+      '' out: a packed color value
+      ''
+      function rgb_color( rgb_ )
+        rgb_color = rgb(   _
+          rgb_( COLOR_R ), _
+          rgb_( COLOR_G ), _
+          rgb_( COLOR_B )  _
+        )
+      end function
+    ''#endmethod
+    ''#method rgb_cmy( )
+      '' Convert RGB to CMY
+      '' in:  a color rgb vector
+      '' out: a color cmy vector
+      ''
+      function rgb_cmy( rgb_ )
+        rgb_cmy = array( _
+          NUMBER_MAX_BYTE - rgb_( COLOR_R ), _
+          NUMBER_MAX_BYTE - rgb_( COLOR_G ), _
+          NUMBER_MAX_BYTE - rgb_( COLOR_B )  _
+        )
+      end function
+    ''#endmethod
+    ''#method cmy_rgb( )
+      '' Convert CMY to RGB
+      '' in:  a color cmy vector
+      '' out: a color rgb vector
+      ''
+      function cmy_rgb( cmy_ )
+        cmy_rgb = rgb_cmy( cmy_ )
+      end function
+    ''#endmethod
+    ''#method rgb_cmyk( )
+      '' Convert RGB to CMYK
+      '' in:  a color rgb  vector
+      '' out: a color cmyk vector
+      ''
+      function rgb_cmyk( rgb_ )
+        dim black: black = number_mini( number_mini( _
+          NUMBER_MAX_BYTE - rgb_( COLOR_R ),   _
+          NUMBER_MAX_BYTE - rgb_( COLOR_G ) ), _
+          NUMBER_MAX_BYTE - rgb_( COLOR_B ) )
+        dim white: white = NUMBER_MAX_BYTE - black
+        rgb_cmyk = array( _
+          ( NUMBER_MAX_BYTE - rgb_( COLOR_R ) - black ) / white, _
+          ( NUMBER_MAX_BYTE - rgb_( COLOR_G ) - black ) / white, _
+          ( NUMBER_MAX_BYTE - rgb_( COLOR_B ) - black ) / white, _
+          black _
+        )
+      end function
+    ''#endmethod
+    ''#method cmyk_rgb( )
+      '' Convert CMYK to RGB
+      '' in:  a color cmyk vector
+      '' out: a color rgb  vector
+      ''
+      function cmyk_rgb( cmyk_ )
+        dim white: white = NUMBER_MAX_BYTE - cmyk_( COLOR_K )
+        cmyk_rgb = array( _
+          NUMBER_MAX_BYTE - number_mini( NUMBER_MAX_BYTE, cmyk_( COLOR_C ) * white / black ), _
+          NUMBER_MAX_BYTE - number_mini( NUMBER_MAX_BYTE, cmyk_( COLOR_M ) * white / black ), _
+          NUMBER_MAX_BYTE - number_mini( NUMBER_MAX_BYTE, cmyk_( COLOR_Y ) * white / black )  _
+        )
+      end function
+    ''#endmethod
+    ''#method color_gray( )
+      '' Convert RGB to grayscale
+      '' in:  a color rgb  vector
+      '' out: the gray scale value
+      ''
+      function color_gray( rgb_ )
+        color_gray = ( _
+          rgb_( COLOR_R ) +  _
+          rgb_( COLOR_G ) +  _
+          rgb_( COLOR_B )    _
+        ) / 3.0
+      end function
+    ''#endmethod
+    ''#method rgb_gray( )
+      '' Convert RGB to grayscale
+      '' in:  a color rgb  vector
+      '' out: a gray scale rgb vector
+      ''
+      function rgb_gray( rgb_ )
+        dim gray: gray = ( _
+          rgb_( COLOR_R ) + _
+          rgb_( COLOR_G ) + _
+          rgb_( COLOR_B )   _
+        ) / 3.0
+        rgb_gray = array( gray, gray, gray )
+      end function
+    ''#endmethod
+    ''#method gray_color( )
+      '' Convert grayscale to color
+      '' in:  a grayscale value
+      '' out: the color value
+      ''
+      function gray_color( gray )
+        gray_color = rgb( gray, gray, gray )
+      end function
+    ''#endmethod
+    ''#method color_blend( )
+      '' Blend two colors directly (linear interpolation)
+      '' in:  two color vector
+      ''      the color factor
+      '' out: the blended color vector
+      ''
+      function color_blend( ca, cb, factor )
+        dim rmin: rmin = ca( COLOR_R )
+        dim rmax: rmax = cb( COLOR_R )
+
+        dim gmin: gmin = ca( COLOR_G )
+        dim gmax: gmax = cb( COLOR_G )
+
+        dim bmin: bmin = ca( COLOR_B )
+        dim bmax: bmax = cb( COLOR_B )
+
+        dim temp
+        if( rmin > rmax ) then temp = rmin: rmin = rmax: rmax = temp
+        if( gmin > gmax ) then temp = gmin: gmin = gmax: gmax = temp
+        if( bmin > bmax ) then temp = bmin: bmin = bmax: bmax = temp
+
+        dim r: r = int( ( rmax - rmin ) * factor + rmin )
+        dim g: g = int( ( gmax - gmin ) * factor + gmin )
+        dim b: b = int( ( bmax - bmin ) * factor + bmin )
+
+        color_blend = array( r, g, b )
+      end function
+    ''#endmethod
+    ''#method color_coldhot( )
+      '' Color Ramp Cold/Hot
+      '' Derived from Paul Bourke's Cold/Hot Color Ramps
+      '' http://astronomy.swin.edu.au/~pbourke/colour/colourramp/
+      '' in:  a normalized value [0.0, 1.0]
+      '' out: an rgb color
+      ''
+      function color_coldhot( value )
+        if( value < 0.0 ) then value = 0.0
+        if( value > 1.0 ) then value = 1.0
+
+        if( value < 0.25 ) then
+          r = 0.0
+          g = 4.0 * value
+          b = 1.0
+        elseif( value < 0.50 ) then
+          r = 0.0
+          g = 1.0
+          b = 1.0 + 4.0 * ( 0.25 - value )
+        elseif( value < 0.75 ) then
+          r = 4.0 * ( value - 0.50 )
+          g = 1.0
+          b = 0.0
+        else
+          r = 1.0
+          g = 1.0 + 4.0 * ( 0.75 - value )
+          b = 0.0
+        end if
+
+        color_coldhot = rgb( _
+          int( NUMBER_MAX_BYTE * r ), _
+          int( NUMBER_MAX_BYTE * g ), _
+          int( NUMBER_MAX_BYTE * b )  _
+        )
+      end function
+    ''#endmethod
+    ''#method color_coldhotrev( )
+      '' Color Ramp Cold/Hot Reverse
+      '' in:  an rgb color
+      '' out: the sample value
+      ''
+      function color_coldhotrev( color )
+        dim sample: sample = color_rgb( color )
+
+        sample( COLOR_R ) = sample( COLOR_R ) / NUMBER_MAX_BYTE
+        sample( COLOR_G ) = sample( COLOR_G ) / NUMBER_MAX_BYTE
+        sample( COLOR_B ) = sample( COLOR_B ) / NUMBER_MAX_BYTE
+
+        dim r: r = ( sample( COLOR_R ) = 1.0 )
+        dim g: g = ( sample( COLOR_G ) = 1.0 )
+        dim b: b = ( sample( COLOR_B ) = 1.0 )
+
+        if( ( not r ) and b ) then
+          color_coldhotrev = sample( COLOR_G ) / 4.0
+        elseif( ( not r ) and g ) then
+          color_coldhotrev = 0.5 - sample( COLOR_B ) / 4.0
+        elseif( g and ( not b ) ) then
+          color_coldhotrev = 0.5 + sample( COLOR_R ) / 4.0
+        elseif( r and ( not b ) ) then
+          color_coldhotrev = 1.0 - sample( COLOR_G ) / 4.0
+        else
+          color_coldhotrev = -1.0
+        end if
+      end function
+    ''#endmethod
+    ''#method rgb_hsl( )
+      '' Convert RGB to HSL
+      '' in:  an rgb color vector
+      '' out: a hsl color vector
+      ''
+      function rgb_hsl( rgb_ )
+        dim h
+        dim s
+        dim l
+
+        dim r: r = rgb_( COLOR_R ) / NUMBER_MAX_BYTE
+        dim g: g = rgb_( COLOR_G ) / NUMBER_MAX_BYTE
+        dim b: b = rgb_( COLOR_B ) / NUMBER_MAX_BYTE
+
+        dim min: min = number_mini( number_mini( r, g ), b )
+        dim max: max = number_maxi( number_maxi( r, g ), b )
+
+        dim delta: delta = max - min
+        dim sigma: sigma = max + min
+        dim kappa: kappa = sigma / 2.0
+
+        l = sigma / 2.0
+
+        if( delta = 0.0 ) then
+          h = 0.0
+          s = 0.0
+        else
+          if( l < 0.5 ) then
+            s = delta / sigma
+          else
+            s = delta / ( 2.0 - sigma )
+          end if
+
+          if( r = max ) then
+            h = ( g - b ) / delta
+          else
+            if( g = max ) then
+              h = ( b - r ) / delta + 2.0
+            else
+              h = ( r - g ) / delta + 4.0
+            end if
+          end if
+
+          h = h / 6.0
+
+          if( h < 0.0 ) then h = h + 1.0
+          if( h > 1.0 ) then h = h - 1.0
+        end if
+        rgb_hsl = array( h, s, l )
+      end function
+    ''#endmethod
+    ''#method hsl_rgb( )
+      '' Convert HSL to RGB
+      '' in:  a hsl color vector
+      '' out: an rgb color vector
+      ''
+      function hsl_rgb( hsl_ )
+        dim h: h = hsl_( COLOR_H )
+        dim s: s = hsl_( COLOR_S )
+        dim l: l = hsl_( COLOR_L )
+
+        if( s = 0.0 ) then
+          dim t: t = int( l * NUMBER_MAX_BYTE )
+          hsl_rgb = array( t, t, t )
+        else
+          dim lo, hi
+          if( l < 0.5 ) then
+            hi = l * ( 1.0 + s )
+          else
+            hi = ( l + s ) - ( s * l )
+          end if
+          lo = 2.0 * l - hi
+
+          dim r: r = int( NUMBER_MAX_BYTE * hue_value( h + 1.0 / 3.0, lo, hi ) )
+          dim g: g = int( NUMBER_MAX_BYTE * hue_value( h,             lo, hi ) )
+          dim b: b = int( NUMBER_MAX_BYTE * hue_value( h - 1.0 / 3.0, lo, hi ) )
+
+          hsl_rgb = array( r, g, b )
+        end if
+      end function
+    ''#endmethod
+    ''#method hue_value( )
+      '' Helper function for hsl to rgb
+      ''
+      function hue_value( hue, lo, hi )
+        if( hue < 0.0 ) then hue = hue + 1.0
+        if( hue > 1.0 ) then hue = hue - 1.0
+
+        if( ( 6.0 * hue ) < 1.0 ) then
+          hue_value = lo + ( hi - lo ) * 6.0 * hue
+        else
+          if( ( 2.0 * hue ) < 1.0 ) then
+            hue_value = hi
+          else
+            if( ( 3.0 * hue ) < 2.0 ) then
+              hue_value = lo + ( hi - lo ) * ( ( 2.0 / 3.0 ) - hue ) * 6.0
+            else
+              hue_value = lo
+            end if
+          end if
+        end if
+      end function
+    ''#endmethod
+  ''#endblock
+  ''#block Matrix
+    ''#fields matrix
+      '' Matrix Information
+      ''''
+      '''' Matrix cell mapping
+      ''''
+      dim MATRIX_00: MATRIX_00 = 0
+      dim MATRIX_01: MATRIX_01 = 1
+      dim MATRIX_02: MATRIX_02 = 2
+      dim MATRIX_03: MATRIX_03 = 3
+      dim MATRIX_10: MATRIX_10 = 4
+      dim MATRIX_11: MATRIX_11 = 5
+      dim MATRIX_12: MATRIX_12 = 6
+      dim MATRIX_13: MATRIX_13 = 7
+      dim MATRIX_20: MATRIX_20 = 8
+      dim MATRIX_21: MATRIX_21 = 9
+      dim MATRIX_22: MATRIX_22 = 10
+      dim MATRIX_23: MATRIX_23 = 11
+      dim MATRIX_30: MATRIX_30 = 12
+      dim MATRIX_31: MATRIX_31 = 13
+      dim MATRIX_32: MATRIX_32 = 14
+      dim MATRIX_33: MATRIX_33 = 15
+    ''#endfields
+    ''#method matrix_new( )
+      '' Matrix Constructor
+      '' in:  the sixteen elements of 4x4 matrix
+      '' out: a matrix object
+      ''
+      function matrix_new( m00, m01, m02, m03, _
+                           m10, m11, m12, m13, _
+                           m20, m21, m22, m23, _
+                           m30, m31, m32, m33 )
+        matrix_new = array(   _
+          m00, m01, m02, m03, _
+          m10, m11, m12, m13, _
+          m20, m21, m22, m23, _
+          m30, m31, m32, m33 )
+      end function
+    ''#endmethod
+    ''#method matrix_create( )
+      ''  Matrix Constructor
+      ''  in:  the dimensions of the matrix
+      ''  out: a matrix object
+      ''
+      function matrix_create( m, n )
+        dim matrix: matrix = array_allocate( m )
+        for row = 0 to m - 1
+          matrix( row ) = array_allocate( n )
+        next
+      end function
+    ''#endmethod
+    ''#method matrix_row( )
+      ''  Matrix Row
+      ''  in:  a matrix, the row to get/set, and the vector (null for get)
+      ''  out: a row vector
+      ''
+      function matrix_row( matrix, row, vector )
+        if( valid( vector ) ) then
+          for col = lbound( matrix( 0 ) ) to ubound( matrix( 0 ) )
+            matrix( row )( col ) = vector( col )
+          next
+        else
+          vector = array_allocate( ubound( matrix( 0 ) ) + 1 )
+          for col = lbound( matrix( 0 ) ) to ubound( matrix( 0 ) )
+            vector( col ) = matrix( row )( col )
+          next
+        end if
+      end function
+    ''#endmethod
+    ''#method matrix_col( )
+      ''  Matrix Column
+      ''  in:  a matrix, the column to get/set, and the vector (null for get)
+      ''  out: a column vector
+      function matrix_col( matrix, col, vector )
+        if( valid( vector ) ) then
+
+        else
+
+        end if
+      end function
+    ''#endmethod
+    ''#method matrix_planar( )
+      '' Planarity Test Matrix
+      '' in:  four points
+      '' out: a planarity test matrix (determinant is null)
+      ''
+      function matrix_planar( pa, pb, pc, pd )
+        matrix_planar = array( _
+          pa( VERTEX_X ), pa( VERTEX_Y ), pa( VERTEX_Z ), 1.0, _
+          pb( VERTEX_X ), pb( VERTEX_Y ), pb( VERTEX_Z ), 1.0, _
+          pc( VERTEX_X ), pc( VERTEX_Y ), pc( VERTEX_Z ), 1.0, _
+          pd( VERTEX_X ), pd( VERTEX_Y ), pd( VERTEX_Z ), 1.0  )
+      end function
+    ''#endmethod
+    ''#method matrix_assign( )
+      '' Matrix Assignment
+      '' in:  a matrix and sixteen values
+      '' out: the matrix assigned with the values
+      ''
+      function matrix_assign( matrix,             _
+                              m00, m01, m02, m03, _
+                              m10, m11, m12, m13, _
+                              m20, m21, m22, m23, _
+                              m30, m31, m32, m33 )
+          matrix( MATRIX_00 ) = m00
+          matrix( MATRIX_01 ) = m01
+          matrix( MATRIX_02 ) = m02
+          matrix( MATRIX_03 ) = m03
+          matrix( MATRIX_10 ) = m10
+          matrix( MATRIX_11 ) = m11
+          matrix( MATRIX_12 ) = m12
+          matrix( MATRIX_13 ) = m13
+          matrix( MATRIX_20 ) = m20
+          matrix( MATRIX_21 ) = m21
+          matrix( MATRIX_22 ) = m22
+          matrix( MATRIX_23 ) = m23
+          matrix( MATRIX_30 ) = m30
+          matrix( MATRIX_31 ) = m31
+          matrix( MATRIX_32 ) = m32
+          matrix( MATRIX_33 ) = m33
+      end function
+    ''#endmethod
+    ''#method matrix_identity( )
+      '' Identity Matrix
+      '' in:  a matrix or an empty variable
+      '' out: the identity matrix
+      ''
+      function matrix_identity( matrix )
+        if( isarray( matrix ) ) then
+          matrix_identity = matrix_assign( matrix, _
+            1.0, 0.0, 0.0, 0.0, _
+            0.0, 1.0, 0.0, 0.0, _
+            0.0, 0.0, 1.0, 0.0, _
+            0.0, 0.0, 0.0, 1.0 )
+        else
+          matrix_identity = matrix_new( _
+            1.0, 0.0, 0.0, 0.0, _
+            0.0, 1.0, 0.0, 0.0, _
+            0.0, 0.0, 1.0, 0.0, _
+            0.0, 0.0, 0.0, 1.0 )
+        end if
+      end function
+    ''#endmethod
+    ''#method matrix_map( )
+      '' Coordinate System Matrix
+      '' in:  an origin and the CS vectors
+      '' out: the CS mapping matrix
+      ''
+      function matrix_map( origin, vx, vy, vz )
+        dim vx_origin: vx_origin = -vector_dot( vx, origin )
+        dim vy_origin: vy_origin = -vector_dot( vy, origin )
+        dim vz_origin: vz_origin = -vector_dot( vz, origin )
+        matrix_map = matrix_new( _
+          vx( VECTOR_X ), vy( VECTOR_X ), vz( VECTOR_X ), 0.0, _
+          vx( VECTOR_Y ), vy( VECTOR_Y ), vz( VECTOR_Y ), 0.0, _
+          vx( VECTOR_Z ), vy( VECTOR_Z ), vz( VECTOR_Z ), 0.0, _
+          vx_origin,      vy_origin,      vz_origin,      1.0 )
+      end function
+    ''#endmethod
+    ''#method matrix_rotatex( )
+      '' Rotation Matrix about X
+      '' in:  an angle to rotate about x
+      '' out: the rotation matrix
+      ''
+      function matrix_rotatex( angle )
+        dim sina: sina = sin( angle )
+        dim cosa: cosa = cos( angle )
+        matrix_rotatex = matrix_new( _
+          1.0,  0.0,  0.0, 0.0, _
+          0.0, cosa, sina, 0.0, _
+          0.0,-sina, cosa, 0.0, _
+          0.0,  0.0,  0.0, 1.0 )
+      end function
+    ''#endmethod
+    ''#method matrix_rotatey( )
+      '' Rotation Matrix about Y
+      '' in:  an angle to rotate about y
+      '' out: the rotation matrix
+      ''
+      function matrix_rotatey( angle )
+        dim sina: sina = sin( angle )
+        dim cosa: cosa = cos( angle )
+        matrix_rotatey = matrix_new( _
+          cosa, 0.0,-sina, 0.0, _
+           0.0, 1.0,  0.0, 0.0, _
+          sina, 0.0, cosa, 0.0, _
+           0.0, 0.0,  0.0, 1.0 )
+      end function
+    ''#endmethod
+    ''#method matrix_rotatez( )
+      '' Rotation Matrix about Z
+      '' in:  an angle to rotate about z
+      '' out: the rotation matrix
+      ''
+      function matrix_rotatez( angle )
+        dim sina: sina = sin( angle )
+        dim cosa: cosa = cos( angle )
+        matrix_rotatez = matrix_new( _
+          cosa, sina, 0.0, 0.0, _
+         -sina, cosa, 0.0, 0.0, _
+           0.0,  0.0, 1.0, 0.0, _
+           0.0,  0.0, 0.0, 1.0 )
+      end function
+    ''#endmethod
+    ''#method matrix_rotate( )
+      '' Matrix Rotation About Axis (after Graphic Gems)
+      '' in:  a unit vector axis and the angle
+      '' out: the rotation matrix
+      ''
+      function matrix_rotate( axis, angle )
+        dim sina: sina = sin( angle )
+        dim cosa: cosa = cos( angle )
+        dim cosb: cosb = 1.0 - cosa
+        matrix_rotate = matrix_new(                                             _
+          axis( VECTOR_X ) * axis( VECTOR_X ) * cosb +                    cosa, _
+          axis( VECTOR_X ) * axis( VECTOR_Y ) * cosb - axis( VECTOR_Z ) * sina, _
+          axis( VECTOR_X ) * axis( VECTOR_Z ) * cosb + axis( VECTOR_Y ) * sina, _
+          0.0,                                                                  _
+          axis( VECTOR_Y ) * axis( VECTOR_X ) * cosb + axis( VECTOR_Z ) * sina, _
+          axis( VECTOR_Y ) * axis( VECTOR_Y ) * cosb +                    cosa, _
+          axis( VECTOR_Y ) * axis( VECTOR_Z ) * cosb - axis( VECTOR_X ) * sina, _
+          0.0,                                                                  _
+          axis( VECTOR_Z ) * axis( VECTOR_X ) * cosb - axis( VECTOR_Y ) * sina, _
+          axis( VECTOR_Z ) * axis( VECTOR_Y ) * cosb + axis( VECTOR_X ) * sina, _
+          axis( VECTOR_Z ) * axis( VECTOR_Z ) * cosb +                    cosa, _
+          0.0,                                                                  _
+          0.0,                                                                  _
+          0.0,                                                                  _
+          0.0,                                                                  _
+          1.0                                                                   _
+        )
+      end function
+    ''#endmethod
+    ''#method matrix_convert( )
+      '' Matrix Conversion to String
+      '' in:  a matrix
+      '' out: its string notation
+      ''
+      function matrix_convert( matrix )
+        matrix_convert = _
+          number_convert( matrix( MATRIX_00 ) ) + " " +    _
+          number_convert( matrix( MATRIX_01 ) ) + " " +    _
+          number_convert( matrix( MATRIX_02 ) ) + " " +    _
+          number_convert( matrix( MATRIX_03 ) ) + vbcrlf + _
+          number_convert( matrix( MATRIX_10 ) ) + " " +    _
+          number_convert( matrix( MATRIX_11 ) ) + " " +    _
+          number_convert( matrix( MATRIX_12 ) ) + " " +    _
+          number_convert( matrix( MATRIX_13 ) ) + vbcrlf + _
+          number_convert( matrix( MATRIX_20 ) ) + " " +    _
+          number_convert( matrix( MATRIX_21 ) ) + " " +    _
+          number_convert( matrix( MATRIX_22 ) ) + " " +    _
+          number_convert( matrix( MATRIX_23 ) ) + vbcrlf + _
+          number_convert( matrix( MATRIX_30 ) ) + " " +    _
+          number_convert( matrix( MATRIX_31 ) ) + " " +    _
+          number_convert( matrix( MATRIX_32 ) ) + " " +    _
+          number_convert( matrix( MATRIX_33 ) )
+      end function
+    ''#endmethod
+    ''#method matrix_transpose( )
+      '' Matrix Transpose
+      '' in:  a matrix
+      '' out: the transpose matrix
+      ''
+      function matrix_transpose( matrix )
+        matrix_transpose = matrix_new( _
+          matrix( MATRIX_00 ), _
+          matrix( MATRIX_10 ), _
+          matrix( MATRIX_20 ), _
+          matrix( MATRIX_30 ), _
+          matrix( MATRIX_01 ), _
+          matrix( MATRIX_11 ), _
+          matrix( MATRIX_21 ), _
+          matrix( MATRIX_31 ), _
+          matrix( MATRIX_02 ), _
+          matrix( MATRIX_12 ), _
+          matrix( MATRIX_22 ), _
+          matrix( MATRIX_32 ), _
+          matrix( MATRIX_03 ), _
+          matrix( MATRIX_13 ), _
+          matrix( MATRIX_23 ), _
+          matrix( MATRIX_33 )  _
+        )
+      end function
+    ''#endmethod
+    ''#method matrix_invert( )
+      '' Matrix Invertion
+      '' in:  a matrix
+      '' out: the inverted matrix if exists
+      ''
+      function matrix_invert( matrix )
+        dim determinant: determinant = matrix_determinant( matrix )
+        if( abs( determinant ) < NUMBER_ZERO ) then
+          matrix_invert = vbnull
+        else
+          matrix_invert = matrix_multiplication( 1.0 / determinant )
+        end if
+      end function
+    ''#endmethod
+    ''#method matrix_addition( )
+      '' Matrix Addition
+      '' in:  a matrix and a factor
+      '' out: the scaled matrix
+      ''
+      function matrix_addition( matrix, scalar )
+        matrix_addition = matrix_new(   _
+          matrix( MATRIX_00 ) + scalar, _
+          matrix( MATRIX_01 ) + scalar, _
+          matrix( MATRIX_02 ) + scalar, _
+          matrix( MATRIX_03 ) + scalar, _
+          matrix( MATRIX_10 ) + scalar, _
+          matrix( MATRIX_11 ) + scalar, _
+          matrix( MATRIX_12 ) + scalar, _
+          matrix( MATRIX_13 ) + scalar, _
+          matrix( MATRIX_20 ) + scalar, _
+          matrix( MATRIX_21 ) + scalar, _
+          matrix( MATRIX_22 ) + scalar, _
+          matrix( MATRIX_23 ) + scalar, _
+          matrix( MATRIX_30 ) + scalar, _
+          matrix( MATRIX_31 ) + scalar, _
+          matrix( MATRIX_32 ) + scalar, _
+          matrix( MATRIX_33 ) + scalar  _
+        )
+      end function
+    ''#endmethod
+    ''#method matrix_multiplication( )
+      '' Matrix Multiplication
+      '' in:  a matrix and a factor
+      '' out: the scaled matrix
+      ''
+      function matrix_multiplication( matrix, factor )
+        matrix_multiplication = matrix_new( _
+          matrix( MATRIX_00 ) * factor, _
+          matrix( MATRIX_01 ) * factor, _
+          matrix( MATRIX_02 ) * factor, _
+          matrix( MATRIX_03 ) * factor, _
+          matrix( MATRIX_10 ) * factor, _
+          matrix( MATRIX_11 ) * factor, _
+          matrix( MATRIX_12 ) * factor, _
+          matrix( MATRIX_13 ) * factor, _
+          matrix( MATRIX_20 ) * factor, _
+          matrix( MATRIX_21 ) * factor, _
+          matrix( MATRIX_22 ) * factor, _
+          matrix( MATRIX_23 ) * factor, _
+          matrix( MATRIX_30 ) * factor, _
+          matrix( MATRIX_31 ) * factor, _
+          matrix( MATRIX_32 ) * factor, _
+          matrix( MATRIX_33 ) * factor  _
+        )
+      end function
+    ''#endmethod
+    ''#method matrix_multiply( )
+      '' Matrix Multiplication
+      '' in:  two matrices
+      '' out: their product
+      ''
+      function matrix_multiply( ma, mb )
+        matrix_multiply = matrix_new( _
+          ma( MATRIX_00 ) * mb( MATRIX_00 ) + ma( MATRIX_01 ) * mb( MATRIX_10 ) + _
+          ma( MATRIX_02 ) * mb( MATRIX_20 ) + ma( MATRIX_03 ) * mb( MATRIX_30 ),  _
+          ma( MATRIX_00 ) * mb( MATRIX_01 ) + ma( MATRIX_01 ) * mb( MATRIX_11 ) + _
+          ma( MATRIX_02 ) * mb( MATRIX_21 ) + ma( MATRIX_03 ) * mb( MATRIX_31 ),  _
+          ma( MATRIX_00 ) * mb( MATRIX_02 ) + ma( MATRIX_01 ) * mb( MATRIX_12 ) + _
+          ma( MATRIX_02 ) * mb( MATRIX_22 ) + ma( MATRIX_03 ) * mb( MATRIX_32 ),  _
+          ma( MATRIX_00 ) * mb( MATRIX_03 ) + ma( MATRIX_01 ) * mb( MATRIX_13 ) + _
+          ma( MATRIX_02 ) * mb( MATRIX_23 ) + ma( MATRIX_03 ) * mb( MATRIX_33 ),  _
+          ma( MATRIX_10 ) * mb( MATRIX_00 ) + ma( MATRIX_11 ) * mb( MATRIX_10 ) + _
+          ma( MATRIX_12 ) * mb( MATRIX_20 ) + ma( MATRIX_13 ) * mb( MATRIX_30 ),  _
+          ma( MATRIX_10 ) * mb( MATRIX_01 ) + ma( MATRIX_11 ) * mb( MATRIX_11 ) + _
+          ma( MATRIX_12 ) * mb( MATRIX_21 ) + ma( MATRIX_13 ) * mb( MATRIX_31 ),  _
+          ma( MATRIX_10 ) * mb( MATRIX_02 ) + ma( MATRIX_11 ) * mb( MATRIX_12 ) + _
+          ma( MATRIX_12 ) * mb( MATRIX_22 ) + ma( MATRIX_13 ) * mb( MATRIX_32 ),  _
+          ma( MATRIX_10 ) * mb( MATRIX_03 ) + ma( MATRIX_11 ) * mb( MATRIX_13 ) + _
+          ma( MATRIX_12 ) * mb( MATRIX_23 ) + ma( MATRIX_13 ) * mb( MATRIX_33 ),  _
+          ma( MATRIX_20 ) * mb( MATRIX_00 ) + ma( MATRIX_21 ) * mb( MATRIX_10 ) + _
+          ma( MATRIX_22 ) * mb( MATRIX_20 ) + ma( MATRIX_23 ) * mb( MATRIX_30 ),  _
+          ma( MATRIX_20 ) * mb( MATRIX_01 ) + ma( MATRIX_21 ) * mb( MATRIX_11 ) + _
+          ma( MATRIX_22 ) * mb( MATRIX_21 ) + ma( MATRIX_23 ) * mb( MATRIX_31 ),  _
+          ma( MATRIX_20 ) * mb( MATRIX_02 ) + ma( MATRIX_21 ) * mb( MATRIX_12 ) + _
+          ma( MATRIX_22 ) * mb( MATRIX_22 ) + ma( MATRIX_23 ) * mb( MATRIX_32 ),  _
+          ma( MATRIX_20 ) * mb( MATRIX_03 ) + ma( MATRIX_21 ) * mb( MATRIX_13 ) + _
+          ma( MATRIX_22 ) * mb( MATRIX_23 ) + ma( MATRIX_23 ) * mb( MATRIX_33 ),  _
+          ma( MATRIX_30 ) * mb( MATRIX_00 ) + ma( MATRIX_31 ) * mb( MATRIX_10 ) + _
+          ma( MATRIX_32 ) * mb( MATRIX_20 ) + ma( MATRIX_33 ) * mb( MATRIX_30 ),  _
+          ma( MATRIX_30 ) * mb( MATRIX_01 ) + ma( MATRIX_31 ) * mb( MATRIX_11 ) + _
+          ma( MATRIX_32 ) * mb( MATRIX_21 ) + ma( MATRIX_33 ) * mb( MATRIX_31 ),  _
+          ma( MATRIX_30 ) * mb( MATRIX_02 ) + ma( MATRIX_31 ) * mb( MATRIX_12 ) + _
+          ma( MATRIX_32 ) * mb( MATRIX_22 ) + ma( MATRIX_33 ) * mb( MATRIX_32 ),  _
+          ma( MATRIX_30 ) * mb( MATRIX_03 ) + ma( MATRIX_31 ) * mb( MATRIX_13 ) + _
+          ma( MATRIX_32 ) * mb( MATRIX_23 ) + ma( MATRIX_33 ) * mb( MATRIX_33 )   _
+        )
+      end function
+    ''#endmethod
+    ''#method matrix_vector( )
+      '' Matrix Vector
+      '' in:  a point transformation matrix
+      '' out: a vector transformation matrix
+      function matrix_vector( matrix )
+        dim inverse: inverse = matrix_invert( matrix )
+        if( valid( matrix ) ) then
+          matrix_vector = matrix_transpose( inverse )
+        else
+          matrix_vector = inverse
+        end if
+      end function
+    ''#endmethod
+    ''#method matrix_determinant( )
+      '' Matrix determinant
+      '' in:  a matrix
+      '' out: its determinant
+      ''
+      function matrix_determinant( matrix )
+        matrix_determinant = _
+          matrix( MATRIX_03 ) * matrix( MATRIX_12 ) * _
+          matrix( MATRIX_21 ) * matrix( MATRIX_30 ) - _
+          matrix( MATRIX_02 ) * matrix( MATRIX_13 ) * _
+          matrix( MATRIX_21 ) * matrix( MATRIX_30 ) - _
+          matrix( MATRIX_03 ) * matrix( MATRIX_11 ) * _
+          matrix( MATRIX_22 ) * matrix( MATRIX_30 ) + _
+          matrix( MATRIX_01 ) * matrix( MATRIX_13 ) * _
+          matrix( MATRIX_22 ) * matrix( MATRIX_30 ) + _
+          matrix( MATRIX_02 ) * matrix( MATRIX_11 ) * _
+          matrix( MATRIX_23 ) * matrix( MATRIX_30 ) - _
+          matrix( MATRIX_01 ) * matrix( MATRIX_12 ) * _
+          matrix( MATRIX_23 ) * matrix( MATRIX_30 ) - _
+          matrix( MATRIX_03 ) * matrix( MATRIX_12 ) * _
+          matrix( MATRIX_20 ) * matrix( MATRIX_31 ) + _
+          matrix( MATRIX_02 ) * matrix( MATRIX_13 ) * _
+          matrix( MATRIX_20 ) * matrix( MATRIX_31 ) + _
+          matrix( MATRIX_03 ) * matrix( MATRIX_10 ) * _
+          matrix( MATRIX_22 ) * matrix( MATRIX_31 ) - _
+          matrix( MATRIX_00 ) * matrix( MATRIX_13 ) * _
+          matrix( MATRIX_22 ) * matrix( MATRIX_31 ) - _
+          matrix( MATRIX_02 ) * matrix( MATRIX_10 ) * _
+          matrix( MATRIX_23 ) * matrix( MATRIX_31 ) + _
+          matrix( MATRIX_00 ) * matrix( MATRIX_12 ) * _
+          matrix( MATRIX_23 ) * matrix( MATRIX_31 ) + _
+          matrix( MATRIX_03 ) * matrix( MATRIX_11 ) * _
+          matrix( MATRIX_20 ) * matrix( MATRIX_32 ) - _
+          matrix( MATRIX_01 ) * matrix( MATRIX_13 ) * _
+          matrix( MATRIX_20 ) * matrix( MATRIX_32 ) - _
+          matrix( MATRIX_03 ) * matrix( MATRIX_10 ) * _
+          matrix( MATRIX_21 ) * matrix( MATRIX_32 ) + _
+          matrix( MATRIX_00 ) * matrix( MATRIX_13 ) * _
+          matrix( MATRIX_21 ) * matrix( MATRIX_32 ) + _
+          matrix( MATRIX_01 ) * matrix( MATRIX_10 ) * _
+          matrix( MATRIX_23 ) * matrix( MATRIX_32 ) - _
+          matrix( MATRIX_00 ) * matrix( MATRIX_11 ) * _
+          matrix( MATRIX_23 ) * matrix( MATRIX_32 ) - _
+          matrix( MATRIX_02 ) * matrix( MATRIX_11 ) * _
+          matrix( MATRIX_20 ) * matrix( MATRIX_33 ) + _
+          matrix( MATRIX_01 ) * matrix( MATRIX_12 ) * _
+          matrix( MATRIX_20 ) * matrix( MATRIX_33 ) + _
+          matrix( MATRIX_02 ) * matrix( MATRIX_10 ) * _
+          matrix( MATRIX_21 ) * matrix( MATRIX_33 ) - _
+          matrix( MATRIX_00 ) * matrix( MATRIX_12 ) * _
+          matrix( MATRIX_21 ) * matrix( MATRIX_33 ) - _
+          matrix( MATRIX_01 ) * matrix( MATRIX_10 ) * _
+          matrix( MATRIX_22 ) * matrix( MATRIX_33 ) + _
+          matrix( MATRIX_00 ) * matrix( MATRIX_11 ) * _
+          matrix( MATRIX_22 ) * matrix( MATRIX_33 )
+      end function
+    ''#endmethod
+    ''#method matrix_solve( )
+      '' Matrix solve by gaussian elimination
+      '' in:  equation matrix
+      ''      result vector
+      '' out: wheather there was a solution
+      ''
+      function matrix_solve( matrix, vector )
+        dim n: n = array_length( vector )
+        dim i, j, k
+        dim m, t
+        i = 0
+        do while( i < n )
+          m = i
+          j = i + 1
+          do while( j < n )
+            if( abs( matrix( i )( j ) ) > abs( matrix( i )( m ) ) ) then
+              m = j
+            end if
+            j = j + 1
+          loop
+          k = i
+          do while( k < n + 1 )
+            t = matrix( k )( i )
+            matrix( k )( i ) = matrix( k )( m )
+            matrix( k )( m ) = t
+            k = k + 1
+          loop
+          if( abs( matrix( i )( i ) ) <= NUMBER_ZERO ) then
+            matrix_solve = false
+            exit function
+          end if
+          j = i + 1
+          do while( j < n )
+            k = n
+            do while( k >= i )
+              matrix( k )( j ) = matrix( k )( j ) - ( ( matrix( k )( i ) * matrix( i )( j ) ) / matrix( i )( i ) )
+              k = k - 1
+            loop
+            j = j + 1
+          loop
+           i = i + 1
+        loop
+        j = n - 1
+        do while( j >= 0 )
+          t = 0.0
+          k = j + 1
+          do while( k < n )
+            t = t + matrix( k )( j ) * vector( k )
+            k = k + 1
+          loop
+           vector( j ) = ( matrix( n )( j ) - t ) / matrix( j )( j )
+           j = j - 1
+         loop
+        matrix_solve = true
+      end function
+    ''#endmethod
+  ''#endblock
+  ''#block Vector
+    ''#fields vector
+      '' Vector Information
+      ''''
+      ''''  Vector member's access constants
+      ''''
+      dim VECTOR_X: VECTOR_X = 0
+      dim VECTOR_Y: VECTOR_Y = 1
+      dim VECTOR_Z: VECTOR_Z = 2
+
+      ''''  Prefab basis vectors
+      ''''
+      dim VECTOR_NL: VECTOR_NL = vector_new( 0.0, 0.0, 0.0 )
+      dim VECTOR_DX: VECTOR_DX = vector_new( 1.0, 0.0, 0.0 )
+      dim VECTOR_DY: VECTOR_DY = vector_new( 0.0, 1.0, 0.0 )
+      dim VECTOR_DZ: VECTOR_DZ = vector_new( 0.0, 0.0, 1.0 )
+
+    ''#endfields
+    ''#method vector_new( )
+      '' Vector Construction
+      '' in:  the components of the vector
+      '' out: an array containg the vector
+      ''
+      function vector_new( x, y, z )
+        vector_new = vertex_new( x, y, z )
+      end function
+    ''#endmethod
+    ''#method vector_create( )
+      '' Vector Construction
+      '' in:  two vertices
+      '' out: the vector defined by the vertices
+      ''      with the specific order
+      ''
+      function vector_create( va, vb )
+        vector_create = vector_new( _
+          vb( VECTOR_X ) - va( VECTOR_X ), _
+          vb( VECTOR_Y ) - va( VECTOR_Y ), _
+          vb( VECTOR_Z ) - va( VECTOR_Z )  _
+        )
+      end function
+    ''#endmethod
+    ''#method vector_make( )
+      '' Vector Construction
+      '' in:  two vertices in an array
+      '' out: the vector defined by the vertices
+      ''
+      function vector_make( vector )
+        vector_make = vector_create( _
+          vector( 1 ),               _
+          vector( 0 )                _
+        )
+      end function
+    ''#endmethod
+    ''#method vector_length( )
+      '' Vector Length
+      '' in:  a vector
+      '' out: the length of the vector
+      ''
+      function vector_length( vector )
+        vector_length = sqr( _
+          vector( VECTOR_X ) * vector( VECTOR_X ) + _
+          vector( VECTOR_Y ) * vector( VECTOR_Y ) + _
+          vector( VECTOR_Z ) * vector( VECTOR_Z )   _
+        )
+      end function
+    ''#endmethod
+    ''#method vector_add( )
+      '' Vector addition
+      '' in:  a vertex to be translated and another one
+      ''      that contains the translation offsets
+      '' out: a new translated vertex
+      ''
+      function vector_add( va, vb )
+        vector_add = vector_new( _
+          va( VECTOR_X ) + vb( VECTOR_X ), _
+          va( VECTOR_Y ) + vb( VECTOR_Y ), _
+          va( VECTOR_Z ) + vb( VECTOR_Z )  _
+        )
+      end function
+    ''#endmethod
+    ''#method vector_scale( )
+      '' Vector Scaling
+      '' in:  a vector and a scaling factor
+      '' out: a new scaled vector
+      ''
+      function vector_scale( vector, factor )
+        vector_scale = vector_new( _
+          vector( VECTOR_X ) * factor, _
+          vector( VECTOR_Y ) * factor, _
+          vector( VECTOR_Z ) * factor  _
+        )
+      end function
+    ''#endmethod
+    ''#method vector_scaleXYZ( )
+      '' Vector Scaling (non-uniform)
+      '' in:  a vector and a scaling factors
+      '' out: a new scaled vector
+      ''
+      function vector_scaleXYZ( vertex, fx, fy, fz )
+        vector_scaleXYZ = vertex_new( _
+          vertex( VECTOR_X ) * fx, _
+          vertex( VECTOR_Y ) * fy, _
+          vertex( VECTOR_Z ) * fz  _
+        )
+      end function
+    ''#endmethod
+    ''#method vector_normalize( )
+      '' Vector Normalization
+      '' in:  a vector
+      '' out: a new normalized vector
+      ''
+      function vector_normalize( vector )
+        dim length: length = vector_length( vector )
+        if( length = 0.0 ) then
+          vector_normalize = vector_new( 0.0, 0.0, 0.0 )
+        else
+          vector_normalize = vector_new( _
+            vector( VECTOR_X ) / length, _
+            vector( VECTOR_Y ) / length, _
+            vector( VECTOR_Z ) / length  _
+          )
+        end if
+      end function
+    ''#endmethod
+    ''#method vector_rescale( )
+      '' Vector Rescaling
+      '' in:  a vector and the desired length
+      '' out: a new rescaled vector
+      ''
+      function vector_rescale( vector, length )
+        dim length_: length_ = vector_length( vector )
+        if( length_ = 0.0 ) then
+          vector_rescale = vector_new( 0.0, 0.0, 0.0 )
+        else
+          vector_rescale = vector_new( _
+            length * vector( VECTOR_X ) / length_, _
+            length * vector( VECTOR_Y ) / length_, _
+            length * vector( VECTOR_Z ) / length_  _
+          )
+        end if
+      end function
+    ''#endmethod
+    ''#method vector_cross( )
+      '' Vector Cross Product
+      '' in:  two vectors
+      '' out: a new vector, result of applying the
+      ''      the cross product operation
+      ''
+      function vector_cross( va, vb )
+        vector_cross = vector_new( _
+          va( VECTOR_Y ) * vb( VECTOR_Z ) - va( VECTOR_Z ) * vb( VECTOR_Y ), _
+          va( VECTOR_Z ) * vb( VECTOR_X ) - va( VECTOR_X ) * vb( VECTOR_Z ), _
+          va( VECTOR_X ) * vb( VECTOR_Y ) - va( VECTOR_Y ) * vb( VECTOR_X )  _
+        )
+      end function
+    ''#endmethod
+    ''#method vector_dot( )
+      '' Vector Dot Product
+      '' in:  two vectors
+      '' out: a number, result of applying the
+      ''      the dot product operation
+      ''
+      function vector_dot( va, vb )
+        vector_dot = va( VECTOR_X ) * vb( VECTOR_X ) + _
+                     va( VECTOR_Y ) * vb( VECTOR_Y ) + _
+                     va( VECTOR_Z ) * vb( VECTOR_Z )
+      end function
+    ''#endmethod
+    ''#method vector_equals( )
+      '' Vector Equality Test
+      '' in:  two vectors
+      '' out: a boolean value, result of the
+      ''      comparisson of the two vectors
+      ''      for equality
+      ''
+      function vector_equals( va, vb )
+        vector_equals = ( ( va( VECTOR_X ) = vb( VECTOR_X ) ) and _
+                          ( va( VECTOR_Y ) = vb( VECTOR_Y ) ) and _
+                          ( va( VECTOR_Z ) = vb( VECTOR_Z ) ) )
+      end function
+    ''#endmethod
+    ''#method vector_null( )
+      '' Vector Null-Test
+      '' in:  a vector
+      '' out: a boolean value, result of the
+      ''      comparisson between the vector
+      ''      passed and the null-vector
+      ''
+      function vector_null( vector )
+        vector_null = ( ( vector( VECTOR_X ) = 0.0 ) and _
+                        ( vector( VECTOR_Y ) = 0.0 ) and _
+                        ( vector( VECTOR_Z ) = 0.0 ) )
+      end function
+    ''#endmethod
+    ''#method vector_zero( )
+      '' Vector Zero-Test
+      '' in:  a vector, zero tolerance
+      '' out: a boolean value, result of the
+      ''      comparisson between the vector
+      ''      passed and the zero-vector test
+      ''
+      function vector_zero( vector, zero )
+        vector_zero = ( abs( vector( VECTOR_X ) <= zero ) and _
+                        abs( vector( VECTOR_Y ) <= zero ) and _
+                        abs( vector( VECTOR_Z ) <= zero ) )
+      end function
+    ''#endmethod
+    ''#method vector_invert( )
+      '' Vector Inversion
+      '' in:  a vector
+      '' out: a new inverted vector
+      ''
+      function vector_invert( vector )
+        vector_invert = vector_new( _
+          -vector( VECTOR_X ), _
+          -vector( VECTOR_Y ), _
+          -vector( VECTOR_Z )  _
+        )
+      end function
+    ''#endmethod
+    ''#method vector_absolute( )
+      '' Vector Absolute
+      '' in:  a vector
+      '' out: a new vector absolute
+      ''
+      function vector_absolute( vector )
+        vector_absolute = vector_new( _
+          abs( vector( VECTOR_X ) ),  _
+          abs( vector( VECTOR_Y ) ),  _
+          abs( vector( VECTOR_Z ) )   _
+        )
+      end function
+    ''#endmethod
+    ''#method vector_align( )
+      '' Vector Alignment
+      '' in:  two vectors
+      '' out: whether they are lookin in the same direction
+      ''
+      function vector_align( va, vb )
+        vector_align = ( vector_dot( va, vb ) > 0.0 )
+      end function
+    ''#endmethod
+    ''#method vector_normal( )
+      '' Vector Normal
+      '' in:  three vertices
+      '' out: the normal vector of the plane
+      ''
+      function vector_normal( va, vb, vc )
+        dim u: u = vector_create( va, vb )
+        dim v: v = vector_create( va, vc )
+        vector_normal = vector_normalize( vector_cross( u, v ) )
+      end function
+    ''#endmethod
+    ''#method vector_reflect( )
+      '' Vector Reflect
+      '' in:  a vector and the reflection axis vector (both normalized)
+      '' out: the reflected vector about the axis vector which
+      ''      belongs to the plane defined by the input vector pair
+      ''
+      function vector_reflect( vector, axis )
+         dim u: u = vector_dot( vector, axis )
+         vector_reflect = vector_new( _
+           2.0 * u * axis( VECTOR_X ) - vector( VECTOR_X ), _
+           2.0 * u * axis( VECTOR_Y ) - vector( VECTOR_Y ), _
+           2.0 * u * axis( VECTOR_Z ) - vector( VECTOR_Z )  _
+         )
+      end function
+    ''#endmethod
+    ''#method vector_mirror( )
+      '' Vector Mirror
+      '' in:  a vector and the reflection plane normal (both normalized)
+      '' out: the reflected vector about the plane defined by the normal vector
+      ''
+      function vector_mirror( vector, normal )
+         dim u: u = vector_dot( vector, normal )
+         vector_mirror = vector_new( _
+          -2.0 * u * normal( VECTOR_X ) + vector( VECTOR_X ), _
+          -2.0 * u * normal( VECTOR_Y ) + vector( VECTOR_Y ), _
+          -2.0 * u * normal( VECTOR_Z ) + vector( VECTOR_Z )  _
+         )
+      end function
+    ''#endmethod
+    ''#method vector_bisector( )
+      '' Vector Bisector
+      '' in:  a reference point and two (normalized) vectors
+      '' out: the bisecting vector
+      ''
+      function vector_bisector( vertex, u, v )
+        vector_bisector = vector_normalize( _
+          vector_create( _
+            vertex, _
+            vertex_middle( _
+              vertex_translate( vertex, u ), _
+              vertex_translate( vertex, v )  _
+            ) _
+          ) _
+        )
+      end function
+    ''#endmethod
+    ''#method vector_random( )
+      '' Vector randomization
+      '' in:  nothing
+      '' out: A random vector x,y,z in [0.0, 1.0]
+      ''
+      function vector_random( )
+        vector_random = vector_new( rnd( ), rnd( ), rnd( ) )
+      end function
+    ''#endmethod
+    ''#method vector_dependant( )
+      '' Vector dependency
+      '' in:  two vectors and a tolerance factor
+      '' out: true if the vectors are dependant
+      ''
+      function vector_dependant( va, vb, tolerance )
+        dim n: n = vector_cross( va, vb )
+        vector_dependant = _
+          ( abs( n( VECTOR_X ) ) <= tolerance ) and _
+          ( abs( n( VECTOR_Y ) ) <= tolerance ) and _
+          ( abs( n( VECTOR_Z ) ) <= tolerance )
+      end function
+    ''#endmethod
+  ''#endblock
+  ''#block Vertex
+    ''#fields vertex
+      '' Vertex Information
+      ''''
+      '''' Vertex property mapping
+      ''''
+      dim VERTEX_X: VERTEX_X = 0
+      dim VERTEX_Y: VERTEX_Y = 1
+      dim VERTEX_Z: VERTEX_Z = 2
+
+      '''' Prefab null vertex
+      ''''
+      dim VERTEX_NULL: VERTEX_NULL = vertex_new( 0.0, 0.0, 0.0 )
+    ''#endfields
+    ''#method vertex_new( )
+      '' Vertex Construction
+      '' in:  the components of a vertex
+      '' out: an array containing the vertex
+      ''
+      function vertex_new( x, y, z )
+        vertex_new = array( x, y, z )
+      end function
+    ''#endmethod
+    ''#method vertex_convert( )
+      '' Vertex Conversion to String
+      '' in:  a vertex, precision digits
+      '' out: a string representation of the vertex, comma separeted
+      ''
+      function vertex_convert( vertex )
+        vertex_convert = number_convert( vertex( VERTEX_X ) ) + "," + _
+                         number_convert( vertex( VERTEX_Y ) ) + "," + _
+                         number_convert( vertex( VERTEX_Z ) )
+      end function
+    ''#endmethod
+    ''#method vertex_print( )
+      '' Vertex Conversion to String
+      '' in:  a vertex, precision digits, delimiter
+      '' out: a string representation of the vertex
+      ''
+      function vertex_print( vertex, digits, delimiter )
+        vertex_print = formatnumber( vertex( VERTEX_X ), digits, 0, 0, 0 ) + delimiter + _
+                       formatnumber( vertex( VERTEX_Y ), digits, 0, 0, 0 ) + delimiter + _
+                       formatnumber( vertex( VERTEX_Z ), digits, 0, 0, 0 )
+      end function
+    ''#endmethod
+    ''#method vertex_clone( )
+      '' Vertex Cloning
+      '' in:  a vertex object
+      '' out: a new clone of the (vertex)
+      ''
+      function vertex_clone( vertex )
+        vertex_clone = vertex_new( _
+          vertex( VERTEX_X ), _
+          vertex( VERTEX_Y ), _
+          vertex( VERTEX_Z )  _
+        )
+      end function
+    ''#endmethod
+    ''#method vertex_length( )
+      '' Vertex Distance / Length
+      '' in:  two vertices
+      '' out: a number representing the
+      ''      in between distance
+      ''
+      function vertex_length( va, vb )
+        dim dx: dx = va( VERTEX_X ) - vb( VERTEX_X )
+        dim dy: dy = va( VERTEX_Y ) - vb( VERTEX_Y )
+        dim dz: dz = va( VERTEX_Z ) - vb( VERTEX_Z )
+        vertex_length = sqr( dx * dx + dy * dy + dz * dz )
+      end function
+    ''#endmethod
+    ''#method vertex_equals( )
+      '' Vertex Equality Test Function
+      '' in:  two vertices
+      '' out: a boolean value, result of the
+      ''      comparisson of the two vertices
+      ''      for equality
+      ''
+      function vertex_equals( va, vb )
+        vertex_equals = ( ( va( VERTEX_X ) = vb( VERTEX_X ) ) and _
+                          ( va( VERTEX_Y ) = vb( VERTEX_Y ) ) and _
+                          ( va( VERTEX_Z ) = vb( VERTEX_Z ) ) )
+      end function
+    ''#endmethod
+    ''#method vertex_translate( )
+      '' Vertex Translation Function
+      '' in:  a vertex to be translated and another one
+      ''      that contains the translation offsets
+      '' out: a new translated vertex
+      ''
+      function vertex_translate( vertex, vector )
+        vertex_translate = vertex_new( _
+          vertex( VERTEX_X ) + vector( VERTEX_X ), _
+          vertex( VERTEX_Y ) + vector( VERTEX_Y ), _
+          vertex( VERTEX_Z ) + vector( VERTEX_Z )  _
+        )
+      end function
+    ''#endmethod
+    ''#method vertex_translateXYZ( )
+      '' Vertex Translation
+      '' in:  a vertex to be translated and the
+      ''      three offset values per axis
+      '' out: a new translated vertex
+      ''
+      function vertex_translateXYZ( vertex, dx, dy, dz )
+        vertex_translate = vertex_new( _
+          vertex( VERTEX_X ) + dx, _
+          vertex( VERTEX_Y ) + dy, _
+          vertex( VERTEX_Z ) + dz  _
+        )
+      end function
+    ''#endmethod
+    ''#method vertex_scale( )
+      '' Vertex Scaling (uniform)
+      '' in:  a vertex to be translated and the scale factor
+      '' out: a new scaled vertex
+      ''
+      function vertex_scale( vertex, factor )
+        vertex_scale = vertex_new( _
+          vertex( VERTEX_X ) * factor, _
+          vertex( VERTEX_Y ) * factor, _
+          vertex( VERTEX_Z ) * factor  _
+        )
+      end function
+    ''#endmethod
+    ''#method vertex_scaleXYZ( )
+      '' Vertex Scaling (non-uniform)
+      '' in:  a vertex to be translated and the scale factors
+      '' out: a new scaled vertex
+      ''
+      function vertex_scaleXYZ( vertex, fx, fy, fz )
+        vertex_scaleXYZ = vertex_new( _
+          vertex( VERTEX_X ) * fx, _
+          vertex( VERTEX_Y ) * fy, _
+          vertex( VERTEX_Z ) * fz  _
+        )
+      end function
+    ''#endmethod
+    ''#method vertex_rotate( )
+      '' Vertex Rotation
+      '' in:  a vertex to rotate
+      ''      a reference origin
+      ''      a rotation axis
+      ''      an angle
+      '' out: a rotated vertex
+      function vertex_rotate( vertex, origin, axis, angle )
+        vertex_rotate = vertex_translate( vertex, vector_invert( origin ) )
+        vertex_rotate = vertex_multiply( vertex_rotate, matrix_rotate( axis, angle ) )
+        vertex_rotate = vertex_translate( vertex_rotate, origin )
+      end function
+    ''#endmethod
+    ''#method vertex_interpolate( )
+      '' Vertex Interpolation
+      '' in:  two vertices and a factor
+      '' out: a vertex interpolated between them
+      ''
+      function vertex_interpolate( va, vb, factor )
+        vertex_interpolate = vertex_new( _
+          ( vb( VERTEX_X ) - va( VERTEX_X ) ) * factor + va( VERTEX_X ), _
+          ( vb( VERTEX_Y ) - va( VERTEX_Y ) ) * factor + va( VERTEX_Y ), _
+          ( vb( VERTEX_Z ) - va( VERTEX_Z ) ) * factor + va( VERTEX_Z )  _
+        )
+      end function
+    ''#endmethod
+    ''#method vertex_map( )
+      '' Vertex Coordinate System Mapping
+      '' in:  a vertex and a coordinate system by origin and vectors
+      '' out: the vertex mapped in the coordinate system
+      ''
+      function vertex_map( vertex, origin, vx, vy, vz )
+        vertex_map = vertex_new( _
+          origin( VERTEX_X ) + vertex( VERTEX_X ) * vx( VERTEX_X ) + _
+                               vertex( VERTEX_Y ) * vy( VERTEX_X ) + _
+                               vertex( VERTEX_Z ) * vz( VERTEX_X ),  _
+          origin( VERTEX_Y ) + vertex( VERTEX_X ) * vx( VERTEX_Y ) + _
+                               vertex( VERTEX_Y ) * vy( VERTEX_Y ) + _
+                               vertex( VERTEX_Z ) * vz( VERTEX_Y ),  _
+          origin( VERTEX_Z ) + vertex( VERTEX_X ) * vx( VERTEX_Z ) + _
+                               vertex( VERTEX_Y ) * vy( VERTEX_Z ) + _
+                               vertex( VERTEX_Z ) * vz( VERTEX_Z )   _
+        )
+      end function
+    ''#endmethod
+    ''#method vertex_local( )
+      '' Vertex (Global To) Local Coordinate System Transformation
+      '' in:  a vertex in the global scope, the origin and vectors of a local csystem
+      '' out: a vertex "as seen" from the local coordinate system
+      ''
+      function vertex_local( vertex, origin, vx, vy, vz )
+        dim vector: vector = vector_create( origin, vertex )
+        vertex_local = vertex_new( _
+          vector_dot( vector, vx ), _
+          vector_dot( vector, vy ), _
+          vector_dot( vector, vz ) _
+        )
+      end function
+    ''#endmethod
+    ''#method vertex_global( )
+      '' Vertex (Local To) Global Coordinate System Transformation
+      '' in:  a vertex and its reference coordinate system
+      '' out: a vertex mapped to global coordinates
+      ''
+      function vertex_global( vertex, origin, vx, vy, vz )
+        vertex_global = vertex_map( vertex, origin, vx, vy, vz )
+      end function
+    ''#endmethod
+    ''#method vertex_multiply( )
+      '' Vertex Matrix Multiplication
+      '' in:  a vertex and a transformation matrix
+      '' out: the transformed vertex
+      ''
+      function vertex_multiply( vertex, matrix )
+        vertex_multiply = vertex_new( _
+          vertex( VERTEX_X ) * matrix( MATRIX_00 ) + _
+          vertex( VERTEX_Y ) * matrix( MATRIX_01 ) + _
+          vertex( VERTEX_Z ) * matrix( MATRIX_02 ) + _
+                               matrix( MATRIX_03 ),  _
+          vertex( VERTEX_X ) * matrix( MATRIX_10 ) + _
+          vertex( VERTEX_Y ) * matrix( MATRIX_11 ) + _
+          vertex( VERTEX_Z ) * matrix( MATRIX_12 ) + _
+                               matrix( MATRIX_13 ),  _
+          vertex( VERTEX_X ) * matrix( MATRIX_20 ) + _
+          vertex( VERTEX_Y ) * matrix( MATRIX_21 ) + _
+          vertex( VERTEX_Z ) * matrix( MATRIX_22 ) + _
+                               matrix( MATRIX_23 ) )
+      end function
+    ''#endmethod
+    ''#method vertex_middle( )
+      '' Vertex Mid-Point
+      '' in:  two vertices
+      '' out: their middle
+      ''
+      function vertex_middle( va, vb )
+        vertex_middle = vertex_new( _
+          ( va( VERTEX_X ) + vb( VERTEX_X ) ) / 2.0, _
+          ( va( VERTEX_Y ) + vb( VERTEX_Y ) ) / 2.0, _
+          ( va( VERTEX_Z ) + vb( VERTEX_Z ) ) / 2.0  _
+        )
+      end function
+    ''#endmethod
+    ''#method vertex_close( )
+      '' Vertex Proximity Test
+      '' in:  two vertices and a distance
+      '' out: whether the vertices are close enough
+      ''
+      function vertex_close( va, vb, max )
+        vertex_close = ( vertex_length( va, vb ) < max )
+      end function
+    ''#endmethod
+    ''#method vertex_match( )
+      '' Vertex Matching with Tollerance
+      '' in:  two vertices and a tollerance factor
+      '' out: whether the vertices match within the tollerance
+      ''
+      function vertex_match( va, vb, tollerance )
+        vertex_match = ( ( abs( va( VERTEX_X ) - vb( VERTEX_X ) ) < tollerance  ) and _
+                         ( abs( va( VERTEX_Y ) - vb( VERTEX_Y ) ) < tollerance  ) and _
+                         ( abs( va( VERTEX_Z ) - vb( VERTEX_Z ) ) < tollerance ) )
+      end function
+    ''#endmethod
+    ''#method vertex_centroid( )
+      '' Vertex Centroid of Triangle
+      '' in:  three vertices
+      '' out: the centroid
+      ''
+      function vertex_centroid( va, vb, vc )
+        vertex_centroid = vertex_new( _
+          ( va( VERTEX_X ) + vb( VERTEX_X ) + vc( VERTEX_X ) ) / 3.0, _
+          ( va( VERTEX_Y ) + vb( VERTEX_Y ) + vc( VERTEX_Y ) ) / 3.0, _
+          ( va( VERTEX_Z ) + vb( VERTEX_Z ) + vc( VERTEX_Z ) ) / 3.0  _
+        )
+      end function
+    ''#endmethod
+    ''#method vertex_average( )
+      '' Vertices Centroid
+      '' in:  an array of vertices
+      '' out: the centroid of them
+      ''
+      function vertex_average( vertices )
+        dim result: result = vertex_new( 0.0, 0.0, 0.0 )
+        dim index
+        for index = lbound( vertices ) to ubound( vertices )
+          result( VERTEX_X ) = result( VERTEX_X ) + vertices( index )( VERTEX_X )
+          result( VERTEX_Y ) = result( VERTEX_Y ) + vertices( index )( VERTEX_Y )
+          result( VERTEX_Z ) = result( VERTEX_Z ) + vertices( index )( VERTEX_Z )
+        next
+        dim total: total = array_length( vertices )
+        result( VERTEX_X ) = result( VERTEX_X ) / total
+        result( VERTEX_Y ) = result( VERTEX_Y ) / total
+        result( VERTEX_Z ) = result( VERTEX_Z ) / total
+        vertex_average = result
+      end function
+    ''#endmethod
+    ''#method vertex_project( )
+      '' Vertex Projection on line
+      '' in:  va, vb are points that define a line and vc is gonna be projected
+      '' out: the projected point on the line (it might not be inside it)
+      ''
+      function vertex_project( va, vb, vc )
+        dim ua: ua = vector_create( va, vc )
+        dim ub: ub = vector_normalize( vector_create( va, vb ) )
+        dim ta: ta = vector_dot( ua, ub )
+        vertex_project = vertex_translate( va, vector_scale( ub, ta ) )
+      end function
+    ''#endmethod
+    ''#method vertex_flatten( )
+      '' Vertex Projection on plane
+      '' in:  pa, pb, pc are point that define a plane, pd is gonna be projected
+      '' out: the projected point on the abc plane (it might not be inside it)
+      ''
+      function vertex_flatten( pa, pb, pc, pd )
+        dim u: u = vector_create( pa, pb )
+        dim v: v = vector_create( pa, pc )
+        dim n: n = vector_normalize( vector_cross( u, v ) )
+        dim s: s = vector_create( pa, pd )
+        dim t: t = vector_cross( n, s )
+        dim l: l = vector_cross( t, n )
+        vertex_flatten = vertex_translate( pa, l )
+      end function
+    ''#endmethod
+    ''#method vertex_mirror( )
+      '' Vertex Mirror
+      '' in:  three points that define the reflection plane and a point
+      '' out: the reflected point
+      ''
+      function vertex_mirror( va, vb, vc, vd )
+        dim projected: projected = vertex_flatten( va, vb, vc, vd )
+        vertex_mirror = vertex_translate( projected, vector_create( vd, projected ) )
+      end function
+    ''#endmethod
+    ''#method vertex_reflect( )
+      '' Vertex Reflect
+      '' in:  two points of a line and a point
+      '' out: the reflected point
+      ''
+      function vertex_reflect( va, vb, vc )
+        dim projected: projected = vertex_project( va, vb, vc )
+        vertex_reflect = vertex_translate( projected, vector_create( vc, projected ) )
+      end function
+    ''#endmethod
+    ''#method vertex_mutate( )
+      '' Vertex mutation for genetic algorithms or adding plain noise
+      '' in:  a vertex
+      '' out: a mutated vertex
+      ''
+      function vertex_mutate( vertex )
+        vertex_mutate = vertex_new( _
+          vertex( VERTEX_X ) * number_random( -0.5, 0.5 ), _
+          vertex( VERTEX_Y ) * number_random( -0.5, 0.5 ), _
+          vertex( VERTEX_Z ) * number_random( -0.5, 0.5 )  _
+        )
+      end function
+    ''#endmethod
+    ''#method vertex_closest( )
+      '' Vertex closest from cloud
+      '' in:  a vertex and a point cloud
+      '' out: the index of the closest
+      ''
+      function vertex_closest( vertex, vertices )
+        dim closest:  closest  = 0
+        dim distance: distance = vertex_length( vertex, vertices( closest ) )
+        dim index
+        for index = lbound( vertices ) + 1 to ubound( vertices )
+          dim length: length = vertex_length( vertex, vertices( index ) )
+          if( length < distance ) then
+            distance = length
+            closest  = index
+          end if
+        next
+        vertex_closest = closest
+      end function
+    ''#endmethod
+    ''#method vertex_inside( )
+      '' Vertex Inside
+      '' in:  three points of a triangle and a point
+      '' out: is point inside the triangle?
+      ''
+      function vertex_inside( va, vb, vc, vd )
+        dim na: na = vector_cross( vector_create( va, vb ), vector_create( va, vd ) )
+        dim nb: nb = vector_cross( vector_create( vb, vc ), vector_create( vb, vd ) )
+        dim nc: nc = vector_cross( vector_create( vc, va ), vector_create( vc, vd ) )
+        vertex_inside = vector_align( na, nb ) and _
+                        vector_align( nb, nc ) and _
+                        vector_align( nc, na )
+      end function
+    ''#endmethod
+    ''#method vertex_between( )
+      '' Vertex Between
+      '' in:  two points of a line and a point
+      '' out: is point between in line?
+      ''
+      function vertex_between( va, vb, vc )
+        vertex_between = not ( ( vertex_length( va, vc ) + vertex_length( vb, vc ) ) > vertex_length( va, vb ) )
+      end function
+    ''#endmethod
+  ''#endblock
+  ''#block Intersection
+    ''#method intersect_planeplane
+      '' Intersection between planes
+      '' in:  two pairs of three points that define the planes
+      '' out: an array of a vertex, vector pair of the intersection line
+      ''
+      function intersect_planeplane( pa, pb, pc, qa, qb, qc )
+        dim pn: pn = vector_normal( pa, pb, pc )
+        dim qn: qn = vector_normal( qa, qb, qc )
+
+        dim dot: dot = vector_dot( pn, qn )
+        if( dot = 1.0 ) then
+          intersect_planeplane = vbnull
+          exit function
+        end if
+
+        dim dp: dp = vector_dot( pa, pn )
+        dim dq: dq = vector_dot( qa, qn )
+
+        dim dpn: dpn = vector_dot( pn, pn )
+        dim dqn: dqn = vector_dot( qn, qn )
+
+        dim det: det = dpn * dqn - dot * dot
+
+        if( det = 0.0 ) then
+          intersect_planeplane = vbnull
+          exit function
+        end if
+
+        dim co: co = ( dp * dqn - dq * dot ) / det
+        dim ci: ci = ( dq * dpn - dp * dot ) / det
+
+        intersect_planeplane = array(                    _
+          vertex_new(                                    _
+            co * pn( VERTEX_X ) + ci * qn( VERTEX_X ),   _
+            co * pn( VERTEX_Y ) + ci * qn( VERTEX_Y ),   _
+            co * pn( VERTEX_Z ) + ci * qn( VERTEX_Z ) ), _
+          vector_cross( pn, qn ) )
+      end function
+    ''#endmethod
+    ''#method intersect_lineline
+      '' Intersection Line Line
+      '' in:  two points of first line, two points of second line
+      '' out: a number -> parallelism  -> distance line line
+      ''      a vertex -> intersection -> point of intersection
+      ''
+      function intersect_lineline( ua, ub, va, vb )
+        dim u: u = vector_create( ua, ub )
+        dim v: v = vector_create( va, vb )
+        dim w: w = vector_create( ua, va )
+        dim n: n = vector_cross( u, v )
+        dim p: p = vector_length( n )
+        dim q: q = vector_dot( vector_cross( w, v ), n )
+        dim d: d = vector_dot( w, n )
+        if( abs( d ) <= NUMBER_ZERO ) then
+          if( abs( p ) <= NUMBER_ZERO ) then
+            intersect_lineline = vertex_length( ua, vertex_project( va, vb, ua ) )
+          else
+            intersect_lineline = vertex_translate( ua, vector_scale( u, q / ( p * p ) ) )
+          end if
+        else
+          intersect_lineline = abs( d / p )
+        end if
+      end function
+    ''#endmethod
+    ''#method intersect_lineplane
+      '' Intersection Line Plane
+      '' in:  three points of a plane, two points of a line
+      '' out: a number -> parallelism  -> distance line plane
+      ''      a vertex -> intersection -> point of intersection
+      ''
+      function intersect_lineplane( va, vb, vc, ua, ub )
+        dim u: u = vector_create( vb, va )
+        dim v: v = vector_create( vc, va )
+        dim n: n = vector_normalize( vector_cross( u, v ) )
+        dim w: w = vector_normalize( vector_create( ua, ub ) )
+        dim y: y = vector_create( ua, va )
+        dim p: p = vector_dot( n, w )
+        dim q: q = vector_dot( n, y )
+        if( abs( p ) <= NUMBER_ZERO ) then
+          intersect_lineplane = vertex_length( ua, vertex_flatten( va, vb, vc, ua ) )
+        else
+          intersect_lineplane = vertex_translate( ua, vector_scale( w, q / p ) )
+        end if
+      end function
+    ''#endmethod
+    ''#method intersect_linesphere
+      '' Intersection Line Sphere
+      '' in:  two point of line, circle center and radius
+      '' out: a number -> no intersection -> distance sphere line
+      ''      a vertex -> tangency        -> tangency point on sphere
+      ''      vertices -> intersection    -> two intersection points
+      ''
+      function intersect_linesphere( va, vb, cc, cr )
+        dim u: u = vector_create( va, vb )
+        dim v: v = vector_create( cc, va )
+        dim a: a = vector_dot( u, u )   * 2.0
+        dim b: b = vector_dot( u, v )   * 2.0
+        dim c: c = vector_dot( cc, cc ) + _
+                   vector_dot( va, va ) - _
+                   vector_dot( cc, va ) * 2.0 - cr * cr
+        dim d: d = b * b - 2.0 * a * c
+        if( abs( d ) <= NUMBER_ZERO ) then
+          intersect_linesphere = vertex_translate( va, vector_scale( u, - b / a ) )
+        else
+          if( d > 0 ) then
+            intersect_linesphere = array( _
+              vertex_translate( va, vector_scale( u, -( b + sqr( d ) ) / a ) ), _
+              vertex_translate( va, vector_scale( u, -( b - sqr( d ) ) / a ) )  _
+            )
+          else
+            intersect_linesphere = vertex_length( cc, vertex_project( va, vb, cc ) ) - cr
+          end if
+        end if
+      end function
+    ''#endmethod
+    ''#method intersect_tripleplane
+      '' Triple plane intersection
+      '' in:  three planes, three points per plane
+      '' out: point intersection of the planes
+      ''     {line intersection of two planes}
+      ''      nothing on no intersection
+      ''
+      function intersect_tripleplane( pa, pb, pc, oa, ob, oc, qa, qb, qc )
+        dim np: np = vector_normal( pa, pb, pc ) ' N1
+        dim no: no = vector_normal( oa, ob, oc ) ' N2
+        dim nq: nq = vector_normal( qa, qb, qc ) ' N3
+
+        dim bp: bp = vector_dot( np, pa ) ' d1
+        dim bo: bo = vector_dot( no, oa ) ' d2
+        dim bq: bq = vector_dot( nq, qa ) ' d3
+
+        dim po: po = vector_scale( vector_cross( np, no ), bq ) ' d3 * N1 x N2
+        dim oq: oq = vector_scale( vector_cross( no, nq ), bp ) ' d1 * N2 x N3
+        dim qp: qp = vector_scale( vector_cross( nq, np ), bo ) ' d2 * N3 x N1
+
+        dim d: d = vector_dot( np, vector_cross( no, nq ) ) ' N1 . N2 x N3
+        if( d = 0.0 ) then
+          intersect_tripleplane = vbnull
+        else
+          intersect_tripleplane = vector_scale( vector_add( vector_add( po, oq ), qp ), 1.0 / d )
+        end if
+      end function
+    ''#endmethod
+  ''#endblock
+  ''#block Ellipse
+    ''#fields ellipse
+      '' Ellipse Information
+      ''''
+      '''' Ellipse constants
+      ''''
+      dim ELLIPSE_CENTER: ELLIPSE_CENTER = 0
+      dim ELLIPSE_MAJOR:  ELLIPSE_MAJOR  = 1
+      dim ELLIPSE_MINOR:  ELLIPSE_MINOR  = 2
+    ''#endfields
+    ''#method ellipse_conjugate
+      '' Ellipse from conjugate axes
+      '' in:  the conjugate axes va-vb and ua-ub of the ellipse
+      '' out: the center point and major and minor axes vectors
+      ''
+      function ellipse_conjugate( va, vb, ua, ub )
+        dim u: u = vector_create( ua, ub )
+        dim v: v = vector_create( va, vb )
+        dim n: n = vector_cross( u, v )
+        dim w: w = vector_cross( v, n )
+        dim c: c = vertex_middle( va, vb )
+        dim h: h = vector_length( v ) / 2.0
+        dim r: r = vertex_translate( c, vector_rescale( w, h ) )
+        dim m: m = vertex_middle( ub, r )
+        dim s: s = vector_create( ub, r )
+        dim g: g = vertex_length( c, m )
+        dim p: p = vertex_translate( m, vector_rescale( s, g ) )
+        dim q: q = vertex_translate( m, vector_rescale( s,-g ) )
+        dim o: o = vertex_middle( c, ub )
+        dim i: i = vertex_length( c, vertex_translate( o, vector_create( p, o ) ) )
+        dim j: j = vertex_length( c, vertex_translate( o, vector_create( q, o ) ) )
+        ellipse_conjugate = array( c, _
+          vector_rescale( vector_create( c, q ), i ), _
+          vector_rescale( vector_create( c, p ), j )  _
+        )
+      end function
+    ''#endmethod
+  ''#endblock
+  ''#block Range
+    ''#fields range
+      '' Range Information
+      ''''
+      '''' Range constants
+      ''''
+      dim RANGE_VALUE: RANGE_VALUE = 0
+      dim RANGE_MIN:   RANGE_MIN   = 0
+      dim RANGE_MAX:   RANGE_MAX   = 1
+    ''#endfields
+    ''#method range_new
+      '' Range Constructor
+      '' in:  a number of dimensions
+      '' out: a range object
+      ''
+      function range_new( dimensions )
+        dim range: range = array_allocate( dimensions )
+        for dimension = 0 to dimensions
+          range( dimension ) = array( 0.0, 1.0 )
+        next
+        range_new = range
+      end function
+    ''#endmethod
+    ''#method range_one
+      '' One dimensional range
+      '' in:  the low bound
+      ''      the high bound
+      '' out: a range object
+      ''
+      function range_one( tmin, tmax )
+        range_one = array(    _
+          array( tmin, tmax ) _
+        )
+      end function
+    ''#endmethod
+    ''#method range_1d
+      '' One dimensional range
+      '' in:  an array of the range's bounds
+      '' out: a range object
+      ''
+      function range_1d( t )
+        range_1d = t
+      end function
+    ''#endmethod
+    ''#method range_two
+      function range_two( umin, umax, vmin, vmax )
+        range_two = array(     _
+          array( umin, umax ), _
+          array( vmin, vmax )  _
+        )
+      end function
+    ''#endmethod
+    ''#method range_2d
+      function range_2d( u, v )
+        range_2d = array( u, v )
+      end function
+    ''#endmethod
+    ''#method range_three
+      function range_three( xmin, xmax, ymin, ymax, zmin, zmax )
+        range_three = array(   _
+          array( xmin, xmax ), _
+          array( ymin, ymax ), _
+          array( zmin, zmax )  _
+        )
+      end function
+    ''#endmethod
+    ''#method range_3d
+      function range_3d( x, y, z )
+        range_3d = array( x, y, z )
+      end function
+    ''#endmethod
+    ''#method range_interpolate
+      function range_interpolate( range, factor )
+        parameters = array_allocate( array_length( range ) )
+        for dimension = lbound( range ) to ubound( range )
+          parameters( dimension ) = ( range( dimension )( RANGE_MAX ) - _
+                                      range( dimension )( RANGE_MIN ) ) * factor + _
+                                      range( dimension )( RANGE_MIN )
+        next
+        range_interpolate = parameters
+      end function
+    ''#endmethod
+    ''#method range_middle
+      function range_middle( range )
+        parameters = array_allocate( array_length( range ) )
+        for dimension = lbound( range ) to ubound( range )
+          parameters( dimension ) = ( range( dimension )( RANGE_MAX ) - _
+                                      range( dimension )( RANGE_MIN ) ) / 2.0 + _
+                                      range( dimension )( RANGE_MIN )
+        next
+        range_middle = parameters
+      end function
+    ''#endmethod
+    ''#method range_delta
+      function range_delta( range )
+        parameters = array_allocate( array_length( range ) )
+        for dimension = lbound( range ) to ubound( range )
+          parameters( dimension ) = range( dimension )( RANGE_MAX ) - _
+                                    range( dimension )( RANGE_MIN )
+        next
+        range_delta = parameters
+      end function
+    ''#endmethod
+  ''#endblock
+  ''#block Surface
+    ''#fields surface
+      '' Surface Information
+      ''''
+      '''' Surface constants
+      ''''
+      dim SURFACE_U: SURFACE_U = 0
+      dim SURFACE_V: SURFACE_V = 1
+    ''#endfields
+  ''#endblock
+  ''#block Nurbs
+    ''#fields nurbs
+      '' Nurbs Information
+      ''''
+      '''' Nurbs constants
+      ''''
+      dim NURBS_POINTS: NURBS_POINTS = 0
+      dim NURBS_KNOT:   NURBS_KNOT   = 1
+      dim NURBS_DEGREE: NURBS_DEGREE = 2
+      dim NURBS_WEIGHT: NURBS_WEIGHT = 3
+    ''#endfields
+    ''#method nurbs_circle
+      '' Nurbs circle
+      '' in:  center and radius
+      '' out: a nurbs circle
+      ''
+      function nurbs_circle( center, radius )
+        dim points: points = array( _
+          vertex_translate( vertex_new( radius,    0.0, 0.0 ), center ), _
+          vertex_translate( vertex_new( radius, radius, 0.0 ), center ), _
+          vertex_translate( vertex_new(    0.0, radius, 0.0 ), center ), _
+          vertex_translate( vertex_new(-radius, radius, 0.0 ), center ), _
+          vertex_translate( vertex_new(-radius,    0.0, 0.0 ), center ), _
+          vertex_translate( vertex_new(-radius,-radius, 0.0 ), center ), _
+          vertex_translate( vertex_new(    0.0,-radius, 0.0 ), center ), _
+          vertex_translate( vertex_new( radius,-radius, 0.0 ), center ), _
+          vertex_translate( vertex_new( radius,    0.0, 0.0 ), center )  _
+        )
+        dim knot:    knot    = array( 0.0, 0.0, 0.25, 0.25, 0.50, 0.50, 0.75, 0.75, 1.0, 1.0 )
+        dim weight:  weight  = 0.70710678118654752440084436210485
+        dim weights: weights = array( 1.0, weight, 1.0, weight, 1.0, weight, 1.0, weight, 1.0 )
+        nurbs_circle = array( points, knot, 2, weights )
+      end function
+    ''#endmethod
+    ''#method nurbs_square
+      '' Nurbs square
+      '' in:  center and side length
+      '' out: a nurbs square
+      ''
+      function nurbs_square( center, side )
+        dim points: points = array( _
+          vertex_translate( vertex_new( side, side, 0.0 ), center ), _
+          vertex_translate( vertex_new(-side, side, 0.0 ), center ), _
+          vertex_translate( vertex_new(-side,-side, 0.0 ), center ), _
+          vertex_translate( vertex_new( side,-side, 0.0 ), center ), _
+          vertex_translate( vertex_new( side, side, 0.0 ), center )  _
+        )
+        dim knot:    knot    = array( 0.0, 0.25, 0.50, 0.75, 1.0 )
+        dim weights: weights = array( 1.0, 1.0,  1.0,  1.0,  1.0 )
+        nurbs_square = array( points, knot, 1, weights )
+      end function
+    ''#endmethod
+    ''#method nurbs_rectangle
+      '' Nurbs rectangle
+      '' in:  center, width, height
+      '' out: a nurbs rectangle
+      ''
+      function nurbs_rectangle( center, width, height )
+        dim points: points = array( _
+          vertex_translate( vertex_new( width, height, 0.0 ), center ), _
+          vertex_translate( vertex_new(-width, height, 0.0 ), center ), _
+          vertex_translate( vertex_new(-width,-height, 0.0 ), center ), _
+          vertex_translate( vertex_new( width,-height, 0.0 ), center ), _
+          vertex_translate( vertex_new( width, height, 0.0 ), center )  _
+        )
+        dim knot:   knot     = array( 0.0, 0.25, 0.50, 0.75, 1.0 )
+        dim weights: weights = array( 1.0, 1.0,  1.0,  1.0,  1.0 )
+        nurbs_rectangle = array( points, knot, 1, weights )
+      end function
+    ''#endmethod
+  ''#endblock
+  ''#block Triangle
+    ''#fields triangle
+      '' Triangle Information
+      ''''
+      ''''  Triangle Mappings
+      ''''
+      dim TRIANGLE_A: TRIANGLE_A = 0
+      dim TRIANGLE_B: TRIANGLE_B = 1
+      dim TRIANGLE_C: TRIANGLE_C = 2
+    ''#endfields
+    ''#method triangle_new
+      '' Triangle Constructor
+      '' in:  three points of a triangle
+      '' out: a triangle object
+      ''
+      function triangle_new( a, b, c )
+        triangle_new = array( a, b, c )
+      end function
+    ''#endmethod
+    ''#method triangle_area
+      '' Triangle Area
+      '' in:  a triangle
+      '' out: its area
+      ''
+      function triangle_area( triangle )
+        triangle_area = vector_length( _
+          vector_cross( _
+            vector_create( triangle( TRIANGLE_A ), triangle( TRIANGLE_B ) ), _
+            vector_create( triangle( TRIANGLE_B ), triangle( TRIANGLE_C ) )  _
+          ) _
+        ) / 2.0
+      end function
+    ''#endmethod
+    ''#method triangle_perimeter
+      '' Triangle Perimeter
+      '' in:  a triangle
+      '' out: its perimeter
+      ''
+      function triangle_perimeter( triangle )
+        triangle_perimeter = _
+          vertex_length( triangle( TRIANGLE_A ), triangle( TRIANGLE_B ) ) + _
+          vertex_length( triangle( TRIANGLE_B ), triangle( TRIANGLE_C ) ) + _
+          vertex_length( triangle( TRIANGLE_C ), triangle( TRIANGLE_A ) )
+      end function
+    ''#endmethod
+    ''#method triangle_cradius
+      '' Triangle Radius of Circumscribed Circle
+      '' in:  a triangle
+      '' out: the radius of the circumscribed circle
+      ''
+      function triangle_cradius( triangle )
+        triangle_cradius = 0.25 * _
+          vertex_length( triangle( TRIANGLE_A ), triangle( TRIANGLE_B ) ) * _
+          vertex_length( triangle( TRIANGLE_B ), triangle( TRIANGLE_C ) ) * _
+          vertex_length( triangle( TRIANGLE_C ), triangle( TRIANGLE_A ) ) / _
+          triangle_area( triangle )
+      end function
+    ''#endmethod
+    ''#method triangle_iradius
+      '' Triangle Radius of Inscribed Circle
+      '' in:  a triangle
+      '' out: the radius of the inscribed circle
+      ''
+      function triangle_iradius( triangle )
+        triangle_iradius = _
+          2.0 * triangle_area( triangle ) / triangle_perimeter( triangle )
+      end function
+    ''#endmethod
+  ''#endblock
+  ''#block Streams
+    ''#fields streams
+      '' Streams Information
+
+      ''''
+      '''' The DesignScripting.dll has to be installed before using these
+      '''' functions. Othewise you will get activex object not found errors
+      '''' The serial and file objects share the read/write functions. You
+      '''' can directly use file_readbyte( serial ) for instance, but try
+      '''' to use an array with same size as the serial_buffersize and the
+      '''' read/write bytes function for serial communications
+      ''''
+
+      '''' File mapping
+      ''''
+      dim FILE_INVALID_CHARS: FILE_INVALID_CHARS = "\/:*?""<>|"
+      dim FILE_HANDLE:        FILE_HANDLE        = 0
+      dim FILE_NAME:          FILE_NAME          = 1
+
+      '''' Serial mapping
+      ''''
+      dim SERIAL_HANDLE:     SERIAL_HANDLE     = 0
+      dim SERIAL_PORTNUMBER: SERIAL_PORTNUMBER = 1
+      dim SERIAL_BUFFERSIZE: SERIAL_BUFFERSIZE = 2
+      dim SERIAL_BAUDRATE:   SERIAL_BAUDRATE   = 3
+      dim SERIAL_PARITY:     SERIAL_PARITY     = 4
+      dim SERIAL_DATABITS:   SERIAL_DATABITS   = 5
+      dim SERIAL_STOPBITS:   SERIAL_STOPBITS   = 6
+      dim SERIAL_TIMEOUT:    SERIAL_TIMEOUT    = 7
+    ''#endfields
+    ''#method file_open( )
+      '' Open file
+      '' in:  filename
+      ''      read only flag
+      '' out: a file if success, null otherwise
+      ''
+      function file_open( filename, readonly )
+        dim file: set file = createobject( "DesignScripting" )
+        if( file.openfile( filename, readonly ) ) then
+          file_open = array( file, filename )
+        else
+          file_open = vbnull
+        end if
+      end function
+    ''#endmethod
+    ''#method serial_open( )
+      '' Open serial port
+      '' in:  port number (eg 1 for com1)  same the terminal settings
+      ''      buffer size (eg 1024 bytes)
+      ''      baud rate   (eg 9600 bps)
+      ''      parity      (yes=1 no=0)
+      ''      data bits   (eg 8 bits)
+      ''      stop bits   (eg 1 bit)
+      ''      timeout     (eg 200 msec)    for not blocking the program
+      '' out: a serial if success, null otherwise
+      ''
+      function serial_open( portnumber, buffersize, baudrate, parity, databits, stopbits, timeout )
+        dim file: set file = createobject( "DesignScripting" )
+        if( file.openserial( portnumber, buffersize, baudrate, parity, databits, stopbits, timeout ) ) then
+          serial_open = array( file, buffersize, baudrate, parity, databits, stopbits, timeout )
+        else
+          serial_open = vbnull
+        end if
+      end function
+    ''#endmethod
+    ''#method file_exists( )
+      function file_exists( filename )
+        set filesystem = createobject( "Scripting.FileSystemObject" )
+        file_exists = filesystem.fileexists( filename )
+      end function
+    ''#endmethod
+    ''#method file_temp( )
+      function file_temp( folder )
+        if( folder = vbnullstring ) then
+          file_temp = vbnullstring
+          exit function
+        end if
+        if( right( folder, 1 ) <> "\" ) then
+          folder = folder + "\"
+        end if
+        set filesystem = createobject( "Scripting.FileSystemObject" )
+        do
+          file_temp = folder + file_validate( cstr( now ), "" )
+        loop until( not filesystem.fileexists( file_temp ) )
+      end function
+    ''#endmethod
+    ''#method file_validname( )
+      function file_validname( filename )
+        file_validname = string_haschar( filename, FILE_INVALID_CHARS )
+      end function
+    ''#endmethod
+    ''#method file_validatename( )
+      function file_validatename( filename, char )
+        file_validatename = string_replacechars( _
+          filename,                              _
+          "\/:*?""<>|",                          _
+          char                                   _
+        )
+      end function
+    ''#endmethod
+    ''#method file_close( )
+      '' Closes a file
+      '' in:  a file object
+      '' out: nothing
+      ''
+      function file_close( file )
+        call file( FILE_HANDLE ).close( )
+        set file( FILE_HANDLE ) = nothing
+      end function
+    ''#endmethod
+    ''#method serial_close( )
+      '' Closes serial port
+      '' in:  a serial object
+      '' out: nothing
+      ''
+      function serial_close( file )
+        call serial( SERIAL_HANDLE ).close( )
+        set serail( SERIAL_HANDLE ) = nothing
+      end function
+    ''#endmethod
+    ''#method file_readbyte( )
+      '' Reads a byte from the stream
+      '' (1 byte, 8bit, unsigned integer 0..255)
+      '' in:  a file object
+      '' out: nothing
+      ''
+      function file_readbyte( file )
+        file_readbyte = file( FILE_HANDLE ).readbyte( )
+      end function
+    ''#endmethod
+    ''#method file_readword( )
+      '' Reads a word from the stream
+      '' (2 bytes unsigned 16bit, integer 0..65535)
+      '' in:  a file object
+      '' out: nothing
+      ''
+      function file_readword( file )
+        file_readword = file( FILE_HANDLE ).readword( )
+      end function
+    ''#endmethod
+    ''#method file_readdword( )
+      '' Reads a double word from the stream
+      '' (4 bytes unsigned integer, 32bits, 0..4294967295)
+      '' in:  a file object
+      '' out: nothing
+      ''
+      function file_readdword( file )
+        file_readdword = file( FILE_HANDLE ).readdword( )
+      end function
+    ''#endmethod
+    ''#method file_readshort( )
+      '' Reads a short from the stream
+      '' (2 bytes signed integer, 16bits, -32767..32768)
+      '' in:  a file object
+      '' out: nothing
+      ''
+      function file_readshort( file )
+        file_readshort = file( FILE_HANDLE ).readshort( )
+      end function
+    ''#endmethod
+    ''#method file_readlong( )
+      '' Reads a long from the stream
+      '' (4 bytes signed integer, 32bits, -2147483647..2147483648)
+      '' in:  a file object
+      '' out: nothing
+      ''
+      function file_readlong( file )
+        file_readlong = file( FILE_HANDLE ).readlong( )
+      end function
+    ''#endmethod
+    ''#method file_readfloat( )
+      '' Reads a float from the stream
+      '' (4 bytes real, 32bits)
+      '' in:  a file object
+      '' out: nothing
+      ''
+      function file_readfloat( file )
+        file_readfloat = file( FILE_HANDLE ).readfloat( )
+      end function
+    ''#endmethod
+    ''#method file_readdouble( )
+      '' Reads a double from the stream
+      '' (8 bytes real, 64bits)
+      '' in:  a file object
+      '' out: nothing
+      ''
+      function file_readdouble( file )
+        file_readdouble = file( FILE_HANDLE ).readdouble( )
+      end function
+    ''#endmethod
+    ''#method file_readbytes( )
+      '' Read an array of bytes
+      '' in:  a file object
+      ''      the array with bytes (you have to preset the size)
+      '' out: true if everything when ok
+      ''
+      function file_readbytes( file, bytes )
+        file_readbytes = file( FILE_HANDLE ).readbytes( bytes )
+      end function
+    ''#endmethod
+    ''#method file_writebyte( )
+      '' Write a byte to the stream
+      '' (1 byte unsigned, 8bits)
+      '' in:  a file object
+      ''      the value (automatically trimmed)
+      '' out: nothing
+      ''
+      function file_writebyte( file, value )
+        call file( FILE_HANDLE ).writebyte( value )
+        file_writebyte = value
+      end function
+    ''#endmethod
+    ''#method file_writeword( )
+      '' Write a word to the stream
+      '' (2 bytes unsigned, 16bits)
+      '' in:  a file object
+      ''      the value (automatically trimmed)
+      '' out: nothing
+      ''
+      function file_writeword( file, value )
+        call file( FILE_HANDLE ).writeword( value )
+        file_writeword = value
+      end function
+    ''#endmethod
+    ''#method file_writedword( )
+      '' Write a double word to the stream
+      '' (4 bytes unsigned, 16bits)
+      '' in:  a file object
+      ''      the value (automatically trimmed)
+      '' out: nothing
+      ''
+      function file_writedword( file, value )
+        call file( FILE_HANDLE ).writedword( value )
+        file_writedword = value
+      end function
+    ''#endmethod
+    ''#method file_writeshort( )
+      '' Write a short to the stream
+      '' (2 bytes signed, 16bits)
+      '' in:  a file object
+      ''      the value (automatically trimmed)
+      '' out: nothing
+      ''
+      function file_writeshort( file, value )
+        call file( FILE_HANDLE ).writeshort( value )
+        file_writeshort = value
+      end function
+    ''#endmethod
+    ''#method file_writelong( )
+      '' Write a long to the stream
+      '' (4 bytes signed, 32bits)
+      '' in:  a file object
+      ''      the value (automatically trimmed)
+      '' out: nothing
+      ''
+      function file_writelong( file, value )
+        call file( FILE_HANDLE ).writelong( value )
+        file_writelong = value
+      end function
+    ''#endmethod
+    ''#method file_writefloat( )
+      '' Write a float to the stream
+      '' (4 bytes real, 32bits)
+      '' in:  a file object
+      ''      the value (automatically trimmed)
+      '' out: nothing
+      ''
+      function file_writefloat( file, value )
+        call file( FILE_HANDLE ).writefloat( value )
+        file_writefloat = value
+      end function
+    ''#endmethod
+    ''#method file_writebytes( )
+      '' Write an array of bytes
+      '' in:  a file object
+      ''      the array with bytes (only numbers allowed)
+      '' out: true if everything when ok
+      ''
+      function file_writebytes( file, bytes )
+        file_writebytes = file( FILE_HANDLE ).writebytes( bytes )
+      end function
+    ''#endmethod
+    ''#method file_writedouble( )
+      '' Write a double to the stream
+      '' (8 bytes unsigned, 64bits)
+      '' in:  a file object
+      ''      the value (automatically trimmed)
+      '' out: nothing
+      ''
+      function file_writedouble( file, value )
+        call file( FILE_HANDLE ).writedouble( value )
+        file_writedouble = value
+      end function
+    ''#endmethod
+    ''#method file_location( )
+      '' Get the location of the stream (don't do on serial)
+      '' in:  a file object
+      '' out: the location for success, -1 for error
+      ''
+      function file_location( file )
+        file_location = file( FILE_HANDLE ).location( )
+      end function
+    ''#endmethod
+    ''#method file_moveto( )
+      '' Set the location of the stream (don't do on serial)
+      '' in:  a file object
+      ''      the new location (zero is the beggining)
+      '' out: the previous location for success, -1 for error
+      ''
+      function file_moveto( file, location )
+        file_moveto = file( FILE_HANDLE ).location( )
+        call file( FILE_HANDLE ).moveto( location )
+      end function
+    ''#endmethod
+    ''#method file_length( )
+      '' The length of the file stream in bytes
+      '' in:  a file object
+      '' out: the file length
+      ''
+      function file_length( file )
+        file_length = file( FILE_HANDLE ).length( )
+      end function
+    ''#endmethod
+    ''#method file_skipbytes( )
+      '' Skips a number of bytes
+      '' in:  a file object
+      ''      number of bytes to skip
+      '' out: the number of bytes skipped
+      ''
+      function file_skipbytes( file, bytes )
+        call file( FILE_HANDLE ).moveto( file( FILE_HANDLE ).location( ) + bytes )
+        file_skipbytes = bytes
+      end function
+    ''#endmethod
+  ''#endblock
+  ''#block Bitmap File
+    ''#fields bitmap
+      ''  Bitmap File Information
+      ''''
+      ''''
+      ''''  BITMAP FILE CLASS
+      ''''
+      ''''  Functions for reading uncompressed 24 or 32 bit bitmaps
+      ''''
+      ''''  Example:
+      ''''  dim filename: filename = rhino.openfilename( _
+      ''''    "Select bitmap file",                      _
+      ''''    "Bitmap Files (*.bmp)|*.bmp||"             _
+      ''''  )
+      ''''  if( valid( filename ) ) then
+      ''''    dim bitmap: bitmap = bmp_open( filename )
+      ''''    if( valid( bitmap ) ) then
+      ''''      dim x, y
+      ''''      for y = 0 to bitmap( BMP_INFO )( BMP_HEIGHT ) - 1
+      ''''        for x = 0 to bitmap( BMP_INFO )( BMP_WIDTH ) - 1
+      ''''          dim vertex: vertex = vertex_new( x, y, 0 )
+      ''''          dim point:  point  = rhino.addpoint( vertex )
+      ''''          dim pixel:  pixel  = bmp_readpixel( bitmap, x, y )
+      ''''          call rhino.objectcolor( point, pixel )
+      ''''         next
+      ''''       next
+      ''''      call bmp_close( bitmap )
+      ''''    else
+      ''''      call msgbox( "Couldn't load the bitmap", vbinformation )
+      ''''    end if
+      ''''  else
+      ''''    call msgbox( "Script aborted", vbinformation )
+      ''''  end if
+      ''''
+      ''''
+
+      '''' PUBLIC
+      ''''
+      dim BMP_FILE:      BMP_FILE      = 0
+      dim BMP_HEADER:    BMP_HEADER    = 1
+      dim BMP_INFO:      BMP_INFO      = 2
+
+      '''' PRIVATE
+      ''''
+      dim BMP_SIGNATURE: BMP_SIGNATURE = 0
+      dim BMP_FILESIZE:  BMP_FILESIZE  = 1
+      dim BMP_RESERVED:  BMP_RESERVED  = 2
+      dim BMP_BITOFFSET: BMP_BITOFFSET = 3
+
+      dim BMP_STRUCTLEN: BMP_STRUCTLEN = 0
+      dim BMP_WIDTH:     BMP_WIDTH     = 1
+      dim BMP_HEIGHT:    BMP_HEIGHT    = 2
+      dim BMP_PLANES:    BMP_PLANES    = 3
+      dim BMP_BITS:      BMP_BITS      = 4
+      dim BMP_COMPRESS:  BMP_COMPRESS  = 5
+      dim BMP_IMAGESIZE: BMP_IMAGESIZE = 6
+      dim BMP_WIDTHIM:   BMP_WIDTHIM   = 7
+      dim BMP_HEIGHTIM:  BMP_HEIGHTIM  = 8
+      dim BMP_USEDCOLOR: BMP_USEDCOLOR = 9
+      dim BMP_IMPORTANT: BMP_IMPORTANT = 10
+    ''#endfields
+    ''#method bmp_readheader( )
+      '' Read bitmap file header
+      '' in:  the file object
+      '' out: the bitmap file header
+      ''
+      function bmp_readheader( file )
+        dim sign: sign = chr( file_readbyte( file ) ) + _
+                         chr( file_readbyte( file ) )
+        dim size: size = file_readdword( file )
+        dim rsrv: rsrv = file_readdword( file )
+        dim offs: offs = file_readdword( file )
+        bmp_readheader = array( sign, size, rsrv, offs )
+      end function
+    ''#endmethod
+    ''#method bmp_readinfo( )
+      '' Read bitmap file header
+      '' in:  the file object
+      '' out: the bitmap info header
+      ''
+      function bmp_readinfo( file )
+        dim size: size = file_readdword( file )
+        dim delx: delx = file_readdword( file )
+        dim dely: dely = file_readdword( file )
+        dim plan: plan = file_readword ( file )
+        dim bits: bits = file_readword ( file )
+        dim cmpr: cmpr = file_readword ( file )
+        dim imgs: imgs = file_readdword( file )
+        dim mmdx: mmdx = file_readdword( file )
+        dim mmdy: mmdy = file_readdword( file )
+        dim clru: clru = file_readdword( file )
+        dim clri: clri = file_readdword( file )
+        bmp_readinfo = array( _
+          size, delx, dely, plan, _
+          bits, cmpr, imgs, mmdx, _
+          mmdy, clru, clri _
+        )
+      end function
+    ''#endmethod
+    ''#method bmp_readpixel( )
+      '' Read bitmap pixel from file (slower access, lower memory)
+      '' in:  the bitmap object
+      ''      the x, y coordinates
+      '' out: color value of the pixel
+      ''
+      function bmp_readpixel( bitmap, x, y )
+        dim bpp: bpp = bitmap( BMP_INFO )( BMP_BITS ) \ 8
+        dim bps: bps = ( ( ( bitmap( BMP_INFO )( BMP_WIDTH ) * bitmap( BMP_INFO )( BMP_BITS ) ) + 31 ) \ 32 ) * 4
+        dim offset: offset = bitmap( BMP_HEADER )( BMP_BITOFFSET ) + x * bpp + y * bps
+        call file_moveto( bitmap( BMP_FILE ), offset )
+        select case bitmap( BMP_INFO )( BMP_BITS )
+          case 32
+            bmp_readpixel = file_readdword( bitmap( BMP_FILE ) )
+          case 24
+            dim b: b = file_readbyte( bitmap( BMP_FILE ) )
+            dim g: g = file_readbyte( bitmap( BMP_FILE ) )
+            dim r: r = file_readbyte( bitmap( BMP_FILE ) )
+            bmp_readpixel = rgb( r, g, b )
+          case else
+            bmp_readpixel = -1
+        end select
+      end function
+    ''#endmethod
+    ''#method bmp_readpixels( )
+      '' Read all bitmap pixels from file (don't use for big images)
+      '' in:  the bitmap object
+      '' out: an array with all the pixels
+      ''
+      function bmp_readpixels( bitmap )
+        dim w: w = bitmap( BMP_INFO )( BMP_WIDTH )
+        dim h: h = bitmap( BMP_INFO )( BMP_HEIGHT )
+        dim length: length = w * h
+        dim bpp: bpp = bitmap( BMP_INFO )( BMP_BITS )
+        dim bps: bps = ( ( ( w * bpp ) + 31 ) \ 32 ) * 4
+        dim stride: stride = bps - ( w * ( bpp / 8 ) )
+
+        dim pixels: pixels = array_allocate( length )
+        select case bitmap( BMP_INFO )( BMP_BITS )
+          case 32
+            dim index
+            for index = 0 to length - 1
+              pixels( index ) = file_readdword( bitmap( BMP_FILE ) )
+            next
+            bmp_readpixels = pixels
+          case 24
+            dim x, y
+            for y = 0 to h - 1
+              for x = 0 to w - 1
+                dim b: b = file_readbyte( bitmap( BMP_FILE ) )
+                dim g: g = file_readbyte( bitmap( BMP_FILE ) )
+                dim r: r = file_readbyte( bitmap( BMP_FILE ) )
+                pixels( index ) = rgb( r, g, b )
+                index = index + 1
+              next
+              call file_skipbytes( bitmap( BMP_FILE ), stride )
+            next
+            bmp_readpixels = pixels
+          case else
+            bmp_readpixels = vbnull
+        end select
+      end function
+    ''#endmethod
+    ''#method bmp_open( )
+      '' Open a bitmap file
+      '' in:  the bitmap filename
+      '' out: bitmap object or null
+      ''
+      function bmp_open( filename )
+        dim file: file = file_open( filename, true )
+        if( valid( file ) ) then
+          dim head: head = bmp_readheader( file )
+          if( head( BMP_SIGNATURE ) = "BM" ) then
+            dim info: info = bmp_readinfo( file )
+            if( info( BMP_COMPRESS ) = 0 ) then
+              call file_moveto( file, head( BMP_BITOFFSET ) )
+              bmp_open = array( file, head, info )
+            else
+              call file_close( file )
+              bmp_open = vbnull
+            end if
+          else
+            call file_close( file )
+            bmp_open = vbnull
+          end if
+        else
+          bmp_open = vbnull
+        end if
+      end function
+    ''#endmethod
+    ''#method bmp_close( )
+      '' Close the bitmap
+      '' in:  a bitmap object
+      '' out: nothing at all
+      ''
+      function bmp_close( bitmap )
+        call file_close( bitmap( BMP_FILE ) )
+      end function
+    ''#endmethod
+  ''#endblock
+  ''#block Wave File
+    ''#fields wave
+      ''  Wave File Information
+      ''''
+      ''''
+      ''''  WAVE CLASS
+      ''''
+      ''''  Functions for reading uncompressed wave files
+      ''''
+      ''''  Example:
+      ''''  dim filename: filename = rhino.openfilename( _
+      ''''    "Select wave file",                        _
+      ''''    "Wave Files (*.wav)|*.wav||"               _
+      ''''  )
+      ''''  if( not isnull( filename ) ) then
+      ''''    dim wave: wave = wave_open( filename )
+      ''''    if( valid( wave ) ) then
+      ''''      '' Sound volume scaling factor
+      ''''      dim amplify: amplify = 100.0
+      ''''
+      ''''      '' The sample buffer gets automatically resized
+      ''''      redim samples( 0 )
+      ''''
+      ''''      '' Read one second of music = sampling rate
+      ''''      call wave_read( wave, samples, wave_rate( wave ) )
+      ''''
+      ''''      '' Process samples
+      ''''      dim isample
+      ''''      for isample = lbound( samples ) to ubound( samples )
+      ''''        dim sample: sample = samples( isample )
+      ''''
+      ''''        '' Process channels
+      ''''        dim ichannel
+      ''''        for ichannel = lbound( sample ) to ubound( sample )
+      ''''          dim sound:  sound  = sample( ichannel ) * amplify
+      ''''          dim vertex: vertex = vertex_new( isample, sound, ichannel )
+      ''''          dim point:  point  = rhino.addpoint( vertex )
+      ''''        next
+      ''''      next
+      ''''
+      ''''      call wave_close( wave )
+      ''''    else
+      ''''      call msgbox( "Couldn't load the wave", vbinformation )
+      ''''    end if
+      ''''  else
+      ''''    call msgbox( "Script aborted", vbinformation )
+      ''''  end if
+      ''''
+      ''''
+
+      '''' PUBLIC
+      ''''
+      dim WAVE_FILE:               WAVE_FILE               = 0
+      dim WAVE_HEADER:             WAVE_HEADER             = 1
+      dim WAVE_FORMAT:             WAVE_FORMAT             = 2
+      dim WAVE_DATA:               WAVE_DATA               = 3
+
+      '''' PRIVATE
+      ''''
+      dim WAVE_HEADER_SIGNATURE:   WAVE_HEADER_SIGNATURE   = 0
+      dim WAVE_HEADER_FILESIZE:    WAVE_HEADER_FILESIZE    = 1
+      dim WAVE_HEADER_DATATYPE:    WAVE_HEADER_DATATYPE    = 2
+
+      dim WAVE_FRAME_NAME:         WAVE_FRAME_NAME         = 0
+      dim WAVE_FRAME_SIZE:         WAVE_FRAME_SIZE         = 1
+
+      dim WAVE_FORMAT_COMPRESSION: WAVE_FORMAT_COMPRESSION = 0
+      dim WAVE_FORMAT_CHANNELS:    WAVE_FORMAT_CHANNELS    = 1
+      dim WAVE_FORMAT_SAMPLERATE:  WAVE_FORMAT_SAMPLERATE  = 2
+      dim WAVE_FORMAT_BYTESPERSEC: WAVE_FORMAT_BYTESPERSEC = 3
+      dim WAVE_FORMAT_BLOCKALIGN:  WAVE_FORMAT_BLOCKALIGN  = 4
+      dim WAVE_FORMAT_SAMPLEBITS:  WAVE_FORMAT_SAMPLEBITS  = 5
+
+      dim WAVE_COMPRESSION_NONE:   WAVE_COMPRESSION_NONE   = 1
+    ''#endfields
+    ''#method wave_readheader( )
+      '' Read the wave file header
+      '' in:  a file object
+      '' out: the wave file header
+      ''
+      function wave_readheader( file )
+        signature   = chr( file_readbyte( file ) ) + _
+                      chr( file_readbyte( file ) ) + _
+                      chr( file_readbyte( file ) ) + _
+                      chr( file_readbyte( file ) )
+        filesize    = file_readdword( file )
+        datatype    = chr( file_readbyte( file ) ) + _
+                      chr( file_readbyte( file ) ) + _
+                      chr( file_readbyte( file ) ) + _
+                      chr( file_readbyte( file ) )
+        wave_readheader = array( _
+          signature, _
+          filesize,  _
+          datatype   _
+        )
+      end function
+    ''#endmethod
+    ''#method wave_readframe( )
+      '' Read a wave file frame
+      '' in:  a file object
+      '' out: the next frame
+      ''
+      function wave_readframe( file )
+        framename = chr( file_readbyte( file ) ) + _
+                    chr( file_readbyte( file ) ) + _
+                    chr( file_readbyte( file ) ) + _
+                    chr( file_readbyte( file ) )
+        framesize = file_readdword( file )
+        wave_readframe = array( framename, framesize )
+      end function
+    ''#endmethod
+    ''#method wave_skipframe( )
+      '' Skips a wave file frame
+      '' in:  a file object
+      '' out: nothing
+      ''
+      function wave_skipframe( file, frame )
+        call file_skipbytes( file, frame( WAVE_FRAME_SIZE ) )
+      end function
+    ''#endmethod
+    ''#method wave_readformat( )
+      '' Reads the wave file format frame
+      '' in:  a file object
+      '' out: the format frame
+      ''
+      function wave_readformat( file )
+        dim frame: frame = wave_readframe( file )
+        if( frame( WAVE_FRAME_NAME ) = "fmt " ) then
+          dataformat  = file_readword ( file )
+          channels    = file_readword ( file )
+          samplerate  = file_readdword( file )
+          bytespersec = file_readdword( file )
+          blockalign  = file_readword ( file )
+          samplebits  = file_readword ( file )
+          wave_readformat = array( _
+            dataformat,  _
+            channels,    _
+            samplerate,  _
+            bytespersec, _
+            blockalign,  _
+            samplebits   _
+          )
+          call file_skipbytes( file, frame( WAVE_FRAME_SIZE ) - 16 )
+        else
+          wave_readformat = vbnull
+        end if
+      end function
+    ''#endmethod
+    ''#method wave_open( )
+      '' Opens a wave file (may freeze on mulformed files)
+      '' in:  a filename
+      '' out: a wave object
+      ''
+      function wave_open( filename )
+        dim file: file = file_open( filename, true )
+        if( valid( file ) ) then
+          dim header: header = wave_readheader( file )
+          if( ( header( WAVE_HEADER_SIGNATURE ) = "RIFF" ) and _
+              ( header( WAVE_HEADER_DATATYPE )  = "WAVE" ) ) then
+            dim waveformat: waveformat = wave_readformat( file )
+            if( not isnull( waveformat ) ) then
+              if( waveformat( WAVE_FORMAT_COMPRESSION ) = WAVE_COMPRESSION_NONE ) then
+                dim dataframe: dataframe = wave_readframe( file )
+                do while( dataframe( WAVE_FRAME_NAME ) <> "data" )
+                  call wave_skipframe( file, dataframe )
+                  dataframe = wave_readframe( file )
+                  if( file_location( file ) >= header( WAVE_HEADER_FILESIZE ) ) then
+                    call file_close( file )
+                    set file = nothing
+                    wave_open = vbnull
+                  end if
+                loop
+                wave_open = array( _
+                  file,            _
+                  header,          _
+                  waveformat,      _
+                  dataframe        _
+                )
+              else
+                call file_close( file )
+                set file = nothing
+                wave_open = vbnull
+              end if
+            else
+              call file_close( file )
+              set file = nothing
+              wave_open = vbnull
+            end if
+          else
+            call file_close( file )
+            set file = nothing
+            wave_open = vbnull
+          end if
+        else
+          wave_open = vbnull
+        end if
+      end function
+    ''#endmethod
+    ''#method wave_close( )
+      '' Closes a wave file
+      '' in:  a wave object
+      '' out: nothing
+      ''
+      function wave_close( wave )
+        call file_close( wave( WAVE_FILE ) )
+        set wave = nothing
+      end function
+    ''#endmethod
+    ''#method wave_samples( )
+      '' Calculates the number of samples
+      '' in:  a wave object
+      '' out: the number of frames
+      ''
+      function wave_samples( wave )
+        dim samples:  samples  = wave( WAVE_DATA   )( WAVE_FRAME_SIZE )
+        dim bps:      bps      = wave( WAVE_FORMAT )( WAVE_FORMAT_SAMPLEBITS ) \ 8
+        dim channels: channels = wave( WAVE_FORMAT )( WAVE_FORMAT_CHANNELS )
+        samples = samples \ bps
+        samples = samples \ channels
+        wave_samples = samples
+      end function
+    ''#endmethod
+    ''#method wave_rate( )
+      '' Shortcut for the sampling rate
+      '' in:  a wave object
+      '' out: the sampling rate
+      ''
+      function wave_rate( wave )
+        wave_rate = wave( WAVE_FORMAT )( WAVE_FORMAT_SAMPLERATE )
+      end function
+    ''#endmethod
+    ''#method wave_read( )
+      '' Reads a number of samples from the wave
+      '' in:  a wave object
+      ''      the array that will get the data
+      ''      the number of samples to read
+      '' out: wheather everything went ok
+      ''
+      function wave_read( wave, data, samples )
+        if( array_length( data ) <> samples ) then
+          redim data( samples - 1 )
+        end if
+        if( wave( WAVE_FORMAT )( WAVE_FORMAT_SAMPLEBITS ) = 8 ) then
+          for isample = 0 to samples - 1
+            data( isample ) = array_allocate( wave( WAVE_FORMAT )( WAVE_FORMAT_CHANNELS ) )
+            for ichannel = 0 to wave( WAVE_FORMAT )( WAVE_FORMAT_CHANNELS ) - 1
+              data( isample )( ichannel ) = file_readbyte( wave( WAVE_FILE ) )
+              data( isample )( ichannel ) = ( data( isample )( ichannel ) - 128.0 ) / 128.0
+            next
+          next
+          wave_read = true
+        elseif( wave( WAVE_FORMAT )( WAVE_FORMAT_SAMPLEBITS ) = 16 ) then
+          for isample = 0 to samples - 1
+            data( isample ) = array_allocate( wave( WAVE_FORMAT )( WAVE_FORMAT_CHANNELS ) )
+            for ichannel = 0 to wave( WAVE_FORMAT )( WAVE_FORMAT_CHANNELS ) - 1
+              data( isample )( ichannel ) = file_readshort( wave( WAVE_FILE ) )
+              data( isample )( ichannel ) = ( data( isample )( ichannel ) ) / 32768.0
+            next
+          next
+          wave_read = true
+        else
+          wave_read = false
+        end if
+      end function
+    ''#endmethod
+    ''#method wave_readall( )
+      '' Reads the whole wave file (don't try on big files)
+      '' in:  a wave object
+      ''      the array that will get the data
+      '' out: wheather everything went ok
+      ''
+      function wave_readall( wave, data )
+        wave_readall = wave_read( wave, data, wave_samples( wave ) )
+      end function
+    ''#endmethod
+  ''#endblock
+  ''#block STL File
+    ''#fields stl
+      ''  Stl File Information
+      ''''
+      ''''
+      ''''  STL CLASS
+      ''''
+      ''''  Functions for exporting STL files
+      ''''
+      ''''  Example: (not very sane since STLs have to be watertight solids)
+      ''''  dim filename: filename = rhino.savefilename( _
+      ''''    "Export STL file", _
+      ''''    "Stereolithography Files (*.stl)|*.stl||"  _
+      ''''   )
+      ''''
+      ''''  if( not isnull( filename ) ) then
+      ''''    dim stl: stl = stl_new( filename, "OBJECT" )
+      ''''
+      ''''    call stl_begin( )
+      ''''
+      ''''    call stl_face( _
+      ''''      vertex_new( 0, 0, 0 ), _
+      ''''      vertex_new( 1, 0, 0 ), _
+      ''''      vertex_new( 0, 1, 0 )  _
+      ''''    )
+      ''''
+      ''''    '' add more faces...
+      ''''
+      ''''    call stl_end( )
+      ''''
+      ''''
+
+      dim STL_STREAM: STL_STREAM = 0
+      dim STL_OBJECT: STL_OBJECT = 1
+    ''#endfields
+    ''#method stl_new( )
+      '' Stl New
+      '' in:  the filename to export and the name of the object
+      '' out: the stl (text) file stream
+      ''
+      function stl_new( filename, object_name )
+        dim filesystem: set filesystem = createobject( "Scripting.FileSystemObject" )
+        stl_new = array( filesystem.createtextfile( filename, true  ), object_name )
+      end function
+    ''#endmethod
+    ''#method stl_begin( )
+      '' Stl Begin
+      '' in:  the stl object
+      '' out: not much
+      ''
+      function stl_begin( stl )
+        stl( STL_STREAM ).writeline( "solid " + stl( STL_OBJECT ) )
+      end function
+    ''#endmethod
+    ''#method stl_face( )
+      '' Stl Face
+      '' in:  the stl object and three point of a face (careful with the order!)
+      '' out: not much either
+      ''
+      function stl_face( stl, va, vb, vc )
+        dim normal: normal = vector_normal( va, vb, vc )
+        stl( STL_STREAM ).writeline( "  facet normal " + vertex_print( normal, 8, " " ) )
+        stl( STL_STREAM ).writeline( "    outer loop" )
+        stl( STL_STREAM ).writeline( "      vertex " +  vertex_print( va, 8, " " ) )
+        stl( STL_STREAM ).writeline( "      vertex " +  vertex_print( vb, 8, " " ) )
+        stl( STL_STREAM ).writeline( "      vertex " +  vertex_print( vc, 8, " " ) )
+        stl( STL_STREAM ).writeline( "    endloop" )
+        stl( STL_STREAM ).writeline( "  endfacet" )
+      end function
+    ''#endmethod
+    ''#method stl_end( )
+      '' Stl End
+      '' in:  the stl object
+      '' out: not much here too
+      ''
+      function stl_end( stl )
+        stl( STL_STREAM ).writeline( "endsolid " + stl( STL_OBJECT ) )
+        stl( STL_STREAM ).close( )
+        set stl( STL_STREAM ) = nothing
+      end function
+    ''#endmethod
+  ''#endblock
+  ''#block Text File
+    ''#method textfile_load
+      ''
+
+      ''
+
+      function textfile_load( filename )
+
+        set filesystem = createobject( "Scripting.FileSystemObject" )
+
+        if( filesystem.fileexists( filename ) ) then
+
+          set textstream = filesystem.opentextfile( filename )
+
+          textfile_load = textstream.readall( )
+
+          call textstream.close( )
+
+        else
+
+          textfile_load = vbnullstring
+
+        end if
+
+      end function
+
+    ''#endmethod
+  ''#endblock
+  ''#block Doclet
+    ''#method doclet_show
+      function doclet_start( properties )
+        set ie = createobject( "InternetExplorer.Application" )
+        properties = map_create( properties, ",", "=" )
+
+             left_ = eval( map_at( properties, "left"      ) )
+              top_ = eval( map_at( properties, "top"       ) )
+            width_ = eval( map_at( properties, "width"     ) )
+           height_ = eval( map_at( properties, "height"    ) )
+          menubar_ = eval( map_at( properties, "menubar"   ) )
+          toolbar_ = eval( map_at( properties, "toolbar"   ) )
+        statusbar_ = eval( map_at( properties, "statusbar" ) )
+
+        if( valid(      left_ ) ) then ie.left      = cint( left_   )
+        if( valid(       top_ ) ) then ie.top       = cint( top_    )
+        if( valid(     width_ ) ) then ie.width     = cint( width_  )
+        if( valid(    height_ ) ) then ie.height    = cint( height_ )
+        if( valid(   menubar_ ) ) then ie.menubar   = menubar_
+        if( valid(   toolbar_ ) ) then ie.toolbar   = toolbar_
+        if( valid( statusbar_ ) ) then ie.statusbar = statusbar_
+
+        ie.visible = true
+        call ie.navigate( "about:blank" )
+
+        do while( ie.busy )
+        loop
+
+        set doclet_start = ie
+      end function
+    ''#endmethod
+    ''#method doclet_link
+      function doclet_link( link, properties )
+        set ie = doclet_start( properties )
+        call ie.navigate( cstr( link ) )
+      end function
+    ''#endmethod
+    ''#method doclet_show
+      function doclet_show( message, properties )
+        set ie = doclet_start( properties )
+        call ie.document.Open( )
+        call ie.document.WriteLn( cstr( message ) )
+        call ie.document.Close( )
+        set doclet_show = ie
+      end function
+    ''#endmethod
+  ''#endblock
+  ''#block Map
+    ''#fields map
+      '' Map Information
+      ''''
+      ''''  Map Mappings
+      ''''
+      dim MAP_KEY: MAP_KEY = 0
+      dim MAP_VAL: MAP_VAL = 1
+    ''#endfields
+    ''#method map_at( )
+      function map_at( map, key )
+        for each pair in map
+          if( pair( MAP_KEY ) = key ) then
+            map_at = pair( MAP_VAL )
+            exit function
+          end if
+        next
+        map_at = null
+      end function
+    ''#endmethod
+    ''#method map_create( )
+      function map_create( entries, entry, pair )
+        dim result: result = split( entries, entry )
+        for index = lbound( result ) to ubound( result )
+          result( index ) = split( result( index ), pair )
+        next
+        map_create = result
+      end function
+    ''#endmethod
+  ''#endblock
+  ''#class Container
+    ''#fields container
+      ''  Container Information
+      ''''
+      ''''
+      ''''  CONTAINER CLASS
+      ''''
+      ''''  A versatile container class based on a custom implementation of a vector
+      ''''  style array. The container class wraps around a purely dynamic array
+      ''''  which automatically expands when more storage space is needed. The vector
+      ''''  has a lazy implementation which doesn't size down the internal buffer when
+      ''''  removing elements from the end. The container class may be too slow for
+      ''''  if you want to perform many insertions around the begining (typical vector
+      ''''  side effect); a linked list style container maybe more suitable. The class
+      ''''  has function so it can be used as a stack.
+      ''''
+      ''''  Example:
+      ''''  dim vector: set vector = new container
+      ''''  dim index
+      ''''  for index = 0 to 11
+      ''''    call vector.append( index )
+      ''''    call msgbox( "array:" + vector.print( ) + _
+      ''''                 " size:" + cstr( vector.length( ) ) )
+      ''''  next
+      ''''
+      ''''
+      class container
+
+      '''' Members of the container class
+      ''''
+        public elements
+        public capacity
+        public increment
+        public pointer
+    ''#endfields
+      ''#method class_initialize( )
+        '' Default Automatic Constructor
+        '' (initializes fields)
+        ''
+        sub class_initialize( )
+          redim elements( 0 )
+          capacity   = 0
+          increment  = 8
+          pointer    =-1
+        end sub
+      ''#endmethod
+      ''#method renew( )
+        '' Constructor
+        '' in:  initial size   -> number of elements to begin with
+        ''      increment size -> how much to automatically increment, when needed
+        '' out: nothing
+        ''
+        function renew( size, chunksize )
+          capacity   = size
+          increment  = chunksize
+          redim elements( size - 1 )
+        end function
+      ''#endmethod
+      ''#method reset( )
+        '' Reset pointer
+        '' in:  nothing
+        '' out: nothing
+        ''
+        function reset( )
+          pointer = -1
+        end function
+      ''#endmethod
+      ''#method length( )
+        '' Length of container
+        '' in:  nothing
+        '' out: the total number of elements
+        ''
+        function length( )
+          length = pointer + 1
+        end function
+      ''#endmethod
+      ''#method autosize( )
+        '' Autosize
+        '' (don't call directly)
+        ''
+        function autosize( )
+          if( pointer >= capacity ) then
+            capacity = capacity + increment
+            redim preserve elements( capacity - 1 )
+          end if
+        end function
+      ''#endmethod
+      ''#method append( )
+        '' Append Elements
+        '' in:  some element
+        '' out: the same element (for chaining)
+        ''
+        function append( element )
+          pointer = pointer + 1
+
+          call autosize( )
+
+          if( isobject( element ) ) then
+            set elements( pointer ) = element
+            set append = element
+          else
+            elements( pointer ) = element
+            append = element
+          end if
+        end function
+      ''#endmethod
+      ''#method assign( )
+        '' Assign Element
+        '' in:  the index and some value
+        '' out: the same element (for chaining)
+        ''      or null on out of bound errors
+        ''
+        function assign( index, element )
+          if( ( index < 0 ) or ( index >= pointer + 1 ) ) then
+            assign = vbnull
+            exit function
+          else
+            if( isobject( element ) ) then
+              set elements( index ) = element
+              set assign = element
+            else
+              elements( index ) = element
+              assign = element
+            end if
+          end if
+        end function
+      ''#endmethod
+      ''#method dispose( )
+        '' Dispose Element
+        '' in:  an index
+        '' out: the disposed element
+        ''
+        function dispose( index )
+          if( ( index < 0 ) or ( index >= pointer + 1 ) ) then
+            retrieve = vbnull
+            exit function
+          else
+            if( isobject( elements( index ) ) ) then
+              set dispose = elements( index )
+            else
+              dispose = elements( index )
+            end if
+            dim skip: skip = index
+            do while( skip < pointer )
+              if( isobject( elements( skip + 1 ) ) ) then
+                set elements( skip ) = elements( skip + 1 )
+              else
+                elements( skip ) = elements( skip + 1 )
+              end if
+              skip = skip + 1
+            loop
+            pointer = pointer - 1
+          end if
+        end function
+      ''#endmethod
+      ''#method insert( )
+        '' Insert Element
+        '' in:  the insertion index and the element
+        '' out: the same element
+        ''
+        function insert( index, element )
+          if( ( index < 0 ) or ( index >= pointer + 1 ) ) then
+            insert = vbnull
+            exit function
+          else
+            pointer = pointer + 1
+
+            call autosize( )
+
+            dim skip: skip = pointer
+            do while( skip > index )
+              if( isobject( elements( skip - 1 ) ) ) then
+                set elements( skip ) = elements( skip - 1 )
+              else
+                elements( skip ) = elements( skip - 1 )
+              end if
+              skip = skip - 1
+            loop
+
+            if( isobject( element ) ) then
+              set elements( index ) = element
+              set insert = element
+            else
+              elements( index ) = element
+              insert = element
+            end if
+          end if
+        end function
+      ''#endmethod
+      ''#method remove( )
+        '' Remove Element
+        '' in:  nothing (the last element is implied)
+        '' out: the removed last element
+        ''
+        function remove( )
+          if( pointer > 0 ) then
+            if( isobject( elements( pointer ) ) ) then
+              set remove = elements( pointer )
+            else
+              remove = elements( pointer )
+            end if
+            pointer = pointer - 1
+          else
+            remove = vbnull
+          end if
+        end function
+      ''#endmethod
+      ''#method clean( )
+        '' Clean Container
+        '' in:  nothing
+        '' out: ditto
+        ''
+        function clean( )
+          dim index: index = 0
+          do while( index <= pointer )
+            elements( index ) = vbnull
+            index = index + 1
+          loop
+        end function
+      ''#endmethod
+      ''#method destroy( )
+        '' Destroys the containers for good
+        '' in:  nothing
+        '' out: ditto
+        ''
+        function destroy( )
+          pointer  = vbnull
+          capacity = vbnull
+          elements = vbnull
+        end function
+      ''#endmethod
+      ''#method pack( )
+        '' Removes the unused elements
+        '' in:  nothing
+        '' out: nothing
+        ''
+        function pack( )
+          if( pointer > 0 ) then
+            capacity = pointer + 1
+            redim preserve elements( capacity - 1 )
+          end if
+        end function
+      ''#endmethod
+      ''#method retrieve( )
+        '' Retrieve Element
+        '' in:  index of elements
+        '' out: the element or null in case of bad index
+        ''
+        function retrieve( index )
+          if( ( index < 0 ) or ( index >= pointer + 1 ) ) then
+            retrieve = vbnull
+            exit function
+          else
+            if( isobject( elements( index ) ) ) then
+              set retrieve = elements( index )
+            else
+              retrieve = elements( index )
+            end if
+          end if
+        end function
+      ''#endmethod
+      ''#method push( )
+        '' Push Element (append alias)
+        '' in:  an element
+        '' out: the same element
+        ''
+        function push( element )
+          pointer = pointer + 1
+
+          call autosize( )
+
+          if( isobject( element ) ) then
+            set elements( pointer ) = element
+            set push = element
+          else
+            elements( pointer ) = element
+            push = element
+          end if
+        end function
+      ''#endmethod
+      ''#method pop( )
+        '' Pop Element (alias of remove)
+        '' in:  nothing
+        '' out: the last popped element
+        ''
+        function pop( )
+          if( pointer > 0 ) then
+            if( isobject( elements( pointer ) ) ) then
+              set pop = elements( pointer )
+            else
+              pop = elements( pointer )
+            end if
+            pointer = pointer - 1
+          else
+            pop = vbnull
+          end if
+        end function
+      ''#endmethod
+      ''#method first( )
+        '' First Element
+        '' in:  nothing
+        '' out: the first element
+        ''
+        function first( )
+          if( pointer >= 0 )then
+            if( isobject( elements( 0 ) ) )then
+              set first = elements( 0 )
+            else
+              first = elements( 0 )
+            end if
+          else
+            first = vbnull
+          end if
+        end function
+      ''#endmethod
+      ''#method last( )
+        '' Last Element
+        '' in:  nothing
+        '' out: the last element
+        ''
+        function last( )
+          if( pointer >= 0 )then
+            if( isobject( elements( pointer ) ) )then
+              set last = elements( pointer )
+            else
+              last = elements( pointer )
+            end if
+          else
+            last = vbnull
+          end if
+        end function
+      ''#endmethod
+      ''#method top( )
+        '' Top Element (alias for last)
+        '' in:  nothing
+        '' out: the last element
+        ''
+        function top( )
+          if( pointer >= 0 )then
+            if( isobject( elements( pointer ) ) )then
+              set top = elements( pointer )
+            else
+              top = elements( pointer )
+            end if
+          else
+            top = vbnull
+          end if
+        end function
+      ''#endmethod
+      ''#method lshift( )
+        '' Left Shift (alias of dispose(0))
+        '' in:  nothing
+        '' out: the disposed element
+        ''
+        function lshift( )
+          if( pointer >= 0 ) then
+            if( isobject( elements( 0 ) ) ) then
+              set lshift = dispose( 0 )
+            else
+              lshift = dispose( 0 )
+            end if
+          else
+            lshift = vbnull
+          end if
+        end function
+      ''#endmethod
+      ''#method rshift( )
+        '' Right Shift (alias of insert(0))
+        '' in:  nothing
+        '' out: the "not really disposed" element
+        ''
+        function rshift( )
+          if( pointer >= 0 ) then
+            if( isobject( elements( pointer ) ) ) then
+              set rshift = elements( pointer )
+            else
+              rshift = elements( pointer )
+            end if
+            call insert( 0, vbnull )
+          else
+            rshift = vbnull
+          end if
+        end function
+      ''#endmethod
+      ''#method void( )
+        '' Void
+        '' in: nothing
+        '' out: true is the container is void
+        ''
+        function void( )
+          void = ( pointer < 0 )
+        end function
+      ''#endmethod
+      ''#method print( )
+        '' Print Container
+        '' in:  nothing at all
+        '' out: a text representation of the container
+        ''
+        function print( )
+          print = array_convert( elements )
+        end function
+      ''#endmethod
+      end class
+  ''#endclass
+''#endblock

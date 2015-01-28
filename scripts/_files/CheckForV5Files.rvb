@@ -1,0 +1,189 @@
+Option Explicit
+'Script written by Pascal
+' RMA
+'Script version Thursday, December 01, 2011
+
+'Rhino.AddStartUpScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "CheckForV5Files", "_NoEcho _-Runscript (CheckForV5Files)"
+'Rhino.AddAlias "CheckForNonV5Files", "_NoEcho _-Runscript (CheckForNonV5Files)"
+
+Sub CheckForV5Files()
+	CheckV5(1)
+	
+End Sub
+
+Sub CheckForNonV5Files()
+	CheckV5(0)
+	
+End Sub
+
+Private sBase
+If isEmpty(sBase) Then
+	sBase = Rhino.WorkingFolder()
+End If
+
+
+Sub CheckV5(intcmd)
+
+	Dim objFSO
+	Set objFSO = CreateObject("Scripting.FileSystemObject")
+	Dim sTitle: sTitle = "Check for V5 files"
+	If intCmd = 0 Then sTitle = "Check for Non-V5 files"
+	Dim usrFolder: usrFolder = Rhino.BrowseForFolder(sbase, "Select folder", sTitle)
+	
+	If isnull(usrFolder) Then Exit Sub
+	sBase = usrFolder
+	
+	Dim Folder: Set Folder = objFSO.GetFolder(usrFolder)
+	Dim dict
+	Set dict = CreateObject("Scripting.Dictionary")
+	Dim  colFiles, objFile
+
+	Dim foundFiles: foundFiles = False
+	Rhino.Print Folder.Path
+	Dim spath: spath = Folder.Path
+	Dim str: str = ""
+
+	Set colFiles = Folder.Files
+		
+	For Each objFile In colFiles
+		If lcase(right(objFile.Name, 3)) = "3dm" Then
+			
+			rhino.Print objFile.Name
+			Str = str & objFile.Name & ","
+		End If
+	Next
+	dict.Add spath, str
+
+	Call GetSubFolders(Folder, dict)
+
+	'Rhino.textout Join(dict.keys)
+	
+	Dim key, version, aFiles, sFile, str5, str0, strDone
+	
+	For Each key In dict.keys
+		str5 = ""
+		str0 = ""
+		aFiles = Split(dict.item(key), ",")
+
+		For Each sFile In aFiles
+			If sFile <> "" Then
+				version = Check3dmVersion(key & "\" & sFile, objfso)
+				If Version = 5 Then
+					str5 = str5 & sFile & vbNewline
+				Else
+					str0 = str0 & sFile & vbNewLine
+				End If
+			
+			End If
+		Next
+		
+		If intCmd = 1 Then
+			If str5 = "" Then
+				str5 = "No V5 files found." & vbNewline
+			Else 
+				FoundFiles = True
+			End If
+		Else
+			If str0 = "" Then
+				str0 = "No Non-V5 files found." & vbNewline
+			Else 
+				FoundFiles = True
+			End If
+		End If
+		
+		If intCmd = 1 Then
+			strDone = strDone & key & ":" & vbNewLine & str5 & vbnewline
+		Else
+			strDone = strDone & key & ":" & vbNewLine & str0 & vbnewline
+		End If
+			
+	Next
+	Set objfso = Nothing
+	
+	
+	Dim strTop
+	If intcmd = 1 Then
+		strTop = "Rhino V5 files found: " & vbNewline & vbNewline
+	Else
+		strTop = "Rhino Non-V5 files found: " & vbNewline & vbNewline
+	End If
+	
+	rhino.TextOut strtop & strDone
+		
+
+	
+End Sub
+
+Function Check3dmVersion(sFile, fso)
+	
+	Const ForReading = 1
+	Dim objFile
+	Check3dmVersion = 0
+	On Error Resume Next
+	
+	Set objFile = fso.OpenTextFile(sFile, ForReading)
+	
+	If Err Then
+		MsgBox Err.Description
+		msgbox sFile
+		Exit Function
+	End If
+	
+	Dim stemp:	sTemp = objFile.ReadLine
+	Dim strtest:	strTest = "3D Geometry File Format        5"
+
+	If instr(left(stemp, 31), "5") <> 0 Then Check3dmVersion = 5
+	
+	objFile.Close
+
+	Set objFile = Nothing
+	
+End Function
+
+
+Function GetSubFolders(Folder, dict)
+	Dim SubFolder, objFolder, colFiles, objFile
+	
+	Dim result(), n, str, spath, temp
+
+	n = 0
+	Dim objFSO
+	Set objFSO = CreateObject("Scripting.FileSystemObject")
+	
+	For Each Subfolder In Folder.SubFolders
+		
+		Rhino.Print Subfolder.Path
+		spath = Subfolder.Path
+		'str = spath
+		str = ""
+		Set objFolder = objFSO.GetFolder(Subfolder.Path)
+		Set colFiles = objFolder.Files
+		
+		For Each objFile In colFiles
+			If lcase(right(objFile.Name, 3)) = "3dm" Then
+				rhino.Print objFile.Name
+				Str = str & objFile.Name & ","
+			End If
+		Next
+		rhino.Print "Printing " & spath
+		dict.Add spath, str
+		n = n + 1
+	Next
+	
+	If n > 0 Then
+		Dim key, keys
+		keys = dict.keys
+		Dim p
+		p = 0
+		For Each key In keys
+			ReDim Preserve result(p)
+			result(p) = array(key, str)
+			p = p + 1
+		Next
+	End If
+	
+	GetSubFolders = result
+	Set objFSO = Nothing
+	
+End Function

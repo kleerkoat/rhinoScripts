@@ -1,0 +1,283 @@
+Option Explicit
+
+'Script written by Pascal
+
+'Script version Wednesday, July 16, 2008
+
+'Select a curve, then muck with the settings until you like the spacing 
+'and pattern. Scaling currently only scales along the curve, not the 
+'thickness of the pattern as I recall. '
+
+
+	'the pattern name array
+
+
+'set up some variables outside the sub
+'so that they can be remembered and reused 
+'as defaults.
+
+Dim aPatStr: aPatStr = array("Pattern1","Pattern2","Pattern3")
+Private sOldpat, dblOldScale, oldSum
+
+If IsEmpty(sOldPat) Then
+	sOldpat = apatStr(0)
+End If
+
+If IsEmpty(dblOldScale) Then'
+	dblOldScale = 1.0
+End If
+
+'make sure this corresponds to the actual sum of the default pattern!
+'Find a better way...
+If IsEmpty(OldSum) Then
+	OldSum = 8
+End If
+
+Sub CurvePattern()
+	
+	Dim starg: starg = Rhino.GetObject("Select target curve",4,True)
+	If isNull(starg) Then Exit Sub
+	
+	Dim Crvlen: Crvlen = Rhino.CurveLength(starg)
+	
+	'the pattern definitions: Dashlength,spacelength etc. DashLength of zero = circle
+	Dim pat1: pat1 = array(4,2,0,2)
+	Dim pat2: pat2 = array(4,2)
+	Dim pat3: pat3 = array(1,2,5,2)
+	
+	Dim i, Pattern
+	
+	'the pattern array
+	Dim Patterns: Patterns = array(Pat1, pat2, Pat3)
+
+	'the initial setting for the current pattern is the default or last used:
+	Dim sPat: sPat = sOldpat
+	
+	Dim aLoop: aLoop = array("OK","ChangePattern", "ScalePattern")
+	
+	'declare some variables that will be used in the Do-Loop below
+	Dim sLoop, dblScale, temp, q, repeat, sStart, sEnd
+	
+	dblScale = dblOldScale
+	
+	'set sLoop so that it will slide into the second "If-Then" in the
+	'do loop below and ask for the pattern right off the bat
+	sLoop = "changepattern"
+	
+	Dim intLoop: intLoop = 0
+		
+	Dim Bound, sum, crnLen,n,aPat(), crntlen
+	
+	Do
+		
+		'show the target curve, hidden if this is the 
+		'second (or greater)time through the Loop.
+		Rhino.ShowObject sTarg
+		
+		'get the pattern name from the user. If it is the first time through the loop
+		'this block is skipped (intloop = 0) and the defaults are used and displayed
+		If intLoop >0 Then
+			If 	lcase(sLoop) = "changepattern" Then
+				sPat = Rhino.GetString("Select pattern",sOldPat,aPatStr)
+			ElseIf lcase(sLoop) = "scalepattern" Then
+				crntLen = Sum
+				'get the desired scale from a separate function below
+				dblScale = getPatternScale(Pattern,dblScale, crntLen)
+				If isNumeric(dblScale) Then
+					dblOldScale = dblScale
+				Else Exit Sub
+				
+				End If
+			End If
+		Else sum = OldSum
+		End If
+		
+		'find which pattern in the array of patterns is being asked for.
+		For q = 0 To UBound(aPatStr)
+			If lcase(spat) = lcase(apatstr(q)) Then
+				Pattern = Patterns(q)
+				Exit For
+			End If
+		Next
+		
+		'set intLoop to 1 so the script knows that the next time through
+		'is not the first loop, and it can use the first block of code above.
+		intLoop = 1
+		
+		Bound = Ubound(Pattern)
+		sum = 0		
+		n = 0
+		
+		'shut off resdraw
+		Rhino.EnableRedraw(False)
+		
+		'create the base pattern of lines
+		For i = 0 To Ubound(Pattern)
+			temp = DblScale*Pattern(i)
+			If isIntegerEven(i) Then
+				ReDim Preserve apat(n)
+				
+				'create the dashes in a special function below called MakeDash
+				apat(n) = MakeDash(sum,temp)
+					
+				'Rhino.AddLine (array(Sum,0,0),array((sum+temp),0,0))
+				n = n +1
+			End If
+			sum = sum + temp
+		Next
+		
+		'the array spacing
+		repeat = int(Crvlen/sum)
+
+		'make sure only the pattern lines are selected
+		Rhino.UnselectAllObjects
+		Rhino.SelectObjects aPat
+	
+		'array the pattern lines using the special function ArrayX, below
+		temp =	ArrayX(aPat, Sum, Repeat)
+	
+		'gather all the pattern curves, original, and from the array
+		' and add them to one big array to flow
+		Rhino.UnselectAllObjects
+		Rhino.SelectObjects Temp
+		Rhino.SelectObjects aPat
+		Dim BasePat:Basepat = Rhino.SelectedObjects
+		
+		' add a group and put the curves in a group
+		'for easier selection by the user
+		Dim Sgrp: sGrp = Rhino.AddGroup
+		Rhino.AddObjectsToGroup BasePat,sGrp
+		
+		'make strings from the start and end points to feed to Rhino.Command
+		sStart = "W" & Rhino.Pt2Str(array(0,0,0),,True)
+		sEnd = "W" &Rhino.Pt2Str(array(Crvlen,0,0),,True)
+	
+		'Flow the pattern lines
+		Rhino.Command "_Flow _Copy=_No _Stretch=_No _Local=_No _Rigid=_No _Line " &sStart &sEnd & " _SelID " & starg &" _Enter", False
+		
+		'make sure something useful happened, otherwise
+		'clean up, redraw, and exit
+		If Rhino.LastCommandResult<>0 Then
+			Rhino.DeleteAliasobjects BasePat
+			Rhino.DeleteGroup sGrp
+			Rhino.EnableRedraw
+			Exit Sub
+		End If
+		
+		'hide the target curve so that the user can best see the pattern
+		'and redraw the screen.
+		Rhino.HideObject starg
+	
+		' redraw the screen so the user can see what we've got so far
+		Rhino.EnableRedraw
+		
+		'ask the user to OK the result or edit the inputs
+		sLoop = Rhino.GetString("Current pattern is " & apatStr(q) & " at scale " &dblScale &". Edit pattern or press Enter to accept","OK",aloop)
+		If lcase (sLoop) = "ok" Then Exit Do
+		
+		'if the user wants to edit, clean up the current preview geometry
+		'and loop with the correct settings.
+		If lcase(sloop) = "changepattern" Then
+			Rhino.DeleteObjects basepat
+			Rhino.DeleteGroup sgrp
+		ElseIf lcase(sLoop) = "scalepattern" Then
+			Rhino.DeleteObjects basepat
+			Rhino.DeleteGroup sgrp
+		End If
+		
+	Loop Until isNull(sLoop)
+	
+	If IsNull(sLoop) Then
+		Rhino.DeleteObjects basepat
+		Rhino.DeleteGroup sgrp
+	End If
+	
+	'show the target curve- this can also be deleted if needed
+	Rhino.ShowObject(starg)
+	Rhino.EnableRedraw
+End Sub
+
+'Rhino.AddStartUpScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "CurvePattern", "_NoEcho _-RunScript (CurvePattern)"
+
+Function IsIntegerEven(inty)
+
+	Dim Result: result = False
+	
+	If CInt(inty/2) = Inty/2 Then Result = True
+	
+	IsIntegerEven = Result
+	
+End Function
+
+Function  GetPatternScale(Pattern, dblScale, crntLen)
+	
+	Dim str: str  = "Current pattern unit length is " & CrntLen & " at scaling of " & dblScale
+	
+	
+	Dim Result:Result =	Rhino.GetReal(str,dblScale)
+
+	getPatternScale = Result
+End Function
+
+Function MakeDash(sum,temp)
+
+	Dim arc1, arc2, line1, line2, Plane, tempPlane
+	
+	plane = Rhino.WorldXyPlane
+	plane(0) = array(sum,0,0)
+
+	tempPlane = Rhino.RotatePlane (Plane,90,plane(3))
+	
+	If temp<>0 Then
+		'	plane = Rhino.RotatePlane (TempPlane,90,Tempplane(3))
+		Plane = tempPlane
+		arc1 = Rhino.AddArc (Plane,.125,180)
+		tempPlane(0) = array(Sum + Temp, 0,0)
+		plane = Rhino.RotatePlane (tempPlane,180,tempplane(3))
+		arc2 = Rhino.AddArc  (Plane,.125,180)
+		Line1 = Rhino.AddLine (Rhino.CurveStartPoint(arc2),Rhino.CurveEndPoint(arc1))
+		Line2 = Rhino.AddLine (Rhino.CurveStartPoint(arc1),Rhino.CurveEndPoint(arc2))
+		Dim aresult: aresult = Rhino.JoinCurves(array(arc1, line1, arc2, line2), True)
+		
+		If uBound(aresult)<>0 Then
+			Rhino.DeleteObjects(array(arc1, line1, arc2, line2))
+			Exit Function
+		End If
+	Else
+		
+		aResult = array(Rhino.addCircle(Plane,.125))
+	End If
+	MakeDash = aResult(0)
+	
+End Function
+
+Function ArrayX(aObj, dblSpace, intRepeat)
+	
+	Dim aBB: aBB = Rhino.BoundingBox(aObj,Rhino.CurrentView,False)
+	Dim aBase:	aBase = Rhino.XformCPlaneToWorld(aBB(0),Rhino.ViewCPlane(Rhino.CurrentView))
+	Dim aCopy(), n, i, aPt, aptWorld, sCopy, sObj, temp
+	n = 0
+	
+	For Each sObj In aobj
+		ReDim Preserve aCopy(n)
+		aCopy(n) = sObj
+		n = n + 1
+	Next
+	
+	For i = 0 To IntRepeat-1
+		apt = array(abb(0)(0)+((i+1)*dblSpace),aBb(0)(1), aBB(0)(2))
+		aptWorld = Rhino.XformCPlaneToWorld(apt,Rhino.ViewCPlane(Rhino.CurrentView))
+		
+		redim preserve aCopy(n)
+		temp= Rhino.CopyObjects (aObj,abase,aPtWorld)
+		For Each sCopy In temp
+			ReDim Preserve aCopy(n)
+			aCopy(n) = sCopy
+			n = n + 1
+		Next
+	Next
+	
+	ArrayX = aCopy
+	
+End Function

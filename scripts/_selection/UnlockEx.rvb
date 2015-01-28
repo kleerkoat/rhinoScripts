@@ -1,0 +1,80 @@
+Option Explicit
+'Script written by Pascal
+' RMA
+'Script version Thursday, November 03, 2011
+
+'Rhino.AddStartUpScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "UnlockSelEx", "_NoEcho _-Runscript (UnlockSelEx)"
+'Rhino.AddAlias "ShowSelEx", "_NoEcho _-Runscript (ShowSelEx)"
+'Rhino.AddAlias "UnlockEx", "_NoEcho _-Runscript (UnlockEx)"
+'Rhino.AddAlias "ShowEx", "_NoEcho _-Runscript (ShowEx)"
+
+
+
+
+'Call ShowSelEx()
+
+'Call UlockSelEx()
+
+Sub UnlockSelEx()
+	
+	Dim aLocked: aLocked = Rhino.LockedObjects()
+	
+	If Not isArray(aLocked) Then 
+		Rhino.Print "No locked objects found."
+		Exit Sub
+	End If
+	Rhino.UnselectAllObjects()
+	Rhino.Command "_UnlockSelected"
+		
+	Rhino.SelectObjects aLocked
+
+End Sub
+
+Sub UnlockEx()
+	
+	Dim aLocked: aLocked = Rhino.LockedObjects()
+
+	If Not isArray(aLocked) Then 
+		Rhino.Print "No locked objects found."
+		Exit Sub
+	End If
+	Rhino.UnselectAllObjects()
+	Rhino.Command "_Unlock"
+		
+	Rhino.SelectObjects aLocked
+
+End Sub
+
+
+Sub ShowSelEx()
+	
+	Dim aHidden: aHidden = Rhino.HiddenObjects()
+	
+	If Not isArray(aHidden) Then 
+		Rhino.Print "No hidden objects found."
+		Exit Sub
+	End If
+	Rhino.UnselectAllObjects()
+	Rhino.Command "_ShowSelected"
+		
+	Rhino.SelectObjects aHidden
+
+End Sub
+
+
+Sub ShowEx()
+	
+	Dim aHidden: aHidden = Rhino.HiddenObjects()
+	
+	If Not isArray(aHidden) Then 
+		Rhino.Print "No hidden objects found."
+		Exit Sub
+	End If
+	
+	Rhino.UnselectAllObjects()
+	Rhino.Command "_Show"
+		
+	Rhino.SelectObjects aHidden
+
+End Sub

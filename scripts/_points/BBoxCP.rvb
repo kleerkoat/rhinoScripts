@@ -1,0 +1,39 @@
+Option Explicit
+'------------------------------------------------------------------------------
+' Subroutine: 	centerPoint
+' Purpose:    	adds a point to the centerpoint of each objects bounding box
+' Author:    	Roland Snooks | 2006 | www.kokkugia.com
+'------------------------------------------------------------------------------
+'Call BBoxCP()
+Sub BBoxCP()
+  
+  Dim arrCurves, i, strCurve, dblDistance, strOffsetDirection, arrCenterPoint, arrBBox
+  
+  ' input
+  arrCurves = Rhino.GetObjects("pick objects for bounding box center point", 0,1,1,0)
+  If IsNull (arrCurves) Then Exit Sub
+  ' loop through each curve and offset
+  For i = 0 To UBound(arrCurves)
+      
+    arrBBox = Rhino.BoundingBox(arrCurves(i))
+    arrCenterPoint = Array((((arrBBox(2)(0)) + (arrBBox(0)(0))) / 2), (((arrBBox(2)(1)) + (arrBBox(0)(1))) / 2), (((arrBBox(2)(2)) + (arrBBox(0)(2))) / 2))
+    Rhino.AddPoint arrCenterPoint
+	Dim strText : strText = Rhino.Pt2Str(arrCenterPoint)
+	Rhino.ClipboardText(strText)
+	
+		'adds point coordinates to notes
+		'strNotesPre = Rhino.Notes
+	
+		'adds new line at beginning
+		'Rhino.Notes(strText) &vbnewline & (strNotesPre)
+	
+		'add new line at end
+		'Rhino.Notes(strNotesPre) &vbnewline & (strText)
+		'Rhino.Notes(strText)
+      
+      
+  Next  
+  Rhino.Command("NoEcho _SelNone")
+  Rhino.Print("CP coordinates Copied to clipboard.")
+End Sub
+

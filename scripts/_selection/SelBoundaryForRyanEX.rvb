@@ -1,0 +1,39 @@
+Option Explicit
+'Script by Mitch Heynick
+'Version Wednesday, 10 November, 2010
+
+Private oldSelMode : If IsEmpty(oldSelMode) Then oldSelMode="Window"
+
+'Call SelBoundaryForRyanEX()
+Sub SelBoundaryForRyanEX()
+	Dim arrSel,msg,strBC,arrOpts,strOpt
+	arrSel=Rhino.SelectedObjects
+	msg="Select closed curve to use as a selection boundary within the viewport"
+	strBC=Rhino.GetObject(msg,4,True,True)
+	If IsNull(strBC) Then Exit Sub
+	Call Rhino.EnableRedraw(False)
+	Call Rhino.UnselectAllObjects
+	
+	arrOpts=Array("Window","Crossing","InvertWindow","InvertCrossing")
+	strOpt=Rhino.GetString("Selection mode?",oldSelMode,arrOpts)
+	If IsNull(strOpt) Then Exit Sub
+	
+	Dim blnMatch,arrObjs,strGroup,i : blnMatch=False
+	For i=0 to 3
+		If strOpt=arrOpts(i) Then blnMatch=True : Exit For
+	Next
+	If not blnMatch Then Exit Sub
+	oldSelMode=strOpt
+
+	Call Rhino.Command("_SelBoundary _SelectionMode="&strOpt&" _SelID "&strBC,False)
+	arrObjs=Rhino.SelectedObjects
+	
+	If IsArray(arrObjs) Then
+		strGroup=Rhino.AddGroup
+		Call Rhino.AddObjectsToGroup(arrObjs,strGroup)
+		Call Rhino.AddObjectToGroup(strBC,strGroup)
+		Call Rhino.ObjectsByGroup(strGroup,True)
+		If IsArray(arrSel) Then Call Rhino.SelectObjects(arrSel)
+	End If
+	Call Rhino.EnableRedraw(True)
+End Sub

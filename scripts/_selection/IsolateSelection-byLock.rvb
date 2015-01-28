@@ -1,0 +1,31 @@
+﻿Option Explicit
+'Script written by Damien Alomar
+'Script copyrighted by <insert company name>
+'Script version Saturday, March 29, 2008
+
+Call Main()
+Sub Main()
+
+	Dim arrObjs, RSObj, RhinoPath
+	
+	RhinoPath = Rhino.InstallFolder
+	
+	arrObjs = Rhino.GetObjects ("Select Objects to Isolate",,,True,True)
+	If IsNull(arrObjs) Then
+		Exit Sub
+	End If
+	
+	arrObjs = Rhino.UnselectedObjects
+	If IsNull(arrObjs) Then Exit Sub
+	
+	Set RSObj = Rhino.GetPlugInObject ("RhinoScript")
+	If Not IsObject(RSObj) Then
+		Rhino.Print "RhinoScript Object could not be created...Exiting Script"
+		Exit Sub
+	End If
+	
+	Rhino.LockObjects arrObjs
+	
+	Call Rhino.HtmlBox(RhinoPath & "IsolateSelectionbyLock.html", Array(RSObj, arrObjs), "dialogWidth:120px; dialogHeight:80px; scoll:no; resizable:no", False)
+	
+End Sub

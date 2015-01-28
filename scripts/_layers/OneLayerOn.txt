@@ -1,0 +1,13 @@
+﻿-RunScript (
+Sub OneLayerOn
+Dim strObject,x
+strObject = Rhino.GetObject("Select object for layer isolate")
+If strObject <> vbNull Then
+Rhino.print Rhino.ObjectLayer(strObject)
+Rhino.StatusBarMessage Rhino.ObjectLayer(strObject) & " isolated"
+x = Rhino.ObjectLayer(strObject)
+Rhino.command "-_OneLayerOn " & Chr(34) & x & Chr(34)
+End If
+End Sub
+OneLayerOn
+)

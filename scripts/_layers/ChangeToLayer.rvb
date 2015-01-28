@@ -1,0 +1,16 @@
+Option Explicit
+
+'Call ChangeToLayer() 
+Sub ChangeToLayer()
+	Dim strChange2Layer, strObjectLayer,strObjectID
+	strObjectID = Rhino.GetObject("Select an object on required layer")
+	'strObjectID = Rhino.GetObject("Select an object on required layer", 0,
+True, True)
+	If IsNull(strObjectID) Then
+		'<Add exit code>
+	End If
+	strObjectLayer = Rhino.ObjectLayer (strObjectID)
+	Rhino.CurrentLayer(strObjectLayer)
+	Rhino.Print ("Current Layer : " & strObjectLayer)
+	strObjectID=""
+End Sub

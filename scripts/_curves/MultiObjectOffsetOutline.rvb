@@ -1,0 +1,49 @@
+﻿Option Explicit
+'Script written by Mitch
+'Version Saturday, 20 March, 2010
+
+Sub MultiObjectOffsetOutline()
+	
+	Dim strMsg1,arrObjs,strObj,dblOdist,arrSilObj
+
+	strMsg1="Select objects to create offset outline"
+	arrObjs=Rhino.GetObjects(strMsg1,4+8+16+32,False,True)
+	If Not IsArray(arrObjs) Then Exit Sub
+	dblODist=Rhino.GetReal("Offset distance?")
+	If IsNull(dblODist) Then Exit Sub
+	
+	Call Rhino.EnableRedraw(False)
+	Call Rhino.UnselectAllObjects
+				
+	Dim arrBB, arrPickPt,strPt,strComm,arrOutL
+	strComm="_CurveBoolean DeleteInput=All CombineRegions=Yes "
+	
+	For Each strObj In arrObjs
+		Call Rhino.SelectObject(strObj)
+		Call Rhino.Command("_Silhouette")
+		arrSilObj=Rhino.LastCreatedObjects(True)
+		If IsArray(arrSilObj) Then			
+			arrBB=Rhino.BoundingBox(arrSilObj)
+			
+			If IsArray(arrBB) Then 
+				arrPickPt=arrBB(2)
+				arrPickPt(0)=arrPickPt(0)+1
+				arrPickPt(1)=arrPickPt(1)+1			
+				strPt=Rhino.Pt2Str(arrPickPt)				
+			
+				Call Rhino.Command(strComm&strPt&" _Enter",False)	
+				arrOutL=Rhino.LastCreatedObjects(True)
+				
+				If IsArray(arrOutL) And UBound(arrOutL)=0 Then
+					Call Rhino.OffsetCurve(arrOutL(0),arrPickPt,dblOdist)
+					Call Rhino.DeleteObject(arrOutL(0))
+				End If				
+			End If
+			Call Rhino.DeleteObjects(arrSilObj)			
+		End If		
+	Next	
+	Call Rhino.EnableRedraw(True)
+	
+End Sub
+
+Call MultiObjectOffsetOutline()

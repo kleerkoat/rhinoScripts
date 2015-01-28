@@ -1,0 +1,99 @@
+Option Explicit
+
+‘Script written by <pierre forissier> for nCodon
+
+'Call Twirl()
+Sub Twirl()
+
+‘>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+‘Points cloud for twirl base curve
+
+Dim arrPoint0, arrPoint1, arrPoint2, arrPoint3
+Dim arrCtlPts()
+Dim i
+Dim N
+Dim crvBase
+N=0
+
+For i = 0 To 500 Step 5
+
+arrPoint0 = array(rnd*10,(rnd*10),i)
+arrPoint1 = array(90+rnd*10,(10*rnd),i)
+arrPoint2 = array(90+10*rnd,(90+rnd*10),i)
+arrPoint3 = array(rnd*10,(90+10*rnd),i)
+
+ReDim Preserve arrCtlPts(N)
+arrCtlPts(N) = arrPoint0
+
+ReDim Preserve arrCtlPts(N+1)
+arrCtlPts(N+1) = arrPoint1
+
+ReDim Preserve arrCtlPts(N+2)
+arrCtlPts(N+2) = arrPoint2
+
+ReDim Preserve arrCtlPts(N+3)
+arrCtlPts(N+3) = arrPoint3
+
+N=N+4
+
+Next
+
+crvBase = Rhino.AddCurve(arrCtlPts,2)
+
+‘>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+‘Twirl
+
+Call Rhino.EnableRedraw(False)
+
+Dim intSamples : intSamples = 1000
+
+Dim crvDomain : crvDomain = Rhino.CurveDomain(crvBase)
+Dim t, M
+
+Dim arrCrossSections(), CrossSectionPLane
+Dim crvPoint, crvTangent, crvPerp, crvNormal
+
+M=0
+
+For t = crvDomain(0) To crvDomain(1) + 1e-9 Step (crvDomain(1)-crvDomain(0))/2000
+
+crvPoint = Rhino.EvaluateCurve(crvBase,t)
+crvTangent = Rhino.CurveTangent(crvBase,t)
+crvPerp = Array(0,0,1)
+crvNormal = Rhino.VectorCrossProduct(crvTangent, crvPerp)
+
+CrossSectionPlane = Rhino.PlaneFromFrame(crvPoint,crvPerp,crvNormal)
+
+ReDim Preserve arrCrossSections(M)
+arrCrossSections(M) = Rhino.AddCircle(CrossSectionPlane,1)
+
+M = M+1
+
+Next
+
+Call Rhino.AddLoftSrf(arrCrossSections)
+
+‘>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+‘Twirl connectors
+
+Dim arrPtBaseConnect1, arrPtBaseConnect2
+Dim arrPtTopConnect1
+Dim j
+
+For j = crvDomain(0) To crvDomain(.7) Step ((crvDomain(1)-crvDomain(0))/intSamples)*20.1
+Dim dblRandom1 : dblRandom1 = rnd*.3
+arrPtBaseConnect1 = Rhino.EvaluateCurve(crvBase, j+dblRandom1)
+arrPtBaseConnect2 = Rhino.EvaluateCurve(crvBase, j+dblRandom1+.1)
+arrPtTopConnect1 = Rhino.EvaluateCurve(crvBase, j+4.3)
+Dim crvConnector1 : crvConnector1 = Rhino.Addline(arrPtBaseConnect1, arrPtTopConnect1)
+Dim objBaseSphere1 : objBaseSphere1 = Rhino.AddSphere(arrPtBaseConnect1, 2)
+Dim objBaseSphere2 : objBaseSphere2 = Rhino.AddSphere(arrPtBaseConnect2, 2)
+Dim objTopSphere1 : objTopSphere1 = Rhino.AddSphere(arrPtTopConnect1, 2)
+Dim objCylindLink1 : objCylindLink1 = Rhino.AddCylinder (arrPtBaseConnect1, arrPtTopConnect1, 0.3)
+Dim objCylindLink2 : objCylindLink2 = Rhino.AddCylinder (arrPtBaseConnect2, arrPtTopConnect1, 0.3)
+
+Next
+
+Call Rhino.EnableRedraw(True)
+
+End Sub

@@ -1,0 +1,37 @@
+Option Explicit
+'Script written by Mitch Heynick
+'Script version Wednesday, 16 March 2011
+
+Private oldCirc : If IsEmpty(oldCirc) Then oldCirc=1
+Sub CircleByCircumference()
+
+	Dim msg,arrCP,dblCirc,dblTol,arrPlane
+	msg=Localize()
+	dblTol=Rhino.UnitAbsoluteTolerance
+	arrCP=Rhino.GetPoint(msg(0))
+	If Not IsArray(arrCP) Then Exit Sub
+	
+	dblCirc=Rhino.GetReal(msg(1),oldCirc,dblTol)
+	If IsNull(dblCirc) Then Exit Sub
+	oldCirc=dblCirc
+	
+	arrPlane=Rhino.ViewCPlane()
+	arrPlane(0)=arrCP	
+	Call Rhino.AddCircle(arrPlane,0.5*dblCirc/Rhino.Pi)	
+End Sub
+
+'Call CircleByCircumference()
+
+Function Localize()
+	Dim intLCID
+	intLCID=Rhino.LocaleID	
+	Dim s0,s1	
+	If intLCID=1036 Then
+		s0="Centre du cercle"
+		s1="Circonférence du cercle"
+	Else
+		s0="Center of circle"
+		s1="Circumference of circle"
+	End If
+	Localize=Array(s0,s1)
+End Function

@@ -1,0 +1,27 @@
+Option Explicit
+'Script by Mitch Heynick
+'Version Thursday, 17 June, 2010
+
+'Call ImportLayerNamesFromFile()
+Sub ImportLayerNamesFromFile()
+	
+	Dim strPath
+	strPath = Rhino.OpenFileName("File with layer names to import", "Text files (*.txt)|*.txt")
+	If IsNull(strPath) Then Exit Sub
+	
+	Dim FSO, objFile	
+	Set FSO = CreateObject("Scripting.FileSystemObject")	
+	Set objFile = FSO.OpenTextFile(strPath, 1, False)
+	
+	Dim strLayerName
+	Do While Not objFile.AtEndOfStream		
+		strLayerName=(ObjFile.ReadLine())
+		If strLayerName<>"" Then
+			If not Rhino.IsLayer(strLayerName) Then
+				Call Rhino.AddLayer(strLayerName)
+			End If	
+		End If	
+	Loop
+	Set objFile = Nothing	
+End Sub
+

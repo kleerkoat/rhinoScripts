@@ -1,0 +1,31 @@
+
+Sub PopupEdits()
+	
+	Dim aEdits(14)
+	
+	aEdits(0) = "Near"
+	aEdits(1) = "Center"
+	aEdits(2) = "Perpendicular"
+	aEdits(3) = "From"
+	aEdits(4) = "PerpendicularFrom"
+	aEdits(5) = "TangentFrom"
+	aEdits(6) = "AlongLine"
+	aEdits(7) = "Alongparallel"
+	aEdits(8) = "Between"
+	aEdits(9) = "OnCurve"
+	aEdits(10) = "OnSurface"
+	aEdits(11) = "OnPolysurface"
+	aEdits(12) = "PercentageEdit"
+  aEdits(13) = "testAddSmartPoint"
+  aEdits(14) = "testAddSmartPoint"
+
+
+
+	Dim intEdit: intEdit = Rhino.PopupMenu(aEdits)
+	
+	If isnull (intEdit) Or intEdit = -1 Then Exit Sub
+	
+	Dim sEdit: sEdit = aEdits(intEdit)
+	Rhino.SendKeystrokes sEdit
+	
+End Sub 

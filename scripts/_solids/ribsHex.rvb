@@ -1,0 +1,182 @@
+Option Explicit
+'
+'Script written by Dimitrie Stefanescu
+'Released under the Creative Commons Attribution-NonCommercial-ShareAlike 3.0
+'№ 5:28:35 AMW ednesday, May 21, 2008
+
+Dim surf
+
+Call ribsHex()
+Sub ribsHex()
+	
+	surf = Rhino.GetObject("sel surf ", 8, True)
+	
+	Dim detailLevel : detailLevel = Rhino.GetInteger("det lev/density x y ", 10, 5, 50)
+	Dim hght : hght = Rhino.GetReal("rib height ", 0.5)
+	
+	Dim uDomain : uDomain = Rhino.SurfaceDomain(surf, 0)
+	Dim uStep : uStep = (uDomain(1) - uDomain(0))/detailLevel
+  
+	Dim vDomain : vDomain = Rhino.SurfaceDomain(surf, 1)
+	Dim vStep : vStep = (vDomain(1) - vDomain(0))/detailLevel
+	
+	Call rhino.enableredraw(False)
+	
+	Dim firstLine : firstLine = Array()
+	Dim secondLine : secondLine = Array()
+	
+	ReDim firstLine(detailLevel)
+	ReDim secondLine(detailLevel)
+	
+	Dim i, j, k : k = -1
+	Dim ribArr : ribArr = Array()
+	Dim n : n = -1
+	Dim rib
+	
+	'Dim sgn : sgn = 0
+	Dim m, mm : m = 0 : mm = 0
+	
+	For i=uDomain(0) To uDomain(1) Step uStep*2
+		Dim sgn : sgn = 0
+		For j=vDomain(0) To vDomain(1) Step vStep
+			
+			k = k + 1
+			ReDim Preserve firstLine(k)
+			ReDim Preserve secondLine(k)  
+			
+			If sgn < 2 Then
+				firstLine(k) = Rhino.EvaluateSurface(surf, Array(i, j))
+				If(m > 0) Then
+					secondLine(k) = Rhino.EvaluateSurface(surf, Array(i, j))
+				End If			
+			End If
+			
+			If ((sgn <4) And (sgn>1)) Then
+				firstLine(k) = Rhino.EvaluateSurface(surf, Array(i + uStep, j))
+				If(m > 0) Then
+					secondLine(k) = Rhino.EvaluateSurface(surf, Array(i - uStep, j))
+				End If	
+			End If
+			
+			Call Rhino.AddText(CStr(sgn), firstLine(k), 0.1)
+			
+			sgn = sgn + 1
+			
+			If sgn >= 4 Then
+				sgn = 0
+			End If
+			
+			mm = mm + 1
+	Next
+	
+		n = n + 1
+		ReDim Preserve ribArr(n)
+	
+		If (i<uDomain(1)-uStep*2) Then	
+			rib = addRib(firstLine, hght)
+			ribArr(n) = rib
+		End If
+		
+		If(m>0) Then
+			rib = addRib(secondLine, hght)
+			n = n + 1
+			ReDim Preserve ribArr(n)
+	
+			rib = addRib(firstLine, hght)	
+			ribArr(n) = rib
+		End If
+		
+	m = m + 2
+	k = -1
+	Next
+	
+	Call borders(uDomain, uStep, vDomain, vStep, hght)
+	
+	
+	Call rhino.enableredraw(True)
+End Sub
+
+Function borders(uDomain, uStep, vDomain, vStep,hght)
+	Dim i, j
+	Dim pts : pts = Array()
+	Dim k
+	
+	k = -1
+	j = vDomain(0)
+	For i=uDomain(0) To uDomain(1) Step uStep
+		k = k + 1
+		ReDim Preserve pts(k)
+		
+		pts(k) = Rhino.EvaluateSurface(surf, Array(i, j))
+	Next
+	Call addRib(pts,hght)
+	
+	k = -1
+	j=vDomain(1)
+	For i=uDomain(0) To uDomain(1) Step uStep
+		k = k + 1
+		ReDim Preserve pts(k)
+		
+		pts(k) = Rhino.EvaluateSurface(surf, Array(i, j))	
+	Next
+	Call addRib(pts,hght)
+	
+	k = -1
+	i = uDomain(0)
+	For j=vDomain(0) To vDomain(1) Step vStep
+		k = k + 1
+		ReDim Preserve pts(k)
+		
+		pts(k) = Rhino.EvaluateSurface(surf, Array(i, j))
+	Next
+	Call addRib(pts,hght)
+	
+	k = -1
+	i = uDomain(1)
+	For j=vDomain(0) To vDomain(1) Step vStep
+		k = k + 1
+		ReDim Preserve pts(k)
+		
+		pts(k) = Rhino.EvaluateSurface(surf, Array(i, j))
+	Next
+	Call addRib(pts,hght)
+	
+End Function
+
+
+Function addRib(pts, height)
+
+	Dim pt, pt2
+	Dim pts2 : pts2 = Array()
+	Dim k : k = -1
+	
+	For Each pt In pts
+		k = k + 1
+		
+		ReDim Preserve pts2(k)
+		pts2(k) = offsetPoint(pt, height)
+	Next
+	
+	Dim firstLine, secondLine, rib
+	
+	firstLine = Rhino.AddPolyline(pts)
+	secondLine =  Rhino.AddPolyline(pts2)
+	rib = Rhino.AddLoftSrf(Array(firstLine, secondLine))
+	
+	'Call Rhino.UnselectAllObjects
+	
+	'Call Rhino.SelectObject(rib(0))
+	
+	'Call Rhino.Command (CStr("_UnrollSrf Explode=No Labels=No _Enter"), vbFalse)
+	
+	addRib = rib
+	
+End Function
+
+Function offsetPoint(point, height)	
+	Dim norm 
+	Dim closestPt : closestPt = Rhino.SurfaceClosestPoint(surf, point)
+	norm = Rhino.SurfaceNormal(surf, closestPt)
+	norm = Rhino.VectorScale(norm, height)
+	offsetPoint = Rhino.VectorAdd(norm, point)	
+End Function

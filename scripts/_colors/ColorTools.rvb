@@ -1,0 +1,320 @@
+' Script from the amazing discoveries series (for Rhino V3 & V4)
+' Color multiple objects, remove color source settings
+' last edit: 11.02.2004 - Clement Greiner
+
+Option Explicit
+Sub ColorTools()
+
+	Dim objects, bound, index
+	Dim Msg, Str, Ready
+	Dim StrStyle, StrPrint, StrWire, StrMat
+	Dim R, G, B
+	Dim Xvalue, Yvalue
+	Dim Rx, Gx, Bx
+	Dim Ry, Gy, By
+	Dim layer, color, value
+	Dim BrightVal, DarkVal
+	Dim MatIndex, Oldcolor, Newcolor, RMat, GMat, BMat
+	Dim O_index, O_Color
+	Dim arrLayers, Material, source
+
+	objects = Rhino.GetObjects(" Select two or more objects to apply / change RGB colors", 1+4+8+16+32+512, vbTrue, vbTrue, vbTrue)
+	If Not IsArray(Objects) Then Rhino.Print "Nothing changed !" : Exit Sub
+
+	If CStr(Ubound(objects)) < 1 Then
+			Print "Please select 2 or more objects to assign / change RGB colors"
+			Exit Sub
+	End If
+
+	If IsArray(objects) Then
+		' default options on startup
+		StrStyle = "Gradient"		' the default gradient style
+		StrPrint = "No"				' the default value "on" will print the RGB values to the CommandLine
+		StrWire = "Yes"				' by default it will assign the color as Wireframe color
+		StrMat = "Yes"				' by default it will assign the color as Material color
+
+	Ready = 0
+	Do While Ready = 0
+		Str = Rhino.GetString("ColorTools  <" & StrStyle & ">" , , Array("Gradient","InvertGradient","Brighten","Darken","RandomColor","RandomGrayScale","ResetColorSource","PrintRGB","WireColor","MaterialColor") )
+
+	Select Case Str
+		Case "Gradient"
+			rhino.print "Applies a 2 color gradient from one custom color to another custom color"
+			StrStyle = "Gradient"
+		Case "InvertGradient"
+			rhino.print "Applies a 2 color gradient from one custom color to the inverse color eg. from Yellow RGB(255,255, 0) to Blue RGB( 0, 0,255)"
+			StrStyle = "InvertGradient"
+		Case "Brighten"
+			rhino.print "Brighten the RGB Wireframe or Material Colors with a user defined amount"
+			StrStyle = "Brighten"
+		Case "Darken"
+			rhino.print "Darken the RGB Wireframe or Material Colors with a user defined amount"
+			StrStyle = "Darken"
+		Case "RandomColor"
+			rhino.print "Applies Random Colors (full spectrum)"
+			StrStyle = "RandomColor"
+		Case "RandomGrayScale"
+			rhino.print "Applies Random Grayscales ranging from RGB(0 0 0) to RGB(255 255 255)"
+			StrStyle = "RandomGrayScale"
+		Case "ResetColorSource"
+			rhino.print "Reset either the Wireframe or Material color to their default settings."
+			StrStyle = "ResetColorSource"
+		Case "PrintRGB"
+			If StrPrint = "On" Then
+				Rhino.Print "Print RGB values to command line DISABLED"
+				StrPrint = "Off"
+			Else
+				Rhino.Print "Print RGB values to command line ENABLED"
+				StrPrint = "On"
+			End If
+		Case "WireColor"
+			If StrWire = "Yes" Then
+				Rhino.Print "Wireframe color assignment DISABLED"
+				StrWire = "No"
+			Else
+				Rhino.Print "Wireframe color assignment ENABLED"
+				StrWire = "Yes"
+			End If
+		Case "MaterialColor"
+			If StrMat = "Yes" Then
+				Rhino.Print "Material color assignment DISABLED"
+				StrMat = "No"
+			Else
+				Rhino.Print "Material color assignment ENABLED"
+				StrMat = "Yes"
+			End If
+		Case "x", "X"
+			Rhino.Print "Exit Command, nothing changed."
+			Exit Sub
+		Case ""
+			Ready = 1
+		Case else
+			 Rhino.Print "Click either one of the command line options, ENTER to process or X to cancel"
+	End Select
+	Loop
+
+	If StrWire = "No" And StrMat = "No" Then Rhino.Print "Nothing to do.....please enable eiter WireColor or MaterialColor assignment." : Exit Sub
+
+		If StrStyle = "Gradient" Then
+			Rhino.Print "Pick the first gradient color"
+			Xvalue = Rhino.GetColor
+			If IsNull(XValue) Then Rhino.Print "Command canceled." : Exit Sub
+			Rx = GetRValue(Xvalue)
+			Gx = GetGValue(Xvalue)
+			Bx = GetBValue(Xvalue)
+			Rhino.Print "GradientStart, RGB Value : " & Rx & "," & Gx & "," & Bx & "   Pick the second gradient color"
+			Yvalue = Rhino.GetColor(RGB((255 - Rx),(255 - Gx),(255 - Bx)))
+			If IsNull(YValue) Then Rhino.Print "Command canceled." : Exit Sub
+		    Ry = GetRValue(Yvalue)
+            Gy = GetGValue(Yvalue)
+            By = GetBValue(Yvalue)
+            Rhino.Print "GradientEnd, RGB Value : " & Ry & "," & Gy & "," & By
+		End If
+
+		If StrStyle = "InvertGradient" Then
+			arrLayers = Rhino.Sort(Rhino.LayerNames, vbTrue)
+			layer = arrLayers(0)
+			color = Rhino.LayerColor(layer)
+			Rhino.Print "Pick a gradient color to invert"
+			value = Rhino.GetColor(CLng(color))
+			If IsNull(value) Then Rhino.Print "Command canceled. Error in line 111" : Exit Sub
+			Rx = GetRValue(value)
+			Gx = GetGValue(value)
+			Bx = GetBValue(value)
+		End If
+
+		If StrStyle = "Brighten" Then
+			BrightVal = Rhino.GetInteger("Enter the amout to shift RGB values up: ", 20)
+			If IsNumeric(BrightVal) Then
+				BrightVal = Abs(BrightVal)
+				Rhino.Print BrightVal
+			End If
+		End If
+
+		If StrStyle = "Darken" Then
+			DarkVal = Rhino.GetInteger("Enter the amout to shift RGB values down: ", 20)
+			If IsNumeric(DarkVal) Then
+				DarkVal = Abs(DarkVal)
+				Rhino.Print DarkVal
+			End If
+		End If
+
+		bound = UBound(objects)
+
+		Rhino.EnableRedraw(vbFalse)
+		Rhino.UnSelectAllObjects
+
+		For index = 0 To bound
+			' - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - InvertGradient
+			If StrStyle = "InvertGradient" Then
+				R = Abs( Rx - Cint ( 255 / bound * index))
+                G = Abs( Gx - Cint ( 255 / bound * index))
+                B = Abs( Bx - Cint ( 255 / bound * index))
+			End If
+			' - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - Gradient
+			If StrStyle = "Gradient" Then
+				R = ( ( index / bound ) * (Ry) ) +	((( bound - index ) / bound ) * (Rx))
+				R = Cint(R)
+				G = ( ( index / bound ) * (Gy) ) +	((( bound - index ) / bound ) * (Gx))
+				G = Cint(G)
+				B = ( ( index / bound ) * (By) ) +	((( bound - index ) / bound ) * (Bx))
+				B = Cint(B)
+			End If
+			' - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - Brighten Wireframe Color
+			If StrStyle = "Brighten" And StrWire = "Yes" Then
+					value = Rhino.ObjectColor(objects(index))
+					Rx = GetRValue(value)
+					R = Rx + (BrightVal)
+					If R > 255 Then R = 255
+					Gx = GetGValue(value)
+					G = Gx + (BrightVal)
+					If G > 255 Then G = 255
+					Bx = GetBValue(value)
+					B = Bx + (BrightVal)
+					If B > 255 Then B = 255
+			End If
+			' - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - Darken Wireframe Color
+			If StrStyle = "Darken" And StrWire = "Yes" Then
+					value = Rhino.ObjectColor(objects(index))
+					Rx = GetRValue(value)
+					R = Rx - (DarkVal)
+					If R < 0 Then R = 0
+					Gx = GetGValue(value)
+					G = Gx - (DarkVal)
+					If G < 0 Then G = 0
+					Bx = GetBValue(value)
+					B = Bx - (DarkVal)
+					If B < 0 Then B = 0
+			End If
+			' - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - extra print for wireframe
+			If StrStyle = "Brighten" Or StrStyle = "Darken" Then
+				If StrWire = "Yes" And StrPrint = "On" Then
+				Rhino.Print "Object number: " & (index+1) & "    WireframeColor   R: " & (R) & "    G: " & (G) & "    B: " & (B)
+				End If
+			End If
+			' - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -Brighten Material Color
+			If StrStyle = "Brighten" And StrMat = "Yes" Then
+
+			MatIndex = Rhino.ObjectMaterialIndex(objects(index))
+				If MatIndex <> -1 Then
+					Oldcolor = Rhino.MaterialColor(MatIndex)  ' get old material color
+					Ry = GetRValue(Oldcolor)
+					RMat = Ry + (BrightVal)
+						If RMat > 255 Then RMat = 255
+					Gy = GetGValue(Oldcolor)
+					GMat = Gy + (BrightVal)
+						If GMat > 255 Then GMat = 255
+					By = GetBValue(Oldcolor)
+					BMat = By + (BrightVal)
+						If BMat > 255 Then BMat = 255
+
+				Newcolor = Rhino.MaterialColor(MatIndex, RGB((RMat),(GMat),(BMat)))	' set new material color
+				End If
+			End If
+			' - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -Darken Material Color
+			If StrStyle = "Darken" And StrMat = "Yes" Then
+
+			MatIndex = Rhino.ObjectMaterialIndex(objects(index))
+				If MatIndex <> -1 Then
+					Oldcolor = Rhino.MaterialColor(MatIndex)  ' get old material color
+					Ry = GetRValue(Oldcolor)
+					RMat = Ry - (DarkVal)
+						If RMat < 0 Then RMat = 0
+					Gy = GetGValue(Oldcolor)
+					GMat = Gy - (DarkVal)
+						If GMat < 0 Then GMat = 0
+					By = GetBValue(Oldcolor)
+					BMat = By - (DarkVal)
+						If BMat < 0 Then BMat = 0
+
+				Newcolor = Rhino.MaterialColor(MatIndex, RGB((RMat),(GMat),(BMat)))	' set new material color
+				End If
+			End If
+			' - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - extra print for material
+			If StrStyle = "Brighten" Or StrStyle = "Darken" Then
+				If StrMat = "Yes" And StrPrint = "On" Then
+				Rhino.Print "Object number: " & (index+1) & "    MaterialColor   R: " & (RMat) & "    G: " & (GMat) & "    B: " & (BMat)
+				End If
+			End If
+			' - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - RandomColor
+			If StrStyle = "RandomColor" Then
+				R = Cint(Rnd*255)
+				G = Cint(Rnd*255)
+				B = Cint(Rnd*255)
+			End If
+			' - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - RandomGrayScale
+			If StrStyle = "RandomGrayScale" Then
+				R = Cint(Rnd*255)
+				G = R
+				B = R
+			End If
+			' - - - - - - - - - - - - - - - - - - - - Print RGB values - - - - - - - - - - - - - - - - - - - - - -
+			If StrPrint = "On" And Not StrStyle = "Brighten" And Not StrStyle = "Darken" Then
+			Rhino.Print "Object number: " & (index+1) & "    Color   R: " & (R) & "    G: " & (G) & "    B: " & (B)
+			End If
+
+			' - - - - - - - - - - - - - - - - - - - - set the wireframe color - - - - - - - - - - - - - - - - - -
+
+			If StrWire = "Yes" Then
+				If StrStyle = "ResetColorSource" Then
+					' reset the wirecolor to layer color
+					Rhino.ObjectColorSource objects(index), 0
+				Else
+					' apply a wireframe color
+					Rhino.ObjectColor objects(index), RGB((R),(G),(B))
+				End If
+			End If
+
+			' - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+			' - - - - - - - - - - - - - - - - - - - - set the Material color - - - - - - - - - - - - - - - - - -
+			If StrMat = "Yes" And Not StrStyle = "Brighten" And Not StrStyle = "Darken" Then
+				If StrStyle = "ResetColorSource" Then
+					' reset material color to layer color mode
+					Rhino.ObjectMaterialSource objects(index), 0
+				Else
+					' assign the material color
+					source = Rhino.ObjectMaterialSource(objects(index))		' get source
+					If source = 0 Then
+						Material = Rhino.AddMaterialToObject(objects(index))		' set to "basic"
+					End If
+			' - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+					O_index = Rhino.ObjectMaterialIndex(objects(index))		' get material index
+					If O_index <> -1 Then
+						O_color = Rhino.MaterialColor(O_index, RGB((R),(G),(B)))	' set material color
+					End If
+				End If
+			End If
+
+			' - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+		Next
+	End If
+	Rhino.EnableRedraw(vbTrue)
+	Rhino.Print "Ready."
+	End Sub
+
+' Extract R value from rvb color value
+Function GetRValue (val)
+ If val > -1 And val < 16777216 Then
+  GetRValue = val \ 256 ^ 0 And 255
+ Else
+  GetRValue = -1
+ End If
+End Function
+' Extract G value from rvb color value
+Function GetGValue (val)
+ If val > -1 And val < 16777216 Then
+  GetGValue = val \ 256 ^ 1 And 255
+ Else
+  GetGValue = -1
+ End If
+End Function
+' Extract B value from rvb color value
+Function GetBValue (val)
+ If val > -1 And val < 16777216 Then
+  GetBValue = val \ 256 ^ 2 And 255
+ Else
+  GetBValue = -1
+ End If
+End Function
+'ColorTools

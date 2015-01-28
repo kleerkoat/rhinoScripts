@@ -1,0 +1,130 @@
+Option Explicit
+'Script written by Pascal
+'Wednesday, September 17, 2008 
+
+'labels selected objects with a text dot
+'if objects are unnamed, asks for user input, 
+'then applies the label
+
+Sub LabelObjects()
+	
+	Dim aObj: aObj = Rhino.GetObjects("Select objects.",,,True)
+	If Not IsArray(aObj) Then Exit Sub
+	
+	Dim aBB,sObj,Name, aCent, temp, param
+	
+	
+	For Each sObj In aObj
+		Rhino.UnselectAllObjects
+		'get the object bounding box and the centroid of the box
+		aBB = Rhino.BoundingBox(sObj,Rhino.CurrentView)
+		aCent = AveragePoints(array(aBB(0), aBB(6)))
+
+		'get the object name
+		Name = Rhino.ObjectName(sObj)
+		
+		'if the object is not named, ask the user to name the object
+		If isNull(Name) Then
+
+			Rhino.SelectObject(sObj)
+			Name = Rhino.StringBox ("Enter a name for the selected object.",,"Object Name")
+			
+			' name the object 
+			If Not isNull(Name) Then
+				Rhino.ObjectName sObj, name
+			End If
+			
+		End If
+		
+		'add the label at the bounding box centroid
+		
+		If Rhino.IsPolysurface(sObj) Or Rhino.IsSurface(sObj) Then
+			temp = Rhino.BrepClosestPoint(sobj,aCent)(0)
+		ElseIf Rhino.IsMesh(sobj) Then
+			temp = Rhino.MeshClosestPoint(sobj,aCent)(0)
+		ElseIf Rhino.IsCurve(sObj) Then
+			param = Rhino.CurveClosestPoint(sObj,aCent)
+			temp = Rhino.EvaluateCurve(sObj, param)
+		Else temp = aCent
+		End If
+		
+		Rhino.AddTextDot Name,Temp
+	Next
+	
+	Rhino.UnselectAllObjects
+	
+End Sub
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "LabelObjects","_NoEcho _-Runscript (LabelObjects)"
+
+Function AveragePoints(arrPts)
+
+	Dim X, Y, Z
+	Dim XX, YY, ZZ
+	Dim arrX(), arrY(), arrZ()
+	Dim BigX, BigY, BigZ
+	Dim XAverage, YAverage, ZAverage, arrAverage
+	Dim i
+
+	XX = False
+	YY = False
+	ZZ = False
+
+	For i=0 To UBound(arrPts)
+		ReDim Preserve arrX(i)
+		arrX(i) = arrPts(i)(0)
+		ReDim Preserve arrY(i)
+		arrY(i) = arrPts(i)(1)
+		ReDim Preserve arrZ(i)
+		arrZ(i) = arrPts(i)(2)
+	Next
+
+	If IsArray(arrX)Then
+		For i=0 To UBound (arrX)
+			If XX =False Then
+				X = arrX(0)
+				BigX=X
+				XX =True
+			ElseIf XX =True Then
+				X= BigX+arrX(i)
+				BigX=X
+			End If
+		Next
+	End If
+
+	If IsArray(arrY) Then
+		For i=0 To UBound (arrY)
+
+			If YY = False Then
+				Y = arrY(0)
+				BigY=Y
+				YY =True
+			ElseIf YY =True Then
+				Y= BigY+arrY(i)
+				BigY=Y
+			End If
+		Next
+	End If
+
+	If IsArray(arrZ)Then
+		For i=0 To UBound (arrZ)
+			If ZZ =False Then
+				Z = arrZ(0)
+				BigZ=Z
+				ZZ =True
+			ElseIf ZZ =True Then
+				Z= BigZ+arrZ(i)
+				BigZ=Z
+			End If
+		Next
+	End If
+
+	XAverage =  BigX/(UBound(arrPts)+1)
+	YAverage =  BigY/(UBound(arrPts)+1)
+	ZAverage =  BigZ/(UBound(arrPts)+1)
+
+	arrAverage = Array(XAverage, YAverage, ZAverage)
+	AveragePoints = arrAverage
+
+End Function

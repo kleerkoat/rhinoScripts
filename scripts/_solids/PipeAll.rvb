@@ -1,0 +1,71 @@
+' ****************************** RhinoScript.org ******************************
+'
+'   A More Complex "Pipe All", version 1
+'
+'   by Dauvit Alexander, published May 05, 2011
+'
+'
+'   An updating of the "PipeAll" command on the Rhino 3D website. Original script by Rajaa Issa.
+'   This version of the script allows for variable radius piping and allows for the cap to be changed between Flat/Round/None. It also automatically prevents errors arising from having used the Pipe command previously with "Thickness=Yes" set.
+'
+'
+'
+'
+'   This RhinoScript Tool has been downloaded from RhinoScript.org.
+'
+'   Rhino versions: Rhino 4
+'
+'   LICENSE INFORMATION:
+'   This script is published under the GNU General Public License, version 3
+'   or any later version, and thus comes WITHOUT ANY WARRANTY. You can get
+'   the complete license text here: www.rhinoscript.org/gpl
+'
+' ****************************** RhinoScript.org ******************************
+
+
+
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+ ' PipeAll.rvb -- May 2011
+ ' Based on code by Rajaa Issa.
+ ' Rewritten for variable radius by Dauvit Alexander.
+ ' Works with Rhino 4.0.
+
+ Option Explicit
+ 
+ Sub PipeOne(strRail, strRadiusStart, strRadiusEnd, pipeCapValue)
+   Dim strCmd
+   strCmd = "_Pipe _SelID " & strRail & " _Thick=_No _Cap=_" & pipeCapValue & " " & strRadiusStart & " " & strRadiusEnd & " _Enter"
+   Call Rhino.Command(strCmd,0)
+ End Sub
+ 
+ Sub PipeAll
+  Dim arrCurves, name, pipeRadiusStart, pipeRadiusEnd, pCapValue
+  
+  Dim arrCapValues(2)
+  arrCapValues(0) = "None"
+  arrCapValues(1) = "Round"
+  arrCapValues(2) = "Flat"
+
+  arrCurves = Rhino.GetObjects("Select curves to pipe", 4)
+  pipeRadiusStart = Rhino.GetReal("Pipe radius Start")
+  pipeRadiusEnd = Rhino.GetReal("Pipe radius End")
+  
+  pCapValue=Rhino.GetString("Cap?", ,arrCapValues)
+  If IsNull(pCapValue) Then
+    pCapValue="None"
+  End If
+ 
+  'PIPE
+  Rhino.EnableRedraw(False)
+  If IsArray(arrCurves) Then
+   For Each name In arrCurves
+    Call PipeOne(name, pipeRadiusStart, pipeRadiusEnd, pCapValue)
+   Next
+  End If
+ Rhino.EnableRedraw(True)
+ End Sub
+ 
+ '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+
+ 'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+ 'Rhino.AddAlias "PipeAll", "_NoEcho _-RunScript (PipeAll)"

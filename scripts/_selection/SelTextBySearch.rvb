@@ -1,0 +1,29 @@
+﻿Option Explicit
+'Script written by Damien Alomar
+'Script copyrighted by <insert company name>
+'Script version Wednesday, February 06, 2008
+
+Call Main()
+Sub Main()
+
+	Dim arrTxtObjs, strTxtObj, strTxt, strSearch, arrSelect(), i
+	
+	arrTxtObjs = Rhino.ObjectsByType (512)
+	If IsNull(arrTxtObjs) Then Exit Sub
+	
+	strSearch = Rhino.StringBox ("Text to Match with Annotations", ,"Match Text")
+	If IsNull(strSearch) Then Exit Sub
+	i = -1
+	
+	For each strTxtObj in arrTxtObjs
+		strTxt = Rhino.TextObjectText (strTxtObj)
+		If strTxt = strSearch Then
+			i = i+1
+			ReDim Preserve arrSelect(i)
+			arrSelect(i) = strTxtObj
+		End If		
+	Next 
+	
+	Rhino.SelectObjects arrSelect
+	
+End Sub

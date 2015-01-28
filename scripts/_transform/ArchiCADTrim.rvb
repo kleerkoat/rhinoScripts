@@ -1,0 +1,91 @@
+Option Explicit
+'Script written by Steven Janssen
+'Script copyrighted by Steven Janssen
+'Script version Monday, 3 March 2008 9:36:35 PM
+
+'Call ArchiCADTrim()
+Sub ArchiCADTrim()
+	Dim k, arrCurve, arrPoint, FltParam, intDist, arrTempPt, MinD(1)
+	Dim i, arrI, j, fltSP, MinP(1), MaxP(1), arrSD
+	
+	Rhino.UnselectAllObjects
+	arrPoint = Rhino.GetPoint
+	arrCurve = Rhino.AllObjects
+	If Not IsArray(arrPoint) Or Not IsArray(arrCurve) Then
+		Exit Sub
+	End If
+	
+	MinD(0) = -1
+	For k = 0 To Ubound(arrCurve)
+		If IsCurve(arrCurve(k)) Then
+			FltParam = Rhino.CurveClosestPoint(arrCurve(k),arrPoint)
+		
+			arrTempPt = Rhino.EvaluateCurve(arrCurve(k),FltParam)
+			intDist = Rhino.Distance(arrPoint,arrTempPt)
+
+			If MinD(0) = -1 Then
+				MinD(0) = intDist
+				MinD(1) = k
+			ElseIf intDist < MinD(0) Then
+				MinD(0) = intDist
+				MinD(1) = k
+			End If
+			
+		End If	
+	Next
+	'Rhino.SelectObject(arrCurve(MinD(1)))
+	
+	'fltSP is the  Selected curve's Parameter
+	fltSP = Rhino.CurveClosestPoint(arrCurve(MinD(1)),arrPoint)
+	'arrSD is the Selected curve's Domain
+	arrSD = Rhino.CurveDomain(arrCurve(MinD(1)))
+	
+	MinP(0) = -1
+	MaxP(0) = -1
+	
+	'MinP and MaxP store the parameter in (0) and the 3D point in (1)
+	For i = 0 To Ubound(arrCurve)
+		If i <> MinD(1) Then
+			If IsCurve(arrCurve(i)) Then
+				arrI = Rhino.CurveCurveIntersection(arrCurve(MinD(1)),arrCurve(i))
+				If Not IsNull(arrI) Then
+					For j = 0 To Ubound(arrI)
+						If arrI(j,5) > fltSP Then
+							If MaxP(0) = -1 Or arrI(j,5) < MaxP(0) Then
+								MaxP(0) = arrI(j,5)
+								MaxP(1) = arrI(j,1)
+							End If
+						ElseIf arrI(j,5) < fltSP Then
+							If MinP(0) = -1 Or arrI(j,5) > MinP(0) Then
+								MinP(0) = arrI(j,5)
+								MinP(1) = arrI(j,1)
+							End If
+						End If
+					Next
+				End If
+			End If
+		End If
+	Next
+	
+	If MinP(0) = -1 And MaxP(0) = -1 Then
+		rhino.DeleteObject arrCurve(MinD(1))
+		Call Main
+		Exit Sub
+	ElseIf MinP(0) = -1 Then
+		'rhino.print "Max"
+		'If the min doesn't exist, we want to keep 'max to the end'
+		Rhino.TrimCurve arrCurve(MinD(1)), Array(MaxP(0),arrSD(1))
+	ElseIf MaxP(0) = -1 Then
+		'rhino.print "min"
+		'if the max doesn't exist, we want to keep 'start to the min
+		Rhino.TrimCurve arrCurve(MinD(1)), Array(arrSD(0),MinP(0))
+	Else 'rhino.Print "other"
+		'if they both exist then we have to trim twice, keep 'start to min' and 'max to end'
+		Rhino.TrimCurve arrCurve(MinD(1)), Array(arrSD(0),MinP(0)), vbFalse
+		Rhino.TrimCurve arrCurve(MinD(1)), Array(MaxP(0),arrSD(1))
+	End If
+		rhino.DeleteObject arrCurve(MinD(1))
+	
+	Call Main
+	Exit Sub
+End Sub

@@ -1,0 +1,300 @@
+Option Explicit
+
+'Move objects normal to the current cplane to a target object.
+' The Move 'from' point hits the target object.
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+
+'Rhino.addAlias "MoveProject", "! _noEcho _-Runscript MoveProject"
+
+'Rhino.AddAlias "MoveProjectEach", "_noEcho _-Runscript MoveProjectEach"
+
+	
+Sub MoveProject
+  
+	Dim arrobjects, abase, strTarget, arrProj
+	Dim strPt, strProj
+  
+	arrObjects = Rhino.getObjects("Select objects to move",,,True)
+	If Not IsArray(arrObjects) Then Exit Sub
+    
+	aBase = Rhino.GetPoint ("Point to move from")
+	If Not IsArray(abase) Then Exit Sub
+
+	strTarget = Rhino.GetObject("Select target surface, polysurface or mesh",8+16+32)
+	If IsNull(strtarget) Then Exit Sub
+	
+	Dim X
+	If Rhino.IsMesh(strTarget) then
+		X = Rhino.ProjectPointToMesh(abase,strTarget,Rhino.ViewCPlane()(3))
+	Else
+		X = Rhino.ProjectPointToSurface(abase,strTarget,Rhino.ViewCPlane()(3))
+	End if
+		
+	Rhino.EnableRedraw(False)
+	dim intTarg
+	If UBound(X) > 0 then
+		intTarg = Rhino.PointArrayClosestPoint( X, abase)
+	else
+		inttarg = 0
+	end if
+		
+	dim atarg: atarg = X(intTarg)
+	Rhino.MoveObjects arrObjects, aBase, atarg	
+
+	Rhino.EnableRedraw(True)
+  
+End Sub
+
+
+'Call MoveProjectEach()
+
+Sub MoveProjectEach()
+	
+	Dim aObj, sobj,starg, View, Plane
+	Dim apt, temp, aProj(), A, B, C, i, dist, aDist()
+	Dim arrBB, arrBBW, arrBBTarg, arrBBAll, arrBBAllW
+	Dim aAll, aTarget
+	
+	
+
+	aObj = Rhino.GetObjects("Select objects to move",8+16+32,True,True)
+
+	If Not isarray(aObj) Then Exit Sub
+	sTarg = Rhino.GetObject("Select target object",8+16+32)
+	If isNull(sTarg) Then Exit Sub
+	
+	View = Rhino.CurrentView
+	Plane = Rhino.ViewCPlane
+	aTarget = array(sTarg)
+	aAll = Rhino.JoinArrays(aObj,aTarget)
+	arrBBTarg = Rhino.BoundingBox(sTarg, View,False)
+	arrBBAll = Rhino.BoundingBox(aAll, view,False)
+	arrBBAllW = CplaneToWorldPts(arrBBAll)
+	
+	Dim length, Line, sInt, aInt, arrEnd
+	
+	Length = Rhino.Distance(arrBBAllW(0), arrBBAllW(4))
+		
+	Rhino.EnableRedraw(False)
+	
+	Dim vecDir, VecLine, aEnd, q
+	For Each sObj In aObj
+		
+		arrBB = Rhino.BoundingBox (sObj,View, False)
+		arrBBW = CplaneToWorldPts(arrBB)
+		
+		If Not isArray(arrBB) Then Exit Sub
+			
+		A = 0
+		B = 0
+		C = 0
+		Dim n 
+		n = 0
+		q = 0
+		
+		If BottomCloser (arrBBW, sTarg) Then
+			q = 0
+			vecDir = Rhino.VectorCreate (arrBBAllW(0),arrBBAllW(4))
+		Else
+			q = 4
+			vecDir = Rhino.VectorCreate (arrBBAllW(4),arrBBAllW(0))
+		
+		End If
+	
+		vecDir = Rhino.VectorUnitize(VecDir)
+		VecLine = Rhino.VectorScale(vecDir,Length)
+					
+		For i  =  q To q + 3 
+		
+			temp = Rhino.XformCplaneToWorld(arrBB(i), Plane)
+			
+			aEnd =Rhino.PointAdd(temp,VecLine)
+			Line = Rhino.AddLine (temp, aEnd)
+			aInt = FirstIntersection(Line, sTarg)
+			Rhino.DeleteObject Line
+			
+			If IsArray(aInt) Then
+				Rhino.DeleteObject Line
+				dist = Rhino.Distance (aInt,temp)
+			
+				If Dist > A Then
+					A = Dist
+					B = i
+					C = aInt
+				End If
+			End If
+		Next
+		
+		If A = 0 Then
+			Rhino.SelectObject sObj
+			Rhino.Enableredraw(True)
+				
+			msgbox " It looks like at least part of this object misses the target, or it is already on the target."
+				
+			Rhino.Enableredraw(False)
+			Rhino.UnselectObject sObj
+		End If
+		
+		If A > 0 Then
+			Rhino.MoveObject sObj, arrBBW(B),C
+		End If
+	
+	Next
+	Rhino.EnableRedraw(True)	
+	
+End Sub
+
+
+Function CplaneToWorldPts(arrPts)
+
+	Dim arrPlane, i, result
+	arrPlane = Rhino.ViewCplane
+	For i = 0 To UBound (arrPts)
+
+		Result = Rhino.XformCPlaneToWorld (arrPts(i), arrPlane)
+		ReDim Preserve arrOutput(i)
+		arrOutput(i) = Result
+	Next
+
+	CplaneToWorldPts = arrOutput
+
+End Function
+
+Function BottomCloser(aBB, starg)
+	
+	Dim AvTop,AvTop2,AvTop3, AvBottom,AvBottom2,AvBottom3, projTop, ProjBottom, aProjTop, aProjBottom
+	Dim strTop, strBottom
+	
+	AvTop = AveragePoints (array(aBB(4), aBB(5), aBB(6), aBB(7)))
+	AvBottom = AveragePoints (array(aBB(0), aBB(1), aBB(2), aBB(3)))
+	
+	If Rhino.Ismesh(starg) Then
+		AvTop2 = Rhino.MeshClosestPoint(starg,avTop)
+		avBottom2 =  Rhino.MeshClosestPoint (sTarg,avBottom)
+	Else
+
+		AvTop2 =  Rhino.BrepClosestPoint (sTarg,avTop)
+		avBottom2 =  Rhino.BrepClosestPoint (sTarg,avBottom)
+			
+	End If
+	AvTop3 = AvTop2(0)
+	
+	avBottom3 = avBottom2(0)
+	'Rhino.addPoint avBottom3
+			
+	If Rhino.Distance(avBottom, avBottom3) < Rhino.Distance(avTop, avtop3) Then
+		BottomCloser = True 
+	Else BottomCloser = False
+	End If
+
+End Function
+
+Function AveragePoints(arrPts)
+	'Finds the average location of an array
+	'of points.
+
+	Dim X, Y, Z
+	Dim i
+	
+	X = 0
+	Y = 0
+	Z = 0
+
+	For i=0 To UBound (arrPts)
+			
+		'add all the X values
+		X = X+arrPts(i)(0)
+	
+		'add all th Y values
+		Y = Y+arrPts(i)(1)			
+	
+		'add all the Z values
+		Z = Z+arrpts(i)(2)
+	Next
+	
+	'Divide by the number of points to
+	'get the average  for each
+	'create the output array from the 3 averages
+	AveragePoints  =array(X/(UBound(arrPts)+1), Y/(UBound(arrPts)+1), Z/(UBound(arrPts)+1))
+
+End Function
+
+Function FirstIntersection (strCrv, strObj)
+
+	FirstIntersection = Null
+	Dim arrInt, arrPts(), i
+
+	If Rhino.IsMesh(strObj) Then
+		arrint = Rhino.CurveMeshIntersection(strCrv, strobj)
+	Else 
+	
+		arrInt = Rhino.CurveBrepIntersect (strCrv, strObj)
+	End If	
+	
+	
+	Dim strInt, k
+	
+	If IsArray(arrInt) Then
+		If Rhino.IsMesh(strObj) Then
+		
+			For k = 0 To ubound(arrInt)
+				If IsArray(arrint(k)) Then
+					ReDim Preserve arrPts(i)
+					arrPts(i) = arrInt(k)
+					i = i + 1	
+					
+				End If
+			Next
+		
+		Else
+			
+			For Each strInt In arrInt
+				If Rhino.IsPoint(strInt) Then
+			
+					ReDim Preserve arrPts(i)
+					arrPts(i) =  Rhino.PointCoordinates(strInt)
+					i = i + 1
+				Else 
+					ReDim Preserve arrPts(i)
+					arrPts(i) = Rhino.CurveStartPoint(strInt)
+					i = i + 1
+					ReDim Preserve arrPts(i)
+					arrPts(i) = Rhino.CurveEndPoint(strInt)
+					i = i + 1
+				End If 
+			Next
+		End If
+	End If
+					
+	If IsUpperBound(arrPts) Then
+   
+		If UBound(arrPts)> 0 Then
+			
+			FirstIntersection = arrPts(Rhino.PointArrayClosestPoint(arrPts, Rhino.CurveStartPoint(sCrv)))
+			
+			Rhino.DeleteObjects arrInt
+		Else
+			
+			If isArray(arrPts(0)) Then
+				firstIntersection = arrpts(0)
+				Rhino.DeleteObjects arrInt
+			End If
+			
+			Exit Function 
+		End If
+	End If
+    
+End Function
+    
+Function IsUpperBound(ByRef arr)
+
+	IsUpperBound = False
+
+	If IsArray(arr) Then
+		On Error Resume Next
+		UBound arr
+		If Err.Number = 0 Then IsUpperBound = True
+	End If
+
+End Function
+

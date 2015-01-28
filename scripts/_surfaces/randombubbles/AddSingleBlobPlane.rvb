@@ -1,0 +1,59 @@
+' Script for Rhinoceros 3.0 Sr3
+' add single RiBlobby 9000 plane to render with RiBlobby Exporter
+' © 2004 Clement Greiner
+
+Option Explicit
+Sub AddSingleBlobPlane
+Dim Ready, dblStrength, IntRiInfluence, StrRiInfluence
+Dim arrRectangle, StrPlane
+
+' search for a default radius in this document, define
+	dblStrength = Rhino.GetDocumentData("RandomBubbles", "PlaneStrength")
+	If IsNull(dblStrength) Then dblStrength = 2
+
+' search for a default RiBlobby influence in this document, define
+	intRiInfluence = Rhino.GetDocumentData("RandomBubbles", "RiInfluence")
+	If IsNull(intRiInfluence) Then intRiInfluence = 1
+
+' define radius for the spheres to add
+	dblStrength = Rhino.GetReal("Enter plane strength", CDbl(dblStrength), 0.001, 10)
+	If IsNull(dblStrength) Then Exit Sub
+	' store
+	Rhino.SetDocumentData "RandomBubbles", "PlaneStrength", dblStrength
+
+' define influence
+	If intRiInfluence = 1 Then StrRiInfluence = "Positive" Else StrRiInfluence = "Negative"
+	StrRiInfluence = Rhino.GetString("Choose RiBlobby Influence mode", StrRiInfluence, Array("Positive","Negative"))
+	If IsNull(StrRiInfluence) Then Exit Sub
+	If StrRiInfluence = "Positive" Then IntRiInfluence = 1 Else IntRiInfluence = -1
+	' store
+	Rhino.SetDocumentData "RandomBubbles", "RiInfluence", intRiInfluence
+
+Do
+	arrRectangle = Rhino.GetRectangle(0, , "Pick first corner of rectangle")
+	If Not IsArray(arrRectangle) Then
+		Exit Do
+	Else
+		StrPlane = Rhino.AddSrfPt(arrRectangle)
+		If IsNull(StrPlane) Then Exit Do
+		ADD_BubbleUserData StrPlane,dblStrength,intRiInfluence
+	End If
+Loop
+
+
+End Sub
+
+' Function to add 1001 bubble user data to spheres
+Private Function ADD_BubbleUserData (StrObject, dblStrength, intRiBlobbyInfluence)
+Dim StrInfluence
+If intRiBlobbyInfluence = -1 Then StrInfluence = "Negative" Else StrInfluence = "Positive"
+' store the "Opcode" to include this object as 1001 (ellipsoid) = spherical
+Rhino.SetObjectData StrObject, "RandomBubbles", "RiOpcode", 9000
+' store the sphere center point and radius for collision detection
+Rhino.SetObjectData  StrObject, "RandomBubbles", "PlaneStrength", dblStrength
+Rhino.SetObjectData  StrObject, "RandomBubbles", "RiInfluence", intRiBlobbyInfluence
+' display the data values to assign
+Rhino.Print "RiOpcode: " & 9000 &  "  PlaneStrength: " & dblStrength & "  RiInfluence: " & StrInfluence
+End Function
+
+AddSingleBlobPlane

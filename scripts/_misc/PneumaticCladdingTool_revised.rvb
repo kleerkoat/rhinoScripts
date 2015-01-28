@@ -1,0 +1,49 @@
+﻿Option Explicit
+'Script written by Rodrigo Medina
+'Script copyrighted by designplaygrounds.com
+'This script is Protected under a Creative Commons 2.5 Licence
+'If you are going to use it for comercial purposes please notify to rodrigo_medina23@hotmail.com
+'Script version viernes, 02 de octubre de 2009 13:49:05
+'revised by Toni Österlund <toni.osterlund@gmail.com> 02/2010
+
+Call Main()
+Sub Main()
+	Dim arrPolygons : arrPolygons=Rhino.GetObjects("select polygons for panel creation ",4)
+	If isNull (arrPolygons) Then Exit Sub 
+	Dim height: height=Rhino.GetInteger("Panel Height")
+	
+	Dim polygon
+	For Each polygon In arrPolygons
+		Call cushion(polygon,height)
+		Call cushion(polygon,-height)
+	Next
+
+End Sub
+Sub cushion(polygon, height)
+	Dim arrTemp, surface, arrCenters, parameter, norm, ppoint
+	
+	'make a surface of the closed polygon - planar or not - the "patch" doesn't care
+	'and then select it and store it in the 'surface' variable
+	Call Rhino.SelectObject(polygon)
+	Call Rhino.Command(" _-Patch " &"_Enter")
+	Call Rhino.UnselectAllObjects()
+	Call Rhino.Command("_sellast")
+	arrTemp = Rhino.SelectedObjects()
+	Call Rhino.UnselectAllObjects()
+	surface = arrTemp(0)
+	
+	arrCenters= Rhino.SurfaceAreaCentroid(surface)
+	If IsArray (arrCenters) Then 
+		parameter = Rhino.SurfaceClosestPoint(surface, arrCenters(0))
+		norm = rhino.SurfaceNormal(surface, Parameter)
+		norm = rhino.VectorScale(norm, height)
+		norm = rhino.VectorAdd(norm, arrCenters(0))
+		ppoint = rhino.addpoint(norm)
+	
+		Call Rhino.selectObjects(Array(polygon,ppoint))
+		Rhino.Command (" _-Patch " &"_Enter")
+		Call Rhino.UnselectAllObjects()
+		
+		Call Rhino.DeleteObjects(Array(surface, ppoint))
+	End If
+End Sub

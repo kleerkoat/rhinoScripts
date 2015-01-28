@@ -1,0 +1,23 @@
+Option Explicit
+'Script by Mitch Heynick
+'Version Thursday, 28 January, 2010
+
+'Call GroupCount()
+Sub GroupCount()
+	
+	Dim arrObjs,strObj,n : n=0
+	arrObjs=Rhino.SelectedObjects
+	If IsArray(arrObjs) Then
+		For Each strObj in arrObjs
+			If Rhino.IsObjectInGroup(strObj)then
+				n=n+1
+			End If
+		Next		
+	End If
+	If n>0 then 
+		Call Rhino.Print("Selection contains "&n&" top groups")
+	Else
+		Call Rhino.Print("No groups found in selection")
+	End If
+End Sub
+

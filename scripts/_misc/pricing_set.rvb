@@ -1,0 +1,9 @@
+﻿Dim strObject, ObjName, SPoint, EPoint, LineLen, LType, LCode, LNum, StrName, arrObjects
+strObject = Rhino.GetObject("Pick an object to set price")
+Rhino.SelectObject strObject
+LName = "FITTING"
+LType = Rhino.GetString("Fitting Type: ")
+LPrice = Rhino.GetString("Price: ")
+Rhino.ObjectName strObject, LName
+Rhino.SetObjectData strObject, "PRICING", "Price", LPrice
+Rhino.SetObjectData strObject, "PRICING", "Type", LType

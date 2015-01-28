@@ -1,0 +1,123 @@
+' ****************************** RhinoScript.org ******************************
+'
+'   Notching for Laser Cut, version 1
+'
+'   by Luis Gil, published Aug 24, 2008
+'
+'
+'   Creates notch markers of a desired thickness on 2d templates for cutting.
+'
+'
+'
+'
+'   This RhinoScript Tool has been downloaded from RhinoScript.org.
+'
+'   Rhino versions: Rhino 4
+'
+'   LICENSE INFORMATION:
+'   This script is published under the GNU General Public License, version 3
+'   or any later version, and thus comes WITHOUT ANY WARRANTY. You can get
+'   the complete license text here: www.rhinoscript.org/gpl
+'
+' ****************************** RhinoScript.org ******************************
+
+
+
+Option Explicit
+'Script written by Luis Gil
+'Script copyrighted by www.legil.org
+'Script version Saturday, August 23, 2008 5:29:22 PM
+
+'notches cutting templates for easy creation of an "eggcrate" model.
+
+'curve must be coplanar for script to work.
+
+'script was developed to work on curves that a planar to the "top" construction plane. an easy way to make sure 
+'curves are on right plane is to use the make2d command and project them onto the right plane.
+
+'all thats left is to take the result into a program like autocad and create boundary regions of the result to make
+'them all closed polylines ready for cutting.
+
+'Call notchObjects()
+Sub notchObjects()
+	Dim strObjects : strObjects = Rhino.GetObjects("Select curves to notch", 4)
+	If IsNull(strObjects) Then Exit Sub
+	Dim arrBounding : arrBounding = Rhino.BoundingBox(strObjects)
+	Dim dblDomainU : dblDomainU = Rhino.Distance(arrBounding(0), arrBounding(1))
+	Dim intCutsU : intCutsU = Rhino.GetInteger("How many notches?", 26)
+	If IsNull(intCutsU) Then Exit Sub
+	Dim dblNotchWidth : dblNotchWidth = Rhino.GetReal("How wide is each notch? (in current units)", 0.25)
+	If IsNull(dblNotchWidth) Then Exit Sub
+	Dim intIndicator : intIndicator = Rhino.GetInteger("Notch top half or bottom half? (0 or 1)", 1, 0, 1) 
+	If IsNull(intIndicator) Then Exit Sub
+      
+	Dim newVecZ : newVecZ = Rhino.PointAdd(arrBounding(3), Array(0, 0, 1))
+	Rhino.Print Rhino.pt2str(newVecZ)
+	Dim strCutPlaneV : strCutPlaneV = Rhino.PlaneFromPoints(arrBounding(0), arrBounding(3), newVecZ)
+	Rhino.print Rhino.pt2str(strCutPlaneV(0))
+	Dim dblStepU : dblStepU = dblDomainU / (intCutsU+1)
+      
+	Dim t, q
+  
+	Dim strCurrent : strCurrent = Rhino.CurrentLayer
+	Rhino.AddLayer "_notches"
+	Rhino.CurrentLayer "_notches"
+  
+	Rhino.EnableRedraw False   
+	For t = 0 To dblDomainU Step dblStepU
+		Dim tempSrf : tempSrf = Rhino.AddPlanarSrf(strObjects)
+		Dim arrVectorU : arrVectorU = Rhino.VectorCreate(arrBounding(1), arrBounding(0))
+		Dim vecUnitb : vecUnitb = Rhino.VectorUnitize(arrVectorU)
+		Dim arrVecMoveb: arrVecMoveb = Rhino.VectorScale(vecUnitb, t)
+		Dim arrNewOriginb : arrNewOriginb = Rhino.PointAdd(arrBounding(0), arrVecMoveb)
+		Dim newCutPlaneb : newCutPlaneb = Rhino.MovePlane(strCutPlaneV, arrNewOriginb)
+    
+		Dim i
+		For i = 0 To UBound(tempSrf)
+			Dim tempLine : tempLine = Rhino.AddSrfSectionCrvs(tempSrf(i), newCutPlaneb)
+			If Not IsNull(tempLine) Then
+    
+				For q = 0 To UBound(tempLine)
+					If intIndicator = 0 Then
+						Dim arrMidPoint : arrMidPoint = Rhino.CurveMidPoint(tempLine(q))
+						Dim newLine : newLine = Rhino.MoveObject(tempLine(q), Rhino.CurveEndPoint(tempLine(q)), arrMidPoint)
+						Dim arrStartPt : arrStartPt = Rhino.CurveStartPoint(newLine)
+						Dim arrEndPt : arrEndPt = Rhino.CurveEndPoint(newLine)
+						Dim copyPt : copyPt = Rhino.PointAdd(arrEndPt, Array(dblNotchWidth, 0, 0))
+						Dim lineCopy : lineCopy = Rhino.CopyObject(tempLine(q), arrEndPt, copyPt)
+						Dim arrStartPt2 : arrStartPt2 = Rhino.CurveStartPoint(lineCopy)
+						Dim arrEndPt2 : arrEndPt2 = Rhino.CurveEndPoint(lineCopy)
+						Dim strNotch : strNotch = Rhino.AddPolyLine(Array(arrStartPt, arrEndPt, arrEndPt2, arrStartPt2, arrStartPt))
+						Dim movePt : movePt = Rhino.PointAdd(arrEndPt, Array(-(dblNotchWidth/2), 0, 0))
+						Rhino.MoveObject strNotch, arrEndPt, movePt
+						Rhino.DeleteObject lineCopy
+    
+					Else
+      
+						Dim arrMidPointb : arrMidPointb = Rhino.CurveMidPoint(tempLine(q))
+						Dim newLineb : newLineb = Rhino.MoveObject(tempLine(q), Rhino.CurveStartPoint(tempLine(q)), arrMidPointb)
+						Dim arrStartPtb : arrStartPtb = Rhino.CurveStartPoint(newLineb)
+						Dim arrEndPtb : arrEndPtb = Rhino.CurveEndPoint(newLineb)
+						Dim copyPtb : copyPtb = Rhino.PointAdd(arrEndPtb, Array(dblNotchWidth, 0, 0))
+						Dim lineCopyb : lineCopyb = Rhino.CopyObject(tempLine(q), arrEndPtb, copyPtb)
+						Dim arrStartPt2b : arrStartPt2b = Rhino.CurveStartPoint(lineCopyb)
+						Dim arrEndPt2b : arrEndPt2b = Rhino.CurveEndPoint(lineCopyb)
+						Dim strNotchb : strNotchb = Rhino.AddPolyLine(Array(arrEndPtb, arrStartPtb, arrStartPt2b, arrEndPt2b, arrEndPtb))
+						Dim movePtb : movePtb = Rhino.PointAdd(arrEndPtb, Array(-(dblNotchWidth/2), 0, 0))
+						Rhino.MoveObject strNotchb, arrEndPtb, movePtb
+						Rhino.DeleteObject lineCopyb
+    
+					End If
+          
+				Next
+    
+				Rhino.DeleteObjects tempLine
+
+			End If
+		Next
+		Rhino.DeleteObjects tempSrf
+	Next
+	Rhino.EnableRedraw True
+	Rhino.CurrentLayer strCurrent
+
+End Sub

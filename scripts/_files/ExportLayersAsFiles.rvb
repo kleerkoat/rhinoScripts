@@ -1,0 +1,78 @@
+Option Explicit
+'Script by Mitch Heynick
+'Version 10 May, 2010
+'Updated 20 August - added localization
+'21 August - added overwrite control
+
+'Call ExportLayersAsFiles()
+Sub ExportLayersAsFiles()
+	
+	Dim arrMsgs,arrItems,arrDefaults,blnOverwrite
+	arrMsgs=Localize()
+	arrItems=Array(arrMsgs(5),arrMsgs(6),arrMsgs(7))
+	arrDefaults=Array(False)	
+	blnOverwrite=Rhino.GetBoolean(arrMsgs(4),arrItems,arrDefaults)(0)
+	
+	Dim arrLayers,strLayer,arrObjs,fso	
+	Dim strFilePathName,docName,docPath,strComm
+	Set fso = CreateObject("Scripting.FileSystemObject")	
+	docName=Rhino.DocumentName()
+	docPath=Rhino.DocumentPath()
+	
+	If IsNull(docName) Then 'file has not been saved yet
+		docName=(arrMsgs(1))
+		docPath=Rhino.BrowseForFolder(,arrMsgs(0))
+	Else
+		docName=Left(docName,Len(docName)-4) 'remove extension
+	End If	
+	 
+	Call Rhino.EnableRedraw(False)
+	arrLayers=Rhino.LayerNames
+	For each strLayer in arrLayers
+		Call Rhino.UnselectAllObjects
+		If Rhino.IsLayerSelectable(strLayer) Then
+			arrObjs=Rhino.ObjectsByLayer(strLayer,True)
+			If IsArray(arrObjs) Then
+				strFilePathName=docPath&docName&"-"&strLayer&".3dm"
+				'check to see if file already exists
+				If fso.FileExists(strFilePathName) and Not blnOverwrite Then
+					strFilePathName=docPath&docName&"-"&strLayer&"-1.3dm"					
+				End If				
+				Call Rhino.Print(arrMsgs(2)&strLayer)
+				strComm="_-Export "&chr(34)&strFilePathName&chr(34)&" _Enter"			
+				Call Rhino.Command(strComm,False)
+			End If			
+		End If
+	Next
+	Set fso=Nothing
+	Call Rhino.EnableRedraw(True)
+	Call Rhino.Print(arrMsgs(3))
+End Sub
+
+Function Localize()
+	Dim intLCID
+	intLCID=Rhino.LocaleID
+	
+	Dim str0,str1,str2,str3,str4,str5,str6,str7		
+	If intLCID=1036 Then
+		str0="Choisir un dossier pour les fichiers"
+		str1="Sans titre"
+		str2="Enrigstrement de calque "
+		str3="Enregistrement terminé"
+		str4="Ecraser fichiers existants?"
+		str5="Ecraser"
+		str6="Non"
+		str7="Oui"
+	Else
+		str0="Select destination folder for files"
+		str1="Untitled"
+		str2="Exporting layer "
+		str3="Done exporting files"
+		str4="Overwrite existing files?"
+		str5="Overwrite"
+		str6="No"
+		str7="Yes"
+	End If
+
+	Localize=Array(str0,str1,str2,str3,str4,str5,str6,str7)
+End Function

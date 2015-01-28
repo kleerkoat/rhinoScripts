@@ -1,0 +1,79 @@
+Option explicit
+'A divide by length script that allows the user to 
+'flip the curve direction.
+
+Private dblOldLength
+If isEmpty(dblOldLength) Then
+	dblOldLength = 1
+End If
+
+Sub DivideMulti
+	Dim strCrv, arrCrvs, arrFlip
+	arrCrvs = Rhino.GetObjects("Select curves",4,True,True)
+  
+	If isArray(arrCrvs) Then
+		Dim Length:	Length = Rhino.GetReal("Length of each division",dblOldLength)
+		
+	Else Exit Sub
+	End If
+		
+	If IsNumeric (length) Then
+		dblOldLength = length 
+	Else Exit Sub
+	End If
+		
+	For Each strCrv In arrCrvs
+		Rhino.CurveArrows strCrv, 2 
+	Next
+
+	
+	arrFlip = Rhino.GetObjects("Select curves to flip",4,,,,arrCrvs)
+	If Isarray(arrFlip) Then
+		For Each strCrv In arrFlip
+			Rhino.ReverseCurve strCrv
+			Rhino.CurveArrows strCrv, 2 
+		Next
+	End If
+	
+	dim alast, aGrps(), n
+	Rhino.EnableRedraw(False)		
+	For Each strCrv In arrCrvs
+		Rhino.Command "Divide SelID " &strCrv &" Enter  Length "&Length
+		If Rhino.LastCommandResult = 0 then
+			alast = Rhino.lastcreatedObjects
+			If isArray(aLast) then
+				redim preserve aGrps(n)
+				aGrps(n)  = Rhino.AddGroup
+				Rhino.AddObjectsToGroup alast, aGrps(n)
+				n = n+ 1
+			End if
+		end if
+		Rhino.CurveArrows strCrv, 0 
+	Next
+	
+	If isUpperBound(aGrps) then
+		for n = 0 to uBound(aGrps)
+			Rhino.ObjectsByGroup aGrps(n), True
+		Next
+	End If
+	
+	Rhino.EnableRedraw(True)
+	
+End Sub
+
+Function IsUpperBound(ByRef arr)
+
+	IsUpperBound = False
+
+	If IsArray(arr) Then
+
+		On Error Resume Next
+
+		UBound arr
+
+		If Err.Number = 0 Then IsUpperBound = True
+
+	End If
+
+End Function
+

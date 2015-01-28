@@ -1,0 +1,243 @@
+﻿Option Explicit
+
+
+'Script written by Pascal
+
+'Script version Saturday, July 05, 2008
+
+
+Sub CVtoCP()
+
+	Dim aObj: aObj = Rhino.GetObjects("Select a curves or surfaces to edit",4+8,True,True)
+	If Not isArray(aObj) Then Exit Sub
+	Dim sObj, aOff(), i
+	i = 0
+	For Each SObj In aObj
+		If  Not Rhino.ObjectGripsOn(sObj) Then
+			Rhino.EnableObjectGrips(sObj)
+			ReDim Preserve aoff(i)
+			aOff(i) = sobj
+			i = i + 1
+		End If
+	Next
+	
+	AdjustCVtoCP(aObj)
+	
+	If isUpperBound(aOff) Then
+		For Each sObj In aOff
+			Rhino.EnableObjectGrips sobj,False
+		Next
+	End If
+	
+End Sub
+
+
+Sub AdjustCVtoCP(aobj)
+
+	Dim aCP , aTemp, atemp2, sObj, aCv, sLine, CrntPlane
+	Dim temp, VecZ,GetLoc,Result, CV, Plane, aPts
+
+	Do
+		Rhino.EnableRedraw(False)
+		For Each sObj In aObj
+		
+			If Rhino.IsSurface(sObj) Then
+
+				atemp = DrawSrfCP (sObj)
+				If IsArray(aCP) Then
+					atemp2 = Rhino.JoinArrays(aCp,atemp)
+					aCP = atemp2
+				Else aCP = atemp
+				End If
+			
+			Else
+			
+				atemp = DrawCrvCP (sObj)
+				If IsArray(aCP) Then
+					atemp2 = Rhino.JoinArrays(aCp,atemp)
+					aCP = atemp2
+				Else aCp = atemp
+				End If	
+			
+			End If
+		Next
+	
+		Rhino.EnableRedraw
+	
+		aCV = Rhino.GetObjectGrips("Select grips.",True,True)
+	
+		If Not isArray(aCV)  Then 
+			
+			Rhino.DeleteObjects aCP
+			
+			Rhino.Enableredraw
+			Exit Sub
+			
+		End If
+	
+		CrntPlane = Rhino.ViewCplane(Rhino.CurrentView)
+	
+		sLine  = Rhino.GetObject("Click on control polygon segment",,,,aCP)
+	
+		If isNull(sLine) Then 
+			Rhino.DeleteObjects(aCP)
+			Exit Sub
+		End If
+
+		aPts = array(Rhino.CurveStartPoint(sLine),Rhino.CurveEndPoint(sLine))
+		If Not IsArray(aPts) Then Exit Sub
+	
+		temp = aPts(1)
+
+		vecz = Rhino.VectorCreate(apts(1), aPts(0))
+		vecZ = Rhino.VectorScale(vecZ, 100)
+	
+		aPts(1) = Rhino.PointAdd(apts(0),vecZ)
+		apts(0) = Rhino.PointAdd(temp, Rhino.VectorReverse(vecZ))
+
+		Plane = Rhino.PlaneFromNormal (Apts(0),vecZ)
+	
+	
+		Rhino.EnableRedraw(False)
+	
+		If isArray(aCV) Then
+			For Each CV In aCV
+				GetLoc = 	Rhino.ObjectGripLocation (CV(0), CV(1))
+				Plane(0) = getLoc
+				result = Rhino.LinePlaneIntersection(aPts,plane)
+				Rhino.ObjectGripLocation CV(0), CV(1),Result
+			Next
+		End If
+	
+		Rhino.DeleteObjects aCP
+	
+		Rhino.EnableRedraw
+	Loop Until isnull(sLine)
+		
+	Rhino.DeleteObjects aCP
+	
+End Sub
+	
+Function DrawSrfCP(sObj)
+	
+	Dim aLines()
+
+	Dim aPts: aPts = Rhino.SurfacePoints(sObj)
+
+	If Not IsArray(aPts) Then Exit Function
+
+	Dim aCount:aCount = Rhino.SurfacePointCount(sObj)
+
+	Dim u, v, n, i
+
+	Dim ulast : ulast = aCount(0)
+
+	Dim vlast : vlast = aCount(1)
+	
+	i = 0
+	n = 0
+	
+	
+	For u = 1 To Ulast
+		For v = 1  To Vlast
+			
+			If i <> (u*v)-1 Or i < Vlast-1  Then 
+			
+				
+				ReDim Preserve aLines(n)
+				aLines(n) = Rhino.AddLine (aPts(i),aPts(i+1))
+				n = n +1
+				If i < ((Ulast*Vlast)-Vlast) Then
+					ReDim Preserve aLines(n)
+					aLines(n) = Rhino.AddLine (aPts(i),aPts(i+Vlast))
+					n = n +1
+					
+				End If
+				
+			ElseIf i = (u*v)-1 And i < (Ulast*Vlast)-Vlast Then
+				ReDim Preserve aLines(n)
+				aLines(n) = Rhino.AddLine (aPts(i),aPts(i+Vlast))
+				n = n +1
+				
+				'			Else 
+				'				ReDim Preserve aLines(n)
+				'				aLines(n) = Rhino.AddLine (aPts(i),aPts(i+vlast))
+				'				n = n +1
+			End If
+			
+			
+			
+			i = i +1
+			
+		Next
+	Next
+	
+
+	DrawSrfCP = aLines
+	
+End Function
+
+Function DrawCrvCP(sObj)
+	
+	Dim aLines(), n, i
+	n = 0
+	Dim apts: aPts = Rhino.CurvePOints(sObj)
+	
+	For i = 0 To uBound(aPts)-1
+		ReDim Preserve aLines(n)
+		aLines(n) = Rhino.AddLine(aPts(i), aPts(i+1))
+		n = n + 1
+	Next
+	
+	DrawCrvCP = aLines
+End Function
+
+Rhino.AddAlias "CVtoCP", "_NoEcho _-Runscript CVtoCP"
+
+Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+
+Function AveragePoints(arrPts)
+	'Finds the average location of an array
+	'of points.
+
+	Dim X, Y, Z
+	Dim i
+	
+	X = 0
+	Y = 0
+	Z = 0
+
+	For i=0 To UBound (arrPts)
+			
+		'add all the X values
+		X = X+arrPts(i)(0)
+	
+		'add all th Y values
+		Y = Y+arrPts(i)(1)			
+	
+		'add all the Z values
+		Z = Z+arrpts(i)(2)
+	Next
+	
+	'Divide by the number of points to
+	'get the average  for each
+	'create the output array from the 3 averages
+	AveragePoints  =array(X/(UBound(arrPts)+1), Y/(UBound(arrPts)+1), Z/(UBound(arrPts)+1))
+
+End Function
+
+Function IsUpperBound(ByRef arr)
+
+	IsUpperBound = False
+
+	If IsArray(arr) Then
+
+		On Error Resume Next
+
+		UBound arr
+
+		If Err.Number = 0 Then IsUpperBound = True
+
+	End If
+
+End Function

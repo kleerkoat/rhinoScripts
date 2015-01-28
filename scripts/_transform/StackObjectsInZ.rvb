@@ -1,0 +1,59 @@
+Option Explicit
+'Script written by Mitch
+'Version Saturday, 20 November 2010
+
+'Call StackObjectsInZ()
+Sub StackObjectsInZ()
+	Dim arrObjs,arrZ(),arrBB,ub
+	arrObjs=Rhino.GetObjects("Select objects to stack vertically",,False,True)
+	If Not IsArray(arrObjs) Then Exit Sub
+	ub=Ubound(arrObjs)
+	ReDim arrZ(ub)
+	
+	For i=0 To ub
+		arrBB=Rhino.BoundingBox(arrObjs(i))
+		arrZ(i)=arrBB(4)(2)
+	Next
+	
+	Dim arrObjSort,nextZ,zMove,i
+	arrObjSort=GnomeKVSort(arrObjs,arrZ)	
+	arrBB=Rhino.BoundingBox(arrObjSort(0))
+	nextZ=arrBB(4)(2)
+	Call Rhino.EnableRedraw(False)
+	For i=1 To ub		
+		arrBB=Rhino.BoundingBox(arrObjSort(i))
+		zMove=nextZ-arrBB(0)(2)
+		Call Rhino.MoveObject(arrObjSort(i),Array(0,0,zMove))
+		nextZ=arrBB(4)(2)+zMove
+	Next
+	Call Rhino.EnableRedraw(True)
+End Sub
+
+
+
+Private Function GnomeKVSort(ByVal arrK, ByVal arrV)	
+	'Sorts Keys (objects - arrK) by Values (numbers - arrV)
+	'by default lowest value will be first in output array
+	Dim size,i,j,arrVTemp,arrKTemp	
+	size=Ubound(arrV)+1 'plus 1?
+	i=1 : j=2	
+	Do While i < size
+		If arrV(i-1) <= arrV(i) Then  'For highest value first, change to >=
+			i=j
+			j= j+1 
+		Else 'swap a[i-1] And a[i]
+			arrVTemp=arrV(i)
+			arrKTemp=arrK(i)
+			arrV(i)=arrV(i-1)
+			arrK(i)=arrK(i-1)
+			arrV(i-1)=arrVTemp
+			arrK(i-1)=arrKTemp
+			i=i-1
+			If i=0 Then
+				i=j
+				j=j+1
+			End If
+		End If		
+	Loop
+	GnomeKVSort=arrK 'output is array of keys
+End Function

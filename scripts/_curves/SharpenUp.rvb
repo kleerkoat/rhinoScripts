@@ -1,0 +1,258 @@
+Option Explicit
+
+'Script written by Pascal
+'Script version Thursday, July 02, 2009 
+'Removes selected subcurves, typically fillets, from a polycurve
+'and extends the neighboring segments (by a tangent line for now)
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "SharpenUp", "_NoEcho _-Runscript (SharpenUp)"
+
+'Call SharpenUp()
+
+Sub SharpenUp()
+
+	Dim sObj:  sObj = Rhino.GetObject("Select polycurve",4,True)
+	If isNull(sObj) Then Exit Sub
+	
+	If Not Rhino.IsPolyCurve(sObj) And Not Rhino.IsPolyline(sObj) Then
+		Rhino.Print "Cannot sharpen up single-segment curves. Try SimplifyCrv and run the script again, it may help"
+		Exit Sub
+	End If
+	
+	Dim aCrvs:aCrvs = Rhino.ExplodeCurves(sObj,False)
+	
+	If Not isArray(aCrvs) Then Exit Sub
+	
+	Dim aStart: aStart = Rhino.CurveStartPoint(sObj)
+	
+	Dim Curves
+	Set Curves = CreateObject("Scripting.Dictionary")
+	
+	Dim aMarkers()
+	Dim sCrv, i, apt, tempCrv , p
+	
+	Rhino.EnableRedraw(False)
+	For i = 0 To uBound(aCrvs)
+
+		If i > 0 Then
+
+			ReDim Preserve amarkers(p)
+			amarkers(p) = Rhino.AddPoint(Rhino.CurveStartPoint(aCrvs(i)))
+			p = p + 1
+		End If
+		
+		If Rhino.IsCurveClosed(sObj) Then
+			If i = 0 Then
+				ReDim Preserve amarkers(p)
+				amarkers(p) = Rhino.AddPoint(Rhino.CurveStartPoint(aCrvs(i)))
+				p = p + 1
+			End If
+		End If
+				
+		Curves.Add i,acrvs(i)
+	Next
+	
+	Rhino.EnableRedraw(True)
+	
+	Dim X:X = Curves.Count
+	
+	Dim PrevCrv, nxtCrv, newSegs
+	Dim K
+
+	Rhino.LockObject(sObj)
+	
+	Do
+		K = False
+		tempCrv = Rhino.GetObject("Select sub-curve to remove",4,,True,aCrvs)
+		If isNull(tempCrv) Then Exit Do
+		
+		If Rhino.PointCompare(aStart, Rhino.CurveStartPoint(tempCrv),0.0001) Then
+			K = True
+			PrevCrv = Curves.Item(Ubound(aCrvs))
+			NxtCrv = Curves.Item(1)
+			
+			NewSegs = ExtendToIntersection(PrevCrv,NxtCrv)
+			
+			If isArray(newSegs) Then
+				
+				Curves.Remove Ubound(aCrvs)
+				Curves.Remove 1
+				Curves.Add Ubound(aCrvs),newSegs(0)
+				Curves.Add 1,newSegs(1)
+				Rhino.DeleteObject tempCrv
+			
+			End If
+			
+		ElseIf	Rhino.PointCompare(aStart, Rhino.CurveEndPoint(tempCrv),0.0001) Then
+			
+			K = True
+			PrevCrv = Curves.Item(Ubound(aCrvs)-1)
+			NxtCrv = Curves.Item(0)
+			
+			NewSegs = ExtendToIntersection(PrevCrv,NxtCrv)
+			
+			If isArray(newSegs) Then
+				
+				Curves.Remove Ubound(aCrvs)-1
+				Curves.Remove 0
+				Curves.Add Ubound(aCrvs)-1,newSegs(0)
+				Curves.Add 0,newSegs(1)
+				Rhino.DeleteObject tempCrv
+			
+			End If
+
+		End If
+		
+		If K = False Then
+			For i = 0 To uBound(aCrvs)
+				If Curves.item(i) = tempCrv Then Exit For
+			Next
+		
+			If Not isNull(tempCrv) Then
+			
+				PrevCrv = Curves.Item(i-1)
+				NxtCrv = Curves.Item(i+1)
+				NewSegs = ExtendToIntersection(PrevCrv,NxtCrv)
+			
+				If isArray(newSegs) Then
+				
+					Curves.Remove i-1
+					Curves.Remove i+1
+					Curves.Add i-1,newSegs(0)
+					Curves.Add i+1,newSegs(1)
+					Rhino.DeleteObject tempCrv
+				
+				End If
+			
+			End If
+		End If
+
+	Loop Until isNull(tempCrv)
+		
+	Dim aJoin
+	ReDim aJoin(Ubound(aCrvs))
+	For i = 0 To ubound(aCrvs)
+		aJoin(i) = Curves.Item(i)
+	Next
+	
+	Rhino.EnableRedraw(False)
+	
+	Rhino.UnlockObject sObj
+	Rhino.DeleteObject sobj
+	Rhino.JoinCurves aJoin,True
+	Rhino.DeleteObjects aMarkers
+	
+	Rhino.EnableRedraw(True)
+	
+End Sub
+
+
+Function ExtendToIntersection(PrevCrv,NxtCrv)
+	
+	Rhino.EnableRedraw(False)
+	
+	Dim input1, Input2
+	Input1 = Rhino.CopyObject(PrevCrv)
+	Input2 =  Rhino.CopyObject(NxtCrv)
+	
+	Dim Vectan
+	
+	Dim base1:Base1 = Rhino.CurveEndPoint(Input1)
+	Dim base2:Base2 = Rhino.CurveStartPoint(Input2)
+	
+	Vectan = Rhino.CurveTangent(Input1,Rhino.CurveDomain(Input1)(1))
+	Dim Line1:Line1 = array(Base1,Rhino.PointAdd(Base1,VecTan))
+
+	Vectan = Rhino.CurveTangent(Input2,Rhino.CurveDomain(Input2)(0))
+	Dim Line2:Line2 = array(Base2,,Rhino.PointAdd(Base2,VecTan))
+	
+	Dim tempPt:tempPt = Rhino.LineLineIntersection(Line1, Line2)
+	If Not isArray(TempPt) Then 
+		Rhino.DeleteObjects array(Input1, input2)
+		Rhino.EnableRedraw(True)
+		Exit Function
+	End If
+
+	Dim Crv1: Crv1 = Rhino.ExtendCurveLength(Input1,0,1,Rhino.Distance(Rhino.CurveEndPoint(Input1),tempPt))
+	
+	If isNull(Crv1) Then 
+		Rhino.DeleteObjects array(Input1, Input2)
+		Rhino.Enableredraw(True)
+		Exit Function
+	End If
+	
+	Dim Crv2: Crv2 = Rhino.ExtendCurveLength(Input2,0,0,Rhino.Distance(Rhino.CurveStartPoint(Input2),tempPt))
+	
+	If isNull(Crv2) Then 
+		Rhino.DeleteObjects array(Crv1, Input2)
+		Rhino.Enableredraw(True)
+		Exit Function
+	End If
+	
+	Dim X : X = Rhino.CurveCurveIntersection(Crv1,Crv2)
+	
+	If Not IsArray(X) Then 
+		Rhino.DeleteObjects array(Crv1,Crv2,Input1,Input2)
+		Rhino.EnableRedraw(True)
+		Exit Function
+	End If
+	
+	If  X(0,0) = 2 Then 
+		
+		Rhino.DeleteObjects array(Crv1,Crv2,Input1,Input2)
+		Rhino.EnableRedraw(True)
+		Exit Function
+	End If
+	
+	Dim testpar1:testpar1 = Rhino.CurveClosestPoint(PrevCrv,X(0,1))
+	Dim testpar2:testpar2 = Rhino.CurveClosestPoint(NxtCrv,X(0,1))
+	
+	Dim aSplit
+	If testPar1 < Rhino.CurveDomain(PrevCrv)(1) Then
+		'MsgBox "OK1"
+		aSplit = Rhino.SplitCurve(Crv1,X(0,5))
+
+	
+		If isArray(aSplit) Then
+			If uBound(aSplit) = 1 Then
+				Rhino.DeleteObject Crv1
+				If Rhino.CurveDomain(aSplit(1))(1) > Rhino.CurveDomain(aSplit(0))(1) Then
+					Rhino.DeleteObject aSplit(1)
+					Crv1 = ASplit(0)
+				Else
+					Rhino.DeleteObject aSplit(0)
+					Crv1 = ASplit(1)
+				End If
+			Else Rhino.Deleteobjects aSplit
+			End If
+		End If
+	End If
+	
+	
+	If testPar2<Rhino.CurveDomain(NxtCrv)(1) Then
+		'MsgBox "OK2"
+		aSplit = Rhino.SplitCurve(Crv2,X(0,7),False)
+
+		If isArray(aSplit) Then
+			If uBound(aSplit) = 1 Then
+				Rhino.DeleteObject Crv2
+				If Rhino.CurveDomain(aSplit(1))(1) < Rhino.CurveDomain(aSplit(0))(1) Then
+					Rhino.DeleteObject aSplit(1)
+					
+					Crv2 = ASplit(0)
+				Else
+					Rhino.DeleteObject aSplit(0)
+					Crv2 = ASplit(1)
+				End If
+				
+			Else Rhino.Deleteobjects aSplit
+			End If
+		End If
+	End If
+	Rhino.DeleteObjects array(PrevCrv,NxtCrv)
+	ExtendToIntersection = array(Crv1,Crv2)
+	
+	Rhino.EnableRedraw(True)
+	
+End Function

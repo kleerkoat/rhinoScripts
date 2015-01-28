@@ -1,0 +1,36 @@
+'--------------------------------------------------------------
+'Command   :  aca(angle calculator)
+'Date      :  2011/03/21
+'Version   :  1.0
+'Organization   :  Rhino+
+'--------------------------------------------------------------
+Sub AngleCalculator()
+
+Dim dblReal01,dblReal02,dblReal03,dblReal04,dblReal05
+
+dblReal01 = Rhino.RealBox ("Enter first(X) value",100,"Rhino+ ")
+
+If Not IsNull(dblReal01) And (dblReal01 > 0) Then
+
+   dblReal02 = Rhino.RealBox ("Enter second(Y) value",100,"Rhino+ ")
+   If Not IsNull(dblReal02) And (dblReal02 > 0) Then
+
+   dblReal04=Rhino.ATan2 (dblReal02, dblReal01)
+   dblReal05=180/Rhino.PI
+   dblReal03=dblReal04*dblReal05
+
+   Rhino.ClipboardText CStr(dblReal03)
+   Rhino.print dblReal03 &"deg"
+   Rhino.MessageBox "É∆ is "  & dblReal03 &"  deg",,"Rhino+"
+     
+   Else
+   Rhino.MessageBox "Please enter the correct value.",48,"Rhino+"
+   End If
+   
+Else
+Rhino.MessageBox "Please enter the correct value.",48,"Rhino+"
+End If
+
+End Sub
+
+'aca

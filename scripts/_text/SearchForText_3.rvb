@@ -1,0 +1,132 @@
+﻿Option Explicit
+Private strOldtext
+If IsEmpty(strOldText) Then
+	strOldText = ""
+End If
+
+Sub SelectText
+	Dim arrObj, arrSelected(), strText
+	Dim i, q, A
+	A = False
+	i = 0
+	q = 0
+
+	arrObj = Rhino.ObjectsByType(512)
+	strText = Rhino.StringBox("Enter text to search for", strOldtext, "Text Search")
+
+	If Not IsNull(strText) Then
+		strOldtext = strText
+	Else Exit Sub
+	End If
+	
+	Dim RegularExpressionObject
+	Set RegularExpressionObject = New RegExp
+  
+	With RegularExpressionObject
+		.Pattern = strText
+		.IgnoreCase = True
+		.Global = True
+	End With
+	
+	Dim strObjText, ExpressionMatch
+	
+	If IsArray(arrObj) Then
+		For i = 0 To UBound(arrobj)
+			strObjText =  Rhino.TextObjectText(arrObj(i))
+			ExpressionMatch = RegularExpressionObject.Test(StrObjText)
+			If ExpressionMatch Then
+				ReDim Preserve arrSelected(q)
+				arrSelected(q) = arrObj(i)
+				q = q+1
+				A = True
+			End If
+		Next
+	End If
+
+	If A = True Then
+		Dim  J, intSelected
+		intSelected = UBound(arrSelected) 
+		J = 0
+		'MsgBox (intSelected) 'Test
+ 
+		Rhino.SelectObject(arrSelected(0))   
+		Rhino.ZoomSelected 
+    
+		Do
+    
+			Dim arrAction
+			If J < IntSelected > 0 Then
+				arrAction = array("Next", "Previous", "ZoomAllText", "Exit")
+			ElseIf J=0 And intSelected > 0 Then
+				arrAction = array("Next", "ZoomAllText", "Exit")
+			ElseIf J=intSelected And intSelected>0 Then
+				arrAction = array("Previous","ZoomAllText", "Exit")
+			ElseIf intSelected = 0 Then
+				arrAction = array("ZoomAllText", "Exit")
+			End If
+               
+			Dim strAction: strAction =Rhino.GetString("Text to zoom", arrAction(0), arrAction)
+			Dim strZoom
+			If strAction = "Next" Then
+				strZoom = arrSelected(J+1)
+				J=J+1   
+				Rhino.UnselectAllObjects
+				Rhino.SelectObject(strZoom)
+				Rhino.ZoomSelected
+			End If
+      
+			If strAction = "Previous" Then
+				strZoom = arrSelected(J-1)
+				Rhino.UnselectAllObjects
+				Rhino.SelectObject(strZoom)
+				Rhino.ZoomSelected
+				J=J-1
+			End If
+      
+			If strAction = "Exit" Or IsNull(strAction) Then
+				Rhino.SelectObjects(arrSelected)
+				Rhino.ZoomSelected
+				Rhino.UnselectAllObjects
+				Exit Sub     
+			End If
+        
+			If strAction = "ZoomAllText" Then
+				Rhino.UnselectAllobjects
+				Rhino.SelectObjects(arrSelected)
+				Rhino.ZoomSelected
+				Rhino.UnselectAllObjects
+				Rhino.SelectObject arrSelected(J)
+			End If
+        
+        
+      
+		Loop Until strAction = "Exit" Or IsNull(strAction)
+        
+      
+	End If 
+
+
+
+End Sub
+
+
+Rhino.AddAlias "selecttext","_noEcho _-Runscript SelectText"
+Rhino.AddAlias "ReverseText","_noEcho _-Runscript ReverseText"
+Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'**************************
+'**************************
+
+Sub ReverseText
+	Dim arrobj, strText, strNewText, strObj
+	arrObj = Rhino.GetObjects("Select text to reverse", 512,, True)
+
+	If IsArray(arrObj) Then
+		For Each strobj In arrObj
+			strText = Rhino.TextObjectText(strObj)
+			strNewText = StrReverse(strText)
+			Rhino.TextObjectText strObj, strNewText
+		Next
+	Else Exit Sub
+	End If
+
+End Sub

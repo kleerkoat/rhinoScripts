@@ -1,0 +1,29 @@
+'Andrew Kudless
+'andrew@materialsystems.org
+ 
+'In: point objects
+'Out: circle with a given diameter around each point.
+'This script is useful for giving points a "dimension" prior to exporting them into a program such as Illustrator
+'Built for Rhino 4.0
+
+'edit: rg, changed name to CirclesOnPoints
+ 
+Sub CircleOnPoints
+ 
+arrPoints = Rhino.GetObjects("Select points", 1)
+drillbit = Rhino.GetReal("Enter diameter of circle")
+drillbit = drillbit/2
+cPlane = Rhino.ViewCPlane
+For i = 0 to ubound(arrPoints)
+    Rhino.StatusBarMessage i &"/" & ubound(arrPoints)
+    coord = Rhino.PointCoordinates(arrPoints(i))
+    cPlane = Rhino.MovePlane (cPlane, coord)
+    Rhino.AddCircle cPlane, drillbit
+    'Rhino.Print i & ": " & Rhino.Pt2Str(coord)
+Next
+ 
+Rhino.Print "Done"
+ 
+End Sub
+ 
+'AddCircleToPoint

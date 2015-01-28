@@ -1,0 +1,89 @@
+Option Explicit
+'Script written by Damien Alomar
+'Script copyrighted by <insert company name>
+'Script version Friday, February 08, 2008
+
+'Call Main()
+Sub DivideByLengthFromMid()
+
+	Dim arrCurves, dblLength, strCurve, strTempCurve, arrTempMidDivs, dblMidParam, arrTempSplits, strSplit
+	Dim arrSplitPoints(), arrAllSplitPoints, arrSplitPointsIDs, arrMidPoints(), arrMidPointsIDs, i, j
+	
+	arrCurves = Rhino.GetObjects ("Select Curves to Divide", 4, ,True, True)
+	If IsNull(arrCurves) Then Exit Sub
+	
+	dblLength = Rhino.GetReal ("Length to Divide Curves from Middle", ,0)
+	If IsNull(dblLength) Then Exit Sub
+	
+	Rhino.UnselectAllObjects
+	
+	i = -1 'Counter for the length divisions
+	
+	Rhino.EnableRedraw False
+	
+	For Each strCurve In arrCurves
+		'copy the object because we're going to have to split it
+		strTempCurve = Rhino.CopyObject (strCurve)
+		
+		'stuff to split the copied curve at its midpoint
+		arrTempMidDivs = Rhino.DivideCurve (strTempCurve, 2)
+		dblMidParam = Rhino.CurveClosestPoint (strTempCurve, arrTempMidDivs(1))
+		arrTempSplits = Rhino.SplitCurve (strTempCurve, dblMidParam)
+				
+		'now we can divide each side by length
+		For Each strSplit In arrTempSplits
+			'Match curve direction
+			MatchCrvDirAwayFromPoint strSplit, arrTempMidDivs(1)
+			
+			i = i+1
+			ReDim Preserve arrSplitPoints(i)
+			arrSplitPoints(i) = Rhino.DivideCurveLength (strSplit, dblLength)
+			Rhino.DeleteObject strSplit
+		Next
+	Next
+	
+	arrAllSplitPoints = JoinAllArrays (arrSplitPoints)
+	arrAllSplitPoints = Rhino.CullDuplicatePoints (arrAllSplitPoints)
+	arrSplitPointsIDs = Rhino.AddPoints (arrAllSplitPoints)
+
+	Rhino.SelectObjects arrSplitPointsIDs
+	
+	Rhino.EnableRedraw True
+	
+End Sub
+
+Function MatchCrvDirAwayFromPoint (strCurve, point)
+	Dim crvStart, compare
+	
+	crvStart = Rhino.CurveStartPoint (strCurve)	
+	compare = Rhino.PointCompare (crvStart, point) 
+	
+	If Not compare Then
+		Rhino.ReverseCurve strCurve
+	End If
+	
+End Function 
+
+Function JoinAllArrays (arrOfArrays)
+	'arrOfArrays is an array where each element contains another array.
+	'by doing it this way, we can pass of as many arrays as we want to 
+	'the function.  Also, this provides an easy way to join the arrays together.
+	Dim arrBigArray, i
+	'Set the function to return null, just incase anything goes wrong
+	JoinAllArrays = Null
+	
+	'set arrBigArray to the first array within the arrOfArrays
+	'This is because Rhino.JoinArrays always needs an array to start with
+	arrBigArray = arrOfArrays(0)
+	
+	'Go through each of the remaining arrays (notice we start at 1 not 0)
+	'and add that to the big array via Rhino.JoinArrays
+	For i=1 To Ubound(arrOfArrays)
+		If Not IsNull(arrOfArrays(i)) Then
+			arrBigArray = Rhino.JoinArrays (arrBigArray, arrOfArrays(i))
+		End If
+	Next
+	
+	'Set the function to return the array that we made
+	JoinAllArrays = arrBigArray
+End Function

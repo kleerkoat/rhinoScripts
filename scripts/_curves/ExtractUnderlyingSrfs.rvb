@@ -1,0 +1,124 @@
+Option Explicit
+'Script written by Pascal
+'Script version Thursday, April 01, 2010
+'Converts a surface or polysurface into all of its
+'underlying untrimmed surfaces. Optionslly deletes the input
+
+
+Rhino.AddStartUpScript Rhino.LastLoadedScriptFile
+Rhino.AddAlias "ExtractUnderlyingSrfs", "_NoEcho _-RunScript (ExtractUnderlyingSrfs)"
+
+'Call ExtractUnderlyingSrfs()
+
+Sub ExtractUnderlyingSrfs()
+	Dim sObj: sObj = Rhino.GetObject("Select object",8+16,true)
+	If isNull(sObj) then exit sub
+	
+	Dim sDel: sDel = Rhino.GetString("Delete input","No",array("No", "Yes"))
+	If isNull(sDel) then exit sub
+	
+	Dim blnDel: blnDel = false
+	If lCase(sDel) = "yes" then blnDel = true
+	
+	dim aSrf
+	
+	If Rhino.IsPolySurface(sObj) then
+		aSrf = Rhino.ExplodePolysurfaces(sObj,blnDel)
+	else
+		if blnDel = True then
+			aSrf = array(sObj)
+		Else
+			aSrf = array(Rhino.CopyObject (sObj))
+		End If
+	end if
+	
+	
+	If not isArray(aSrf) then exit sub
+	
+	UnderlyingSrf(aSrf)
+	Rhino.DeleteObjects aSrf
+	
+End Sub
+
+
+
+Sub UnderlyingSrf(aSrf)
+	
+	'Dim aSrf:aSrf = Rhino.GetObjects("Select surfaces",8,True, True)
+	'	If Not IsArray(aSrf) Then Exit Sub
+	Dim sSrf
+	
+	Rhino.EnableRedraw(False)
+	
+	For  Each sSrf In aSrf
+		GetUntrimmedSrf(sSrf)
+	Next
+	
+	Rhino.EnableRedraw
+	
+End Sub
+
+Rhino.AddStartUpScript Rhino.LastLoadedScriptFile
+Rhino.AddAlias "UnderlyingSrf", "_NoEcho _-RunScript (UnderlyingSrf)"
+
+Function GetUntrimmedSrf(sSrf)
+	'returns the untrimmed version of the selected surface
+	'for analytical surfaces the entire shape is returned.
+	Dim aPlane,dblRad,dblHeight
+	
+	If Rhino.IsSphere(sSrf) then
+		'get sphere info
+		'make a new sphere
+		
+		Dim aSphere: aSphere = Rhino.SurfaceSphere(sSrf)
+		aPlane = aSphere(0)
+		dblRad = aSphere(1)
+		GetUntrimmedSrf = Rhino.AddSphere(aPlane,dblrad)
+		
+		'ElseIf Rhino.IsPlaneSurface(sSrf) Then
+		'get plane info
+		'make a new plane
+		
+	ElseIf Rhino.IsCone(sSrf) Then
+		'get cone info
+		'make a new cone
+		
+		Dim aCone: aCone = Rhino.SurfaceCone(sSrf)
+		aPlane = aCone(0)
+		dblHeight = aCone(1)
+		dblrad = aCone(2)
+		GetUntrimmedSrf = Rhino.AddCone(aPlane, dblHeight,dblRad, False)
+		
+	ElseIf Rhino.IsTorus(sSrf) Then
+		'get torus info
+		'make a new torus
+		
+		Dim aTorus: aTorus = Rhino.SurfaceTorus(sSrf)
+		aPlane = aTorus(0)
+		dblrad = atorus(1)
+		Dim dblrad1: dblRad1 = aTorus(2)
+		GetUntrimmedSrf = Rhino.AddTorus(aPlane, dblRad, dblRad1,aPlane(3))
+		
+	Else 
+		'get surface info
+		'make a new surface
+		
+		Dim aPtCount: aptCount = Rhino.SurfacePointCount(sSrf)
+		Dim aPts: aPts = Rhino.SurfacePoints(sSrf)
+		
+		Dim aKnotCount: aKnotCount = Rhino.SurfaceKnotCount(sSrf)
+		Dim aKnots: aKnots = Rhino.SurfaceKnots(sSrf)
+		
+		Dim aKnotsU: aKnotsU = aKnots(0)
+		Dim aKnotsV: aKnotsV =  aKnots(1)
+		
+		Dim aDegree:aDegree = Rhino.SurfaceDegree(sSrf)
+		Dim aWeights:aWeights = Rhino.SurfaceWeights (sSrf)
+		
+		GetUntrimmedSrf = Rhino.AddNurbsSurface(aPtCount, aPts, aKnotsU, aKnotsV, aDegree, aWeights)
+
+	End If
+	
+End Function
+'Rhino.AddStartUpScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias " ", "_NoEcho _-RunScript ()"

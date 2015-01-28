@@ -1,0 +1,20 @@
+Option Explicit
+
+
+'Call RandomColorSomeObjects()
+Sub RandomColorSomeObjects()
+	Dim arrObjects,strObject,R,G,B,x,y,z
+	arrObjects=Rhino.GetObjects("Pick some objects to randomly color.")
+	If IsNull(arrObjects) Then Exit Sub
+	Call Rhino.EnableRedraw(False)
+	For Each strObject In arrObjects
+		x=Rnd()
+		R=x*255
+		y=Rnd()
+		G=y*255
+		z=Rnd()
+		B=z*255
+		Call Rhino.ObjectColor(strObject,RGB(R,G,B))
+	Next
+	Call Rhino.EnableRedraw(True)
+End Sub

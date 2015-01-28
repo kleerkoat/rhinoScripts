@@ -1,0 +1,69 @@
+
+function getint(inf,nam,def)
+dat=rhino.getdocumentdata("cad",nam)
+if isnull(dat) then dat=def
+if isnull(inf) then getint=dat : exit function
+val=rhino.getinteger(inf&" ?",cint(dat))
+rhino.setdocumentdata "cad",nam,cstr(val)
+getint=val
+end function
+
+sub main
+nu=getint("View number (1..12)","isoview-nu",1)
+if nu<1 then exit sub
+if nu>12 then exit sub
+addiso nu,false
+end sub
+
+sub addiso(nu,restorecp)
+if nu=1 then kx=1:ky=1:kz=1:ku=1
+if nu=2 then kx=-1:ky=1:kz=1:ku=1
+if nu=3 then kx=-1:ky=-1:kz=1:ku=1
+if nu=4 then kx=1:ky=-1:kz=1:ku=1
+if nu=5 then kx=1:ky=1:kz=-1:ku=1
+if nu=6 then kx=-1:ky=1:kz=-1:ku=1
+if nu=7 then kx=-1:ky=-1:kz=-1:ku=1
+if nu=8 then kx=1:ky=-1:kz=-1:ku=1
+if nu=9 then kx=1:ky=1:kz=-1:ku=-1
+if nu=10 then kx=-1:ky=1:kz=-1:ku=-1
+if nu=11 then kx=-1:ky=-1:kz=-1:ku=-1
+if nu=12 then kx=1:ky=-1:kz=-1:ku=-1
+nam="Iso_"&cstr(nu)
+if not rhino.isview(nam) then
+  rhino.addnamedview nam
+end if
+rhino.command"-namedview restore "&nam&" enter"
+rhino.viewprojection nam,1
+rhino.viewcameratarget nam,array(kx*100,ky*100,kz*100),array(0,0,0)
+rhino.viewcameraup nam,array(ku*kx*1,ku*ky*1,ku*kz*2)
+rhino.command"-namedview save "&nam&" enter"
+rhino.command"cplane view"
+rhino.command"-namedcplane s "&nam&" enter"
+if restorecp then
+  rhino.command"cplane previous"
+end if
+end sub
+
+main
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

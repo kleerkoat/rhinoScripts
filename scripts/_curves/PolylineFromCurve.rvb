@@ -1,0 +1,65 @@
+Option Explicit
+
+'Call PolylineFromCurve()
+Sub PolylineFromCurve()
+	Dim strObject,arrSPt,dblRadius,arrPlane,strCirc
+	Dim arrPolyPts(),arrOldCrvs(),i,j,Test,Count
+	
+	strObject=Rhino.GetObject("Pick the curve to subdivide.",4)
+	If IsNull(strObject) Then Exit Sub
+	
+	dblRadius=Rhino.GetReal("Enter the straight line distance value.")
+	
+	If IsNull(dblRadius) Then Exit Sub
+	
+	Call Rhino.EnableRedraw(False)
+	arrSPt=Rhino.CurveStartPoint(strObject)
+
+	ReDim arrPolyPts(0)
+	arrPolyPts(0)=arrSPt
+	i=0
+	j=0
+	Test=True
+	Count=0
+	Do While Test=True
+		
+		i=i+1
+		arrPlane=Rhino.PlaneFromNormal(arrSPt, Array(0,0,1))
+
+		strCirc=Rhino.AddCircle(arrPlane, dblRadius)
+	
+		Dim arrIntersection,dblParameter,arrNewCrvs
+		arrIntersection=Rhino.CurveCurveIntersection(strObject, strCirc)
+		
+		If IsArray (arrIntersection)Then
+			Call Rhino.DeleteObject(strCirc)
+			ReDim Preserve arrPolyPts(i)
+			arrPolyPts(i)=arrIntersection(0,1)
+
+			dblParameter=arrIntersection(0,5)
+			arrNewCrvs=Rhino.SplitCurve(strObject, dblParameter, False)
+			Call Rhino.DeleteObject(arrNewCrvs(0))
+			strObject=arrNewCrvs(1)
+			
+			ReDim Preserve arrOldCrvs(j)
+			arrOldCrvs(j)=arrNewCrvs(1)
+			j=j+1
+			arrSPt=Rhino.CurveStartPoint(strObject)
+			Count=Count+1
+		Else
+			Exit Do
+		End If	
+		
+	Loop
+
+	Dim dblCrvL
+	
+	dblCrvL=Rhino.CurveLength(strObject)
+	Call Rhino.Print("The remaining curve is: "&dblCrvL&" units long.")
+	Call Rhino.Print("The number of straight line segments of this length "&dblRadius&" is: "&Count&".")
+			
+	Call Rhino.DeleteObject(strCirc)
+	Call Rhino.AddPolyline(arrPolyPts)
+	Call Rhino.DeleteObjects(arrOldCrvs)
+	Call Rhino.EnableRedraw(True)
+End Sub

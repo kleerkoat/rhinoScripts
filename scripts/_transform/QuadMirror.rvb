@@ -1,0 +1,23 @@
+﻿Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version Friday, April 18, 2008 9:26:09 AM
+
+Sub QuadMirror()
+	Dim arrObj
+
+	arrObj = Rhino.GetObjects ("Select objects to copy and mirror", ,True, True)
+	If IsNull (arrObj) Then Exit Sub
+
+	Rhino.EnableRedraw vbFalse
+
+	Rhino.SelectObjects arrObj
+	Rhino.command "_Mirror _pause 0 0,1,0"
+	Rhino.command "SelLast"
+	Rhino.command "_Mirror _pause 0 1,0,0"
+	Rhino.command "SelLast"
+
+	Rhino.EnableRedraw vbTrue
+End Sub
+Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+Rhino.AddAlias "Quadmirror", "! _-Runscript Quadmirror"

@@ -1,0 +1,34 @@
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' MeanCrv.rvb -- September 2012
+' Dale Fugier, Robert McNeel & Associates
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+
+Option Explicit
+
+Sub MeanCrv
+  
+  Const rhObjectCurve = 4
+  
+  Dim strCurve0, strCurve1
+
+  If (Rhino.ExeVersion <> 5) Then
+    Call Rhino.Print("This script requires Rhino 5.0 for greater.")
+    Exit Sub
+  End If
+	
+  strCurve0 = Rhino.GetObject("Select the first curve", rhObjectCurve)
+  If IsNull(strCurve0) Then Exit Sub
+
+  strCurve1 = Rhino.GetObject("Select the second curve", rhObjectCurve)
+  If IsNull(strCurve1) Then Exit Sub
+  If strCurve0 = strCurve1 Then Exit Sub
+
+  Call Rhino.MeanCurve(strCurve0, strCurve1)
+
+End Sub
+
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' Drag & drop support
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+Rhino.AddAlias "MeanCrv", "_NoEcho _-RunScript (MeanCrv)"

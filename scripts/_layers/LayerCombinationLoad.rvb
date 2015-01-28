@@ -1,0 +1,79 @@
+﻿Option Explicit
+'Script written by <Simon Aulis Kallioinen>
+'Script copyrighted by <>
+'Script version den 15 december 2008 22:27:50
+
+
+'Call LayerCombinationLoad()
+Sub LayerCombinationLoad()
+	Dim arrLayers, strLayer, strCombName, strValue, arrCombinations, strCombination, arrCombAndLayer, strResult, blnVisible, blnLocked, blnCurrent
+	
+	arrCombinations = Rhino.GetDocumentData("LayerCombinationNames")
+			
+	If IsArray(arrCombinations) Then
+		
+		strResult = Rhino.GetString ("Layer combination to load:", , arrCombinations)
+		If strResult="" Then
+	
+			strResult = Rhino.ListBox(arrCombinations, "Layer combination to load")
+ 
+			If IsNull(strResult) Then
+				Rhino.Print("Layer Combination was NOT changed")
+				Exit Sub
+			End If
+		End If
+		
+		arrLayers = Rhino.GetDocumentData("LayerCombination " & strResult)				
+		
+		If IsNull(arrLayers) Then
+			Exit Sub
+		End If
+		
+		For Each strLayer In arrLayers
+			strValue = Rhino.GetDocumentData("LayerCombination " & strResult, strLayer)
+			If Not Rhino.IsLayer(strLayer) Then
+				Call	Rhino.Print(strLayer & " has been deleted since combination was saved")
+			Else
+				Dim arrValues
+				arrValues = Split(strValue,"|")
+				
+				If Left(arrValues(0), 11)="Visible: Tr" Then
+					blnVisible = True
+				End If
+			 
+				If Left(arrValues(0), 11)="Visible: Fa" Then
+					blnVisible = False
+				End If
+				
+				If Right(arrValues(1), 3)="rue" Then
+					blnLocked = True
+				End If
+			 
+				If Right(arrValues(1), 3)="lse" Then
+					blnLocked = False
+				End If		
+				
+								
+				If Right(arrValues(2), 3)="rue" Then
+					blnCurrent = True
+				End If
+			 
+				If Right(arrValues(2), 3)="lse" Then
+					blnCurrent = False
+				End If		
+				
+				Call Rhino.LayerVisible (strLayer, blnVisible)
+				Call Rhino.LayerLocked (strLayer, blnLocked)
+				If blnCurrent Then
+					Call Rhino.CurrentLayer (strLayer)
+				End If
+				
+			End If
+			
+		Next
+	
+		Rhino.Print("Combination " & strResult & " was loaded")
+		
+	End If
+	
+End Sub

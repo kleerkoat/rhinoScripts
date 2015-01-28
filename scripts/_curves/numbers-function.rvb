@@ -1,0 +1,79 @@
+﻿Option Explicit
+'Script written by <Chris Chalmers>
+'Script copyrighted by <BIOS Design Colective>
+'Script version Tuesday, March 17, 2009 12:55:46 AM
+
+Call Main()
+Sub Main()
+	Dim strPrefix,dblScale,dblCOnvs,arrptStart, arrText, intFirst, intSecond, intThird
+	Dim i,j,k,m, dblX 
+	
+
+	'get info
+	strPrefix=Rhino.GetString("prefix (choose a letter A-K)","A")
+	If isnull(strPrefix) Then : Exit Sub :End If
+	
+	intFirst=rhino.GetInteger("First Digit")
+	If isnull(intFirst) Then : Exit Sub :End If
+	
+	intSecond=rhino.GetInteger("Second Digit")
+	If isnull(intSecond) Then : Exit Sub :End If
+	
+	intThird=rhino.GetInteger("Third Digit")
+	If isnull(intThird) Then : Exit Sub :End If
+	
+	dblScale= rhino.GetReal("text height (in inches)",0.5) 
+	If isnull(dblScale) Then : Exit Sub :End If
+	
+	arrptStart=rhino.GetPoint("select placement")
+	
+	'convert units
+	dblCOnvs=Rhino.UnitSystem(8)
+	dblScale=dblScale/dblCOnvs
+	
+	'layer management
+	If Not isLayer("Text") Then
+		Rhino.AddLayer("text")
+	End If
+	
+	arrText=FcurveNumber(arrptStart, dblScale, strPrefix, intFirst, intSecond, intThird)
+	Rhino.ObjectLayer arrText,"text"
+	
+End Sub
+Function FcurveNumber(arrptStart, dblScale, strPrefix, intFirst, intSecond, intThird)
+	
+	'this function lays out a fabrication label in single curves, avoiding the
+	'common double curve problem when using text objects in lasercutting or CNC milling
+	'inputs are startpoint ,text height (in rhino's current unit system), 
+	'a prefix (uppercase leter)and three digits. 
+	
+	Dim strNumb,strBlock, arrsel(3), arrptOrigin, dblKern, dblX
+	
+	dblKern=dblScale*1.1
+	
+	'first digit
+	strBlock = ("letter"&strPrefix)
+	arrptOrigin= arrptStart
+	arrsel(0) = rhino.InsertBlock(strBlock,arrptOrigin, Array(dblScale,dblScale,dblScale) )
+		
+	'second digit
+	strBlock = ("number"&intFirst)
+	dblX = (dblKern)
+	arrptOrigin=Array((arrptStart(0)+dblX),arrptStart(1),arrptStart(2))
+	arrsel(1) = rhino.InsertBlock(strBlock,arrptOrigin,Array(dblScale,dblScale,dblScale))
+		
+	'third digit
+	strBlock = ("number"&intSecond)
+	dblX = (dblKern*2)
+	arrptOrigin=Array((arrptStart(0)+dblX),arrptStart(1),arrptStart(2))
+	arrsel(2) = rhino.InsertBlock(strBlock,arrptOrigin,Array(dblScale,dblScale,dblScale))
+		
+	'fourth digit
+	strBlock = ("number"&intThird)
+	dblX = (dblKern*3)
+	arrptOrigin=Array((arrptStart(0)+dblX),arrptStart(1),arrptStart(2))
+	arrsel(3) = rhino.InsertBlock(strBlock,arrptOrigin,Array(dblScale,dblScale,dblScale))
+	
+	FcurveNumber=arrSel
+	
+End Function

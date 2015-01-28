@@ -1,0 +1,77 @@
+Option Explicit
+'Script written by Yujun Chen
+'Script version 2010年11月23日 16:02:21
+
+'Call Hexagon()
+Sub Hexagon()
+	Dim suf
+	suf = rhino.GetObject("Please Select a surface: ", 8, False, False)
+	If(isnull(suf))Then Exit Sub
+	
+	Dim domu, domv
+	
+	domu = rhino.SurfaceDomain(suf, 0)
+	domv = rhino.SurfaceDomain(suf, 1)
+
+	Rhino.Print "Domain in U direction: " & CStr(DomU(0)) & " to " & CStr(DomU(1))
+	Rhino.Print "Domain in V direction: " & CStr(DomV(0)) & " to " & CStr(DomV(1))
+
+	Dim numu:numu = 80
+	Dim numv:numv = 50
+	Dim pointsUV
+	ReDim pointsUV(numu+1, numv+1)
+	Dim i, j
+	For i=0 To numu
+		Dim u:u = domu(0) + (domu(1)-domu(0))/numu*i
+		For j=0 To numv
+			Dim v:v = domv(0) + (domv(1)-domv(0))/numv*j
+			
+			Dim pt
+			pt = rhino.EvaluateSurface(suf, array(u,v))
+			
+			pointsUV(i,j) = pt
+		Next
+	Next
+	rhino.EnableRedraw(False)
+	For i=0 To numu
+		For j=0 To numv
+			'rhino.AddPoint(pointsUV(i,j))
+		Next
+	Next
+	
+	For i=0 To numu-1 Step 2
+		For j=0 To numv-1 Step 4
+			Call rhino.AddLine(pointsUV(i,j), pointsUV(i+1, j+1))
+		Next
+	Next
+	For i=0 To numu Step 2
+		For j=3 To numv-1 Step 4
+			Call rhino.AddLine(pointsUV(i,j), pointsUV(i, j+1))
+		Next
+	Next
+	For i=1 To numu Step 2
+		For j=1 To numv-1 Step 4
+			Call rhino.AddLine(pointsUV(i,j), pointsUV(i, j+1))
+		Next
+	Next
+
+	For i=1 To numu Step 2
+		For j=2 To numv-1 Step 4
+			Call rhino.AddLine(pointsUV(i,j), pointsUV(i-1, j+1))
+		Next
+	Next
+
+	For i=1 To numu-1 Step 2
+		For j=1 To numv-1 Step 4
+			Call rhino.AddLine(pointsUV(i,j), pointsUV(i+1, j-1))
+		Next
+	Next
+	For i=1 To numu Step 2
+		For j=2 To numv-1 Step 4
+			Call rhino.AddLine(pointsUV(i,j), pointsUV(i+1, j+1))
+		Next
+	Next
+	
+	rhino.EnableRedraw(True)
+	
+End Sub

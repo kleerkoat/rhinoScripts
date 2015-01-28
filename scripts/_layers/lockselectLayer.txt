@@ -1,0 +1,13 @@
+﻿-RunScript (
+Sub lockselectLayer
+Dim strObject,x
+strObject = Rhino.GetObject("Select object for layer lock")
+If strObject <> vbNull Then
+Rhino.print Rhino.ObjectLayer(strObject) & " Locked"
+Rhino.StatusBarMessage Rhino.ObjectLayer(strObject) & " Locked"
+x = Rhino.ObjectLayer(strObject)
+Rhino.LayerLocked x,True
+End If
+End Sub
+lockselectLayer
+)

@@ -1,0 +1,29 @@
+﻿Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version Monday, November 14, 2011 10:11:48 AM
+
+Call TestStatusBarProgressMeter()
+Sub TestStatusBarProgressMeter
+
+	Dim nLower, nUpper, i
+
+	nLower = 0
+
+	nUpper = 100
+
+	Rhino.StatusBarProgressMeter "Solving", 0, 100
+
+	For i = nLower to nUpper
+
+		Rhino.Print i
+
+		Rhino.StatusBarProgressMeter i
+
+		Rhino.Sleep 500
+
+	Next
+
+	Rhino.StatusBarProgressMeter
+
+End Sub

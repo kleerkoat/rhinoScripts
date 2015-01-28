@@ -1,0 +1,85 @@
+Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version Tuesday, February 16, 2010 6:42:17 PM
+
+'Call ColoredCuts()
+Sub ColoredCuts()
+	Dim strObject, arrPt0, arrPt1,arrBBox,i
+
+	strObject = Rhino.GetObject("Select surface for uniform elevation cuts.",8+16)
+	
+	arrBBox=Rhino.BoundingBox (strObject)
+	Dim dblNumber,dblInterval,intTop
+	dblNumber=5
+	dblInterval=Rhino.GetReal("Enter an spacing interval.", dblNumber)
+	
+	intTop=(((arrBBox(4)(2)-arrBBox(0)(2))/dblInterval)+1)
+	For i=1 To intTop
+		
+			
+		arrPt0 = array(arrBBox(0)(0),arrBBox(0)(1),arrBBox(0)(2)+dblInterval*i)
+		
+		
+		
+		If IsArray(arrPt0) Then
+
+		
+			arrPt1 = array(arrBBox(1)(0),arrBBox(1)(1),arrBBox(1)(2)+dblInterval*i)
+			
+			
+			If IsArray(arrPt1) Then
+				Dim arrPoint1,arrPoint2,arrNormal
+				
+				arrPoint1=array(0,0,0)
+				arrPoint2=array(0,1,0)
+				arrNormal=Rhino.VectorCreate(arrPoint1, arrPoint2)
+			Dim strCutter
+			
+				strCutter=Rhino.AddCutPlane(strObject, arrPt0, arrPt1,arrNormal)
+			
+			
+			
+			Dim arrSplitSurfs,lngColor
+			
+				arrSplitSurfs=Rhino.SplitBrep(strObject,strCutter,True)
+				Call Rhino.DeleteObject(strCutter)
+				If IsNull(arrSplitSurfs)Then
+					
+					dblRed=rnd*255
+					dblGreen=rnd*255
+					dblBlue=rnd*255
+					lngColor=RGB(dblRed,dblGreen,dblBlue)
+					
+					
+					Call Rhino.ObjectColor(strObject,lngColor)
+					
+					Exit Sub
+				End If
+				
+				strObject=arrSplitSurfs(0)
+				
+				
+					Dim dblRed,dblGreen,dblBlue
+					dblRed=rnd*255
+					dblGreen=rnd*255
+					dblBlue=rnd*255
+					lngColor=RGB(dblRed,dblGreen,dblBlue)
+				
+					
+					Call Rhino.ObjectColor(arrSplitSurfs(1),lngColor)
+			
+				
+				
+
+			End If
+		
+			
+			
+		End If
+
+	Next
+	
+
+
+End Sub

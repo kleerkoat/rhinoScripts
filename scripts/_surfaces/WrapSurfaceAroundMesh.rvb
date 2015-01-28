@@ -1,0 +1,384 @@
+Option Explicit
+'Script written by willemderks
+'Script version Saturday, November 26, 2011 13:55:07
+
+'Call WrapSurfaceAroundMesh()
+Sub WrapSurfaceAroundMesh()
+
+	'factor to leave surface point off surface
+	Dim dblMagicNumberA : dblMagicNumberA = 1.1
+	
+	
+	
+	
+	Dim strMesh :	strMesh = Rhino.GetObject("Select mesh to wrap Around", 32, True)
+	If IsNull(strMesh) Then Exit Sub
+	
+	Dim strChoice
+	'	strChoice = "Existing surface"
+	strChoice = Rhino.ListBox(array("Existing surface", "Sphere by axis"), "Type of starting surface", "Base") 
+	'If isNull(strChoice) Then Exit Sub
+	
+	Dim strSrf
+	If strChoice = "Existing surface" Then
+		strSrf = Rhino.GetObject("Select starting surface", 8)
+		If isNull(strSrf) Then Exit Sub
+	End If
+	
+	If strChoice = "Sphere by axis" Then
+		Dim arrAxis :	arrAxis = Rhino.GetLine(1, BBoxEx(strMesh, 1, Null), "Set Sphere orientation")
+		If IsNull(arrAxis) Then Exit Sub
+	End If
+	
+		
+	Dim arrSettings
+	arrSettings = GetSurfaceAroundMeshWrapSettings(True)
+	
+	If strChoice = "Sphere by axis" Then
+		Dim dblRadius :	dblRadius = BBoxEx(strMesh, 5, Null)
+		Dim arrPlane
+		arrPlane = Rhino.PlaneFromNormal(BBoxEx(strMesh, 1, Null), Rhino.VectorCreate(arrAxis(1), arrAxis(0)))
+		strSrf = Rhino.AddSphere(arrPlane, dblRadius)
+		Call Rhino.RebuildSurface(strSrf, array(3, 3), array(10, 10))
+	End If
+	
+	
+	Dim intSteps :	intSteps = Cint(arrSettings(1))
+	
+	Dim intUVmultiplier : intUVmultiplier = Cint(arrSettings(0))
+	
+	Dim arrUVcount : arrUVcount = Rhino.SurfacePointCount(strSrf)
+
+	
+	
+	
+	Dim i, RU,RV, arrUVstep(1)
+	arrUVstep(0) = Cint( (arrUVcount(0) * (intUVmultiplier - 1)) / intSteps)
+	arrUVstep(1) = Cint( (arrUVcount(1) * (intUVmultiplier - 1)) / intSteps)
+	
+	
+	RU = arrUVcount(0) + arrUVstep(0)
+	RV = arrUVcount(1) + arrUVstep(1)
+	
+	Call PullSphereToMesh(strMesh, strSrf)
+	Call AdjustSurfaceToMesh(strSrf, strMesh, dblMagicNumberA, 1)
+		
+	For i=1 To intSteps
+		
+		Call Rhino.RebuildSurface(strSrf, array(3, 3), array(RU, RV))
+		Call PullSphereToMesh(strMesh, strSrf)
+		Call AdjustSurfaceToMesh(strSrf, strMesh, dblMagicNumberA, i + 1)
+	
+		RU = RU + arrUVstep(0)
+		RV = RU + arrUVstep(1)
+				
+	Next
+	
+	Call AdjustSurfaceToMesh(strSrf, strMesh, dblMagicNumberA, intSteps + 1)
+	Call AdjustSurfaceToMesh(strSrf, strMesh, dblMagicNumberA ^ 2, intSteps + 2)
+		
+	
+End Sub
+
+
+
+
+Function  AdjustSurfaceToMesh(strSrf, strMesh, dblFactor, intStep)
+		
+	
+	Call Rhino.EnableObjectGrips(strSrf, True)
+	'Dim arrGripsLocations :	arrGripsLocations = Rhino.ObjectGripLocations(strSrf)
+	'Dim arrParameters : arrParameters = Rhino.SurfaceEditPoints(strSrf, True, False)
+	
+	
+	Dim arrPts : arrPts = Rhino.ObjectGripLocations(strSrf)
+	Dim UB : UB = Ubound(arrPts)
+		
+
+	Dim i,PtSrf,PtMesh,vecMeshSrf
+	
+	
+	For i=0 To UB
+		If  i Mod 100 = 1 Then Rhino.Prompt("Wrapping step " & intStep & "/" & (GetSurfaceAroundMeshWrapSettings(False)(0) + 3) & " :: " & Round((i / UB) * 100, 0) & "%")
+	
+		PtSrf = Rhino.EvaluateSurface(strSrf, Rhino.SurfaceClosestPoint(strSrf, arrPts(i)))
+		PtMesh = Rhino.MeshClosestPoint(strMesh, PtSrf)
+
+		If Not isNull(PtMesh) Then 
+			vecMeshSrf = Rhino.VectorCreate(PtMesh(0), PtSrf)
+			If Not Rhino.IsVectorTiny(vecMeshSrf) Then
+				vecMeshSrf = Rhino.VectorScale(vecMeshSrf, dblFactor)
+				arrPts(i) = Rhino.PointAdd(arrPts(i), vecMeshSrf)
+			End If
+		End If
+		
+		
+	Next
+	
+	
+	Call Rhino.ObjectGripLocations(strSrf, arrPts)
+	Call Rhino.EnableObjectGrips(strSrf, False)
+	
+End Function
+
+Function PullSphereToMesh(strMesh, strSrf)
+	
+	Call Rhino.EnableObjectGrips(strSrf, True)
+	
+	Dim arrGripsLocations :	arrGripsLocations = Rhino.ObjectGripLocations(strSrf)
+	Dim arrPts : arrPts = Rhino.PullPoints(strMesh, arrGripsLocations)
+
+	Call Rhino.ObjectGripLocations(strSrf, arrPts)
+	Call Rhino.EnableObjectGrips(strSrf, False)
+		
+	
+End Function
+
+
+
+
+
+Function BBoxEx(arrObj, intOption, argA)
+	
+	'Function written by willemderks
+	'Returns various Boundingbox related variables.
+	
+	
+	'intOption list
+	'
+	'0 Default BBox
+	'1 BBox Center
+	'2 BBox X Height
+	'3 BBox Y Height
+	'4 BBox Z Height
+	'5 BBox Diagonal : Distance BBox(0) to BBox(6)
+	
+	'Expanding:
+	'20-26           offset the bouding box by adding/substracting argA
+	'                if argA = Null than the amount expanded will be
+	'                64 times rhino's file tolerance
+	'               
+	'20 Expand XYZ    
+	'21 Expand X       
+	'22 Expand Y    
+	'23 Expand Z             
+	'24 Expand XY
+	'25 Expand YZ           
+	'26 Expand ZX
+
+	
+	
+	
+	
+	'Error return
+	BBoxEx = Null
+	
+	
+	Dim BBox,BBoxMM
+	'Regular Boundingbox
+	BBox = Rhino.BoundingBox(arrObj)
+	'array with boundingbox Min and Max points
+	BBoxMM = array(BBox(0), BBox(6))
+	
+	
+	'Regular Boundingbox
+	If intOption = 0 Then
+		BBoxEx = BBox
+	End If
+	
+	'BBox Center
+	If intOption = 1 Then
+		BBoxEx = Rhino.PointDivide(Rhino.PointAdd(BBoxMM(0), BBoxMM(1)), 2)
+	End If
+	
+	
+	'BBox Heights
+	'X Height
+	If intOption = 2 Then
+		BBoxEx = BBoxMM(1)(0) - BBoxMM(0)(0)
+	End If
+	'Y Height
+	If intOption = 3 Then
+		BBoxEx = BBoxMM(1)(1) - BBoxMM(0)(1)
+	End If
+	'Z Height
+	If intOption = 4 Then
+		BBoxEx = BBoxMM(1)(2) - BBoxMM(0)(2)
+	End If
+	'5 BBox Diagonal
+	If intOption = 5 Then
+		BBoxEx = Rhino.Distance(BBox(0), BBox(6))
+	End If
+	
+	
+	
+	
+	
+	
+	'Expanding
+	If intOption >= 20 And intOption < 30 Then
+		
+		Dim dblExpand
+		
+		If isNull(argA) Then 
+			dblExpand = 64 * Rhino.UnitAbsoluteTolerance
+		Else
+			dblExpand = argA
+		End If
+		
+		'X
+		If intOption = 20 Or intOption = 21 Or intOption = 24 Or intOption = 26 Then
+			BBoxMM(0)(0) = BBoxMM(0)(0) - dblExpand
+			BBoxMM(1)(0) = BBoxMM(1)(0) + dblExpand
+		End If
+		
+		'Y
+		If intOption = 20 Or intOption = 22 Or intOption = 24 Or intOption = 25 Then
+			BBoxMM(0)(1) = BBoxMM(0)(1) - dblExpand
+			BBoxMM(1)(1) = BBoxMM(1)(1) + dblExpand
+		End If
+		
+		'Z
+		If intOption = 20 Or intOption = 23 Or intOption = 25 Or intOption = 26 Then
+			BBoxMM(0)(2) = BBoxMM(0)(2) - dblExpand
+			BBoxMM(1)(2) = BBoxMM(1)(2) + dblExpand
+		End If
+		
+		Dim x1,y1,z1,x2,y2,z2
+		x1 = BBoxMM(0)(0)
+		y1 = BBoxMM(0)(1)
+		z1 = BBoxMM(0)(2)
+		x2 = BBoxMM(1)(0)
+		y2 = BBoxMM(1)(1)
+		z2 = BBoxMM(1)(2)
+	
+		
+		BBoxEx = array(array(x1, y1, z1), array(x2, y1, z1), array(x2, y2, z1), array(x1, y2, z1), array(x1, y1, z2), array(x2, y1, z2), array(x2, y2, z2), array(x1, y2, z2))
+		
+		
+	End If
+	
+	
+	
+	
+End Function
+
+
+
+Function GetSurfaceAroundMeshWrapSettings(blnEdit) 'Edit
+	
+	
+	'Function written by willemderks.com
+
+	'this function will return an array of documentdata values
+	'inside the function one has to set the variables below a '############ comment:
+	' - unique string describing what the settings are for.
+	' - an array of default value descriptions as strings
+	' - an array of default value descriptions
+
+	'Function parameter:
+	' blnEdit 
+	' - when False the current values are returned
+	' - when True the current values can be edited and are returned
+	'
+	' - when blnEdit = "Default" the values will be set to the default values
+	'   this is useful when a script has been modified and the file still contains
+	'   a set of values
+
+	'NOTE!
+	' the array returned is an array of STRINGS!
+	' so numerical values should be converted eg with Cstr() of Cint()
+
+
+	Dim strFor 'unique string describing what the settings are for.
+	Dim intItems
+		
+	'############ set identification name for document settings
+	strFor = "SurfaceAroundMeshWrapSettings"
+	intItems = 2
+	'############
+	
+	
+	
+	
+	Dim i
+	intItems = intItems - 1
+	
+	If isNull(Rhino.GetDocumentData(strFor, "settings")) Or blnEdit = "Default" Then
+		'Make arrays with default settings
+		Dim arrDefaultEntries,arrDefaultValues
+		ReDim arrDefaultEntries(intItems)
+		ReDim arrDefaultValues(intItems)
+		
+		
+		'############
+		'############
+		'############ set variable (number of entries should equal intItems set earlier
+		i = 0
+		arrDefaultEntries(i) = "Surface UV multiplier"
+		arrDefaultValues(i) = 4
+		
+		i = i + 1
+		arrDefaultEntries(i) = "Number of Steps to Final Wrap"
+		arrDefaultValues(i) = 5
+		
+		'############
+		'############
+		'############
+	End If
+	
+	
+	
+	
+	
+	
+
+	If isNull(Rhino.GetDocumentData(strFor, "settings")) Or blnEdit = "Default" Then
+		'Clear all Data
+		Call Rhino.DeleteDocumentData(strFor)
+		Call Rhino.DeleteDocumentData(strFor & "_Settings")
+		
+		'set default settings to document		
+		For i=0 To Ubound(arrDefaultValues)
+			Call Rhino.SetDocumentData(strFor & "_Settings", arrDefaultEntries(i), arrDefaultValues(i))
+		Next
+		Call Rhino.SetDocumentData(strFor, "settings", "SET")
+		'Call Rhino.Print (strFor&" settings are set to default")
+	End If	
+	
+	
+	If blnEdit = "Default" Then Exit Function
+	
+	
+		
+	Dim arrSettings
+	arrSettings = Null
+	
+	Dim arrEntries
+	arrEntries = Rhino.GetDocumentData(strFor & "_Settings")
+	Dim arrValueStr()
+	ReDim arrValueStr(Ubound(arrEntries))
+	
+	For i=0 To Ubound(arrEntries)
+		arrValueStr(i) = Rhino.GetDocumentData(strFor & "_Settings", arrEntries(i))
+	Next
+	
+	If blnEdit Then
+		Dim arrNewValueStr
+		arrNewValueStr = Rhino.PropertyListBox(arrEntries, arrValueStr,  , strFor)
+		If isNull(arrNewValueStr) Then
+			arrSettings = Null
+			Exit Function 'probably cancelled
+		Else
+			For i=0 To Ubound(arrNewValueStr)
+				Call Rhino.SetDocumentData(strFor & "_Settings", arrEntries(i), arrNewValueStr(i))
+				arrValueStr(i) = arrNewValueStr(i)
+			Next
+		End If
+	End If
+	
+	arrSettings = arrValueStr
+	
+	GetSurfaceAroundMeshWrapSettings = arrSettings
+	
+End Function 'Settings

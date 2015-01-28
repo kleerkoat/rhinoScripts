@@ -1,0 +1,16 @@
+﻿Option Explicit
+'Script written by Ryan Gilmore
+'Script version Wednesday, 15 August 2012 12:34:56
+
+'Call HideDotsAndDims()
+Sub HideDotsAndDims()
+	Dim arrObjects
+
+	arrObjects = Rhino.ObjectsByType(8192 + 512, True)
+	If IsArray(arrObjects) Then
+
+		Rhino.HideObjects arrObjects
+
+	End If
+
+End Sub

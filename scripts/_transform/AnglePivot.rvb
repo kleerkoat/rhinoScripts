@@ -1,0 +1,32 @@
+Option Explicit
+' Script written by G. C. Webster® (aka Guilherme Cozer Webster) in Jan/06, for Rhinoceros 3.0
+' Contact: gcwebster@pop.com.br
+' RhinoScript June 16, 2005
+' Designed to run the "angle" command with a pivot point.
+
+'-------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Sub AnglePivot
+
+Dim arrPtPv, arrPt1, arrPt2
+
+arrPtPv = Rhino.GetPoint ("Pivot point")
+If IsNull (arrPtPv) Then Exit Sub
+
+arrPt1 = Rhino.GetPoint ("End of first line")
+If IsNull (arrPt1) Then Exit Sub
+
+arrPt2 = Rhino.GetPoint ("End of second line")
+If IsNull (arrPt2) Then Exit Sub
+
+Rhino.EnableRedraw vbFalse
+Rhino.UnselectAllObjects
+
+Rhino.command "angle "&Rhino.Pt2Str(arrPtPv)&" "&Rhino.Pt2Str(arrPt1)&" "&Rhino.Pt2Str(arrPtPv)&" "&Rhino.Pt2Str(arrPt2), vbFalse
+
+Rhino.EnableRedraw vbTrue
+
+End Sub
+
+AnglePivot
+)

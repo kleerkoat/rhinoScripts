@@ -1,0 +1,45 @@
+﻿'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' ConvertLayersToGrayscale.rvb -- May 2010
+' If this code works, it was written by Dale Fugier.
+' If not, I don't know who wrote it.
+' Works with Rhino 4.0.
+
+Option Explicit
+
+Sub ConvertLayersToGrayscale()
+  
+  ' Declare local variables
+  Dim arrLayers, strLayer, lngColor
+  Dim nGray, nRed, nGreen, nBlue
+  
+  ' Turn off screen redrawing (for performance)
+  Call Rhino.EnableRedraw(False)
+  
+  ' Get all of the layers in the document
+  arrLayers = Rhino.LayerNames
+  
+  ' Process each layer one-by-one
+  For Each strLayer In arrLayers
+    
+    ' Get the layer's color
+    lngColor = Rhino.LayerColor(strLayer)
+    
+    ' Get the color's red-green-blue components
+    nRed = Rhino.ColorRedValue(lngColor)
+    nGreen = Rhino.ColorGreenValue(lngColor)
+    nBlue = Rhino.ColorBlueValue(lngColor)
+    
+    ' Calculate the grayscale based on the NTSC color gamut
+    nGray = CByte(nRed * 0.30) + CByte(nGreen * 0.59) + CByte(nBlue * 0.11)
+    
+    ' Modify the layer's color
+    Call Rhino.LayerColor(strlayer, RGB(nGray, nGray, nGray))
+    
+  Next
+  
+  ' Turn on screen redrawing
+  Call Rhino.EnableRedraw(True)
+  
+End Sub
+
+

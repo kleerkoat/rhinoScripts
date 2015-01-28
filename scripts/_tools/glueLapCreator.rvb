@@ -1,0 +1,82 @@
+' ****************************** RhinoScript.org ******************************
+'
+'   glue lap creator, version 1
+'
+'   by Hanno Stehling, published May 18, 2008
+'
+'
+'   A tool designed to help you make paper models: If you have a cutting pattern ready for printing or lasercutting, you can use this script to create glue laps.
+'
+'
+'
+'
+'   This RhinoScript Tool has been downloaded from RhinoScript.org.
+'
+'   Rhino versions: Rhino 4
+'   In order to run it you need the following libraries: "Array Library" (version 1.3) by Hanno Stehling.
+'
+'   LICENSE INFORMATION:
+'   This script is published under the GNU General Public License, version 3
+'   or any later version, and thus comes WITHOUT ANY WARRANTY. You can get
+'   the complete license text here: www.rhinoscript.org/gpl
+'
+' ****************************** RhinoScript.org ******************************
+
+
+
+' glue lap creator - Version 1.0
+' ------------------------------------------
+' by Hanno Stehling - post@hanno-stehling.de
+
+
+
+Option Explicit
+Setlocale "en-us"
+
+
+
+Sub glueLapCreator()
+
+	Dim ln, obj, objects
+	Dim width, axis
+	Dim pt, pt1, pt2, sec
+	
+	obj = rhino.selectedobjects()
+	objects = array()
+	If isarray(obj) Then
+		For Each ln In obj
+			If rhino.isline(ln) Then
+				array_push objects, ln
+			Else
+				rhino.PrintEx "Ignored a non-line object."
+			End If
+		Next
+	End If
+	If array_count(objects) = 0 Then
+		rhino.PrintEx "Please select some lines and try again."
+		Exit Sub
+	End If
+	
+	width = rhino.Getdistance(, 1, "Width of glue laps, first reference point", "Width of glue laps, second reference point")
+	If Not isnumeric(width) Then Exit Sub
+	
+	For Each ln In objects
+		rhino.UnselectAllObjects
+		rhino.selectobject ln
+		pt = rhino.GetPoint("Pick point on side of line where the glue lap should be drawn", , , True)
+		axis = rhino.vectorcrossproduct(rhino.vectorcreate(rhino.curvestartpoint(ln), rhino.CurveEndPoint(ln)), rhino.vectorcreate(pt, rhino.CurveEndPoint(ln)))
+		pt1 = rhino.VectorAdd(rhino.CurveEndPoint(ln), rhino.VectorRotate(rhino.Vectorscale(rhino.VectorUnitize(rhino.VectorCreate(rhino.curvestartpoint(ln), rhino.CurveEndPoint(ln))), 2^0.5 * width), 45, axis))
+		pt2 = rhino.VectorAdd(rhino.CurvestartPoint(ln), rhino.VectorRotate(rhino.Vectorscale(rhino.VectorUnitize(rhino.VectorCreate(rhino.curveendpoint(ln), rhino.CurvestartPoint(ln))), 2^0.5 * width), 45, rhino.vectorscale(axis, -1)))
+		sec = rhino.LineLineIntersection(array(rhino.curveendpoint(ln), pt1), array(pt2, rhino.CurvestartPoint(ln)))
+		If rhino.Distance(rhino.curvestartpoint(ln), sec) > 2^0.5 * width Then
+			rhino.Addpolyline array(rhino.curveendpoint(ln), pt1, pt2, rhino.CurvestartPoint(ln))
+		Else
+			rhino.AddPolyline array(rhino.curveendpoint(ln), sec, rhino.CurvestartPoint(ln))
+		End If
+	Next
+	
+	
+End Sub
+
+
+

@@ -1,0 +1,52 @@
+﻿Option Explicit
+'Script written by Pascal
+'Company: RMA
+'Script version Saturday, August 18, 2007
+
+'Call RotateOnNormal()
+
+Sub RotateOnNormal()
+	
+	If IsNull(Rhino.SelectedObjects (True, True)) Then
+		Dim aObj: aObj = Rhino.GetObjects("Select objects to rotate",,True,,True)
+	
+	Else aObj = Rhino.SelectedObjects (True, True)
+	End If
+	
+	Dim sSrf : sSrf = Rhino.getObject("Select base surface",8, True)
+	If isNull(sSrf) Then Exit Sub
+	
+	Dim aPt : aPt = Rhino.GetPointOnSurface(sSrf, "Point on the surface")
+	If Not isArray(aPt) Then Exit Sub
+	
+	Dim aPtPlane : aPtPlane = Rhino.XformWorldToCPlane(aPt, Rhino.ViewCPlane)
+	Dim sPt : sPt = Rhino.Pt2Str(aPtPlane,,True)	
+	
+	Dim aParam : aParam = Rhino.SurfaceClosestPoint(sSrf, aPt)
+	Dim aNormal : aNormal = Rhino.SurfaceNormal(sSrf,aParam)
+	Dim aEnd : aEnd = Rhino.PointAdd (aPt, aNormal)
+
+	Dim aEndPlane :	aEndPlane = Rhino.XformWorldToCPlane(aEnd, Rhino.ViewCPlane)
+	Dim sEnd : sEnd = Rhino.Pt2Str(aEndPlane,,True)
+
+	Rhino.SelectObjects(aObj)
+	Dim str : str = "_Rotate3D _Pause " &sPt &sEnd
+	Dim A : A = 0
+	Dim sCont
+	
+	Do
+		If A > 0 Then
+			sCont = Rhino.GetString("Press Enter to accept", "",array("Continue"))
+			If isNull(sCont) Then Exit Sub
+			If UCase(sCont) = "" Then Exit Sub
+		End If
+			
+		Rhino.Command str, False
+		A = A +1
+		
+	Loop Until isNull (sCont) 
+	
+End Sub
+
+Rhino.AddStartupScript Rhino.LastloadedScriptFile
+Rhino.AddAlias "RotateOnNormal", "! _NoEcho _-Runscript RotateOnNormal"

@@ -1,0 +1,77 @@
+﻿Option Explicit
+'Script written by Rodrigo Medina
+'Script copyrighted by designplaygrounds.com
+'This script is Protected under a Creative Commons 2.5 Licence
+'If you are going to use it for comercial purposes please notify to rodrigo_medina23@hotmail.com
+'Script version viernes, 02 de octubre de 2009 13:49:05
+
+Call Main()
+Sub Main()
+
+	Dim Polygon,i,surface
+	Dim arrPolygons : arrPolygons=Rhino.GetObjects("select polygons for panel creation ",4)
+	If isNull (arrPolygons) Then Exit Sub 
+	Dim height: height=Rhino.GetInteger("Panel Height")
+	surface=Rhino.ObjectsByType(8)
+
+	Dim arrSurface:arrSurface=rhino.addPlanarSrf(arrPolygons)
+	If IsArray(arrSurface) Then
+		For Each surface In arrSurface
+		
+			Call cushion(arrSurface,surface,height)
+			Call cushion2(arrSurface,surface,height)
+		Next
+	End If
+	rhino.deleteobjects(arrSurface)
+
+End Sub
+Function cushion(arrSurface,surface,height)
+
+	Dim arrCenters,parameter,cenp,norm,norm1,offpt,ppoint,coor,contour,arrPatch
+	arrCenters= Rhino.SurfaceAreaCentroid(surface)
+	If IsArray (arrCenters) Then 
+		cenp=rhino.addpoint(arrCenters(0))
+		coor=Rhino.PointCoordinates(cenp)
+		parameter = Rhino.SurfaceClosestPoint(surface,arrCenters(0))
+		norm= rhino.SurfaceNormal(surface,Parameter)
+		norm=rhino.VectorScale(norm,height)
+		offpt=rhino.VectorAdd(norm,coor)
+		ppoint= rhino.addpoint(offpt)
+	
+		Call Rhino.SelectObject(surface)
+		contour=Rhino.Command("_Silhouette")
+		
+		arrPatch=array(contour, offpt)
+		Call Rhino.selectObject (ppoint)
+		Rhino.Command (" _-Patch " &"_Enter")
+	
+		Rhino.UnselectAllObjects
+	
+	End If
+
+End Function
+Function cushion2(arrSurface,surface,height)
+
+	Dim arrCenters,parameter,cenp,norm,norm1,offpt,ppoint,coor,contour,arrPatch
+	arrCenters= Rhino.SurfaceAreaCentroid(surface)
+	If IsArray (arrCenters) Then 
+		cenp=rhino.addpoint(arrCenters(0))
+		coor=Rhino.PointCoordinates(cenp)
+		parameter = Rhino.SurfaceClosestPoint(surface,arrCenters(0))
+		norm= rhino.SurfaceNormal(surface,Parameter)
+		norm=rhino.VectorScale(norm,-height)
+		offpt=rhino.VectorAdd(norm,coor)
+		ppoint= rhino.addpoint(offpt)
+	
+		Call Rhino.SelectObject(surface)
+		contour=Rhino.Command("_Silhouette")
+		
+		arrPatch=array(contour, offpt)
+		Call Rhino.selectObject (ppoint)
+		Rhino.Command (" _-Patch " &"_Enter")
+	
+		Rhino.UnselectAllObjects
+	
+	End If
+
+End Function

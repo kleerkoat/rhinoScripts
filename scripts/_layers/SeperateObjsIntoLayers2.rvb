@@ -1,0 +1,44 @@
+'--------------------------------------------------------------
+'Command   :  sol (Separate select objects at the layer)
+'Date      :  2011/08/19
+'Version   :  ƒ¿110819
+'Organization   :  Rhino+
+'--------------------------------------------------------------
+Sub SeperateObjsIntoLayers2
+
+Dim arrLayers,strNewName,arrObjects,strObject
+
+
+strObjects = Rhino.GetObjects("Select objects",,True,True)
+
+
+If IsArray(strObjects) Then
+For Each strObject In strObjects
+
+
+Rhino.currentLayer ( Rhino.addlayer (,RandomColor))
+Rhino.ObjectLayer strObject, Rhino.CurrentLayer
+
+
+Next
+End If
+
+Rhino.command "_NoEcho _SelNone"
+End Sub
+'------------------------------------------
+
+
+
+Function RandomColor()
+
+Dim intRed, intGreen, intBlue
+
+Randomize
+
+intRed = Int(255 * Rnd)
+intGreen = Int(255 * Rnd)
+intBlue = Int(255 * Rnd)
+
+RandomColor = RGB(intRed, intGreen, intBlue)
+
+End Function

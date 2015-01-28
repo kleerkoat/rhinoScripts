@@ -1,0 +1,57 @@
+﻿Option Explicit
+'Script written by Steven Janssen
+'Script version Thursday, 11 October 2007 11:21:57 PM
+
+Call Main()
+Sub Main()
+	Dim k
+	Dim intMax, intDist
+	Dim arrP, arrBB, arrIntPt
+	Dim arrSelPt
+	Dim strSurface, strBell, strTmpLine, arrMove, arrMoveScaled
+	
+	strSurface = Rhino.GetObject("Choose a Surface?",8)
+	Rhino.Redraw
+	Rhino.EnableObjectGrips strSurface
+	
+	arrSelPt = Rhino.GetObjectGrip("Choose a Control Point?",,vbTrue)
+	'0 is the surface string
+	'1 Is the Index of the Point
+	'2 Is the 3D point
+	strBell = Rhino.GetObject("Select Displacement Curve",4)
+	arrMove = Rhino.GetObject("Select Displacement Direction Vector (press enter to use Z displacement)",4)
+	If Not IsArray(arrMove) Then
+		arrMove = Array(0,0,1)
+	Else arrMove = Rhino.VectorCreate(Rhino.CurveEndPoint(arrMove),Rhino.CurveStartPoint(arrMove))
+	End If
+	
+	Rhino.EnableRedraw vbFalse
+	arrBB = Rhino.BoundingBox(strBell)
+	
+	intMax = Rhino.ObjectGripCount (arrSelPt(0))
+	For k = 0 To intMax-1
+		arrP = Rhino.ObjectGripLocation (arrSelPt(0), k)
+		intDist = Rhino.Distance(arrSelPt(2),arrP)
+		
+		If intDist >= arrBB(0)(0) And intDist <= arrBB(1)(0) Then
+			
+			strTmpLine = Rhino.AddLine(Array(intDist,arrBB(0)(1)-1,0),Array(intDist,(arrBB(3)(1)+1),0))
+			arrIntPt = Rhino.CurveCurveIntersection(strTmpLine,strBell)
+			rhino.DeleteObject strTmpLine
+
+			arrMoveScaled = Rhino.VectorScale(arrMove,Abs(arrIntPt(0,1)(1)))
+			If arrIntPt(0,1)(1) < 0 Then
+				arrMoveScaled = Rhino.VectorReverse(arrMoveScaled)
+			End If
+			arrMoveScaled = Rhino.VectorAdd(arrMoveScaled,arrP)
+			Rhino.ObjectGripLocation arrSelPt(0), k, arrMoveScaled
+
+		End If
+		
+		Rhino.StatusBarMessage k+1 & " of " & intMax
+	Next
+	
+	Rhino.EnableObjectGrips strSurface,vbFalse
+	Rhino.EnableRedraw vbTrue
+
+End Sub

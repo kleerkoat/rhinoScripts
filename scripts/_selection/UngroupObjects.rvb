@@ -1,0 +1,18 @@
+' VB Script Document
+option explicit
+' I'd like to select a group(s) that possibly have nested groups in 
+' them and completely remove grouping from everything leaving ungrouped 
+' geometry.
+Sub UngroupObjects
+  Dim arrObjects, strObject, arrGroups
+  arrObjects = Rhino.GetObjects("Select objects to ungroup", ,True, True)
+  If IsArray(arrObjects) Then
+    For Each strObject In arrObjects
+      arrGroups = Rhino.ObjectGroups(strObject)
+      If IsArray(arrGroups) Then
+        Call Rhino.RemoveObjectFromAllGroups(strObject)
+      End If
+    Next
+  End If
+  Rhino.Print "Successful, ungrouped all objects."
+End Sub

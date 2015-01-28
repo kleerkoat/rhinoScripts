@@ -1,0 +1,83 @@
+Option Explicit
+'Script written by Mitch
+'Script version Friday, September 10, 2010
+' limitations: currently only selects curves, surfaces and meshes
+' selection curve can be open or closed
+
+'Call FenceSelect()
+Sub FenceSelect()
+
+	Dim strBCrv,arrAllObjs
+	Call Rhino.UnselectAllObjects
+	strBCrv=Rhino.GetObject("Select curve to use as a fence",4,True,True)
+	If IsNull(strBCrv) then Exit Sub
+	
+	Call Rhino.EnableRedraw(False)
+	Call Rhino.LockObject(strBCrv)	
+	arrAllObjs=Rhino.NormalObjects
+	If not IsArray(arrAllObjs) Then 
+		Call Rhino.EnableRedraw(True)
+		Exit Sub
+	End If
+	Call Rhino.UnlockObject(strBCrv)
+	
+	Dim arrCP,arrBB,dblBBH,dblTol
+	dblTol=Rhino.UnitAbsoluteTolerance	
+	arrCP=Rhino.ViewCPlane
+	arrBB=Rhino.BoundingBox(arrAllObjs,arrCP,True) 'False?
+	dblBBH=Rhino.Distance(arrBB(0),arrBB(4))
+	
+	Dim arrBPlane,arrXForm,strBaseCrv,strIntsecSrf
+	arrBPlane=Rhino.PlaneFromPoints(arrBB(0),arrBB(1),arrBB(3))	
+	If dblBBH<dblTol Then 'all objects are planar
+		'use plane Z vector to create dummy box height
+		arrBB(4)=arrBPlane(3)
+		arrBB(0)=Rhino.VectorReverse(arrBPlane(3))
+	End If
+	arrXForm=Rhino.XformPlanarProjection(arrBPlane)
+	
+	On Error Resume Next  'next two operations might fail
+	strBaseCrv=Rhino.TransformObject(strBCrv,arrXForm,True)
+	strIntsecSrf=Rhino.ExtrudeCurveStraight(strBaseCrv,arrBB(0),arrBB(4))	
+	If IsNull(strIntsecSrf) Then
+		Call Rhino.DeleteObject(strBaseCrv)
+		Call Rhino.EnableRedraw(True) : Exit Sub
+	End If
+	On Error GoTo 0	'if we get here we're good
+	
+	Dim strObj,blnMesh,arrMP
+	blnMesh=False : arrMP=Rhino.MeshParameters(3)
+	For each strObj in arrAllObjs
+		
+		Dim arrRes		
+		If Rhino.IsMesh(strObj) Then
+			Dim arrMres
+			If not blnMesh Then
+				Dim strIntsecMesh
+				strIntsecMesh=Rhino.MeshObjects(strIntsecSrf,-1,arrMP)
+				blnMesh=True
+			End If
+			arrMRes=Rhino.MeshMeshIntersection(strObj,strIntsecMesh)			
+		ElseIf Rhino.IsBrep(strObj) Then
+			arrRes=Rhino.IntersectBreps(strObj,strIntsecSrf,dblTol)
+		ElseIf Rhino.IsCurve(strObj) Then
+			arrRes=Rhino.CurveBrepIntersect(strObj,strIntsecSrf,dblTol)
+		End If
+		
+		If IsArray(arrRes) Then 
+			Call Rhino.SelectObject(strObj)
+			Call Rhino.DeleteObjects(arrRes)
+			arrRes=vbEmpty
+		End If
+		
+		If IsArray(arrMRes) Then 
+			Call Rhino.SelectObject(strObj)
+			arrMres=vbEmpty
+		End If
+	Next
+	'cleanup
+	Call Rhino.DeleteObject(strIntsecSrf)
+	Call Rhino.DeleteObject(strBaseCrv)
+	If blnMesh Then Call Rhino.DeleteObject(strIntsecMesh)
+	Call Rhino.EnableRedraw(True)
+End Sub

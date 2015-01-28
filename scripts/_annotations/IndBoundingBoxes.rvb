@@ -1,0 +1,28 @@
+Option Explicit
+' Script written by Guilherme C. Webster, Jan 2005, for Rhinoceros 3D 3.0.
+' Rhinoscript February 11, 2005
+' Designed to create individual bounding boxes for each object selected.
+
+Sub IndBoundingBoxes()
+
+Dim arrObj, strObj
+
+
+arrObj = Rhino.GetObjects ("Select objects to frame with individual boxes", 0, True, True, True)
+       If IsNull (arrObj) Then
+       Exit Sub
+       Else
+       Rhino.EnableRedraw (False)
+           For each strObj in arrObj
+               Rhino.command "SelNone", False
+               Rhino.SelectObject (strObj)
+               Rhino.command "BoundingBox pause World", False
+               Rhino.command "SelNone", False
+           Next 
+       Rhino.SelectObjects (arrObj)
+       Rhino.EnableRedraw (True) 
+       End If
+
+End Sub
+
+

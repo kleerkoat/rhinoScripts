@@ -1,0 +1,23 @@
+Option Explicit
+'Script written by Pascal
+
+'Script version Wednesday, September 14, 2011 
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile()
+'Rhino.AddAlias "ExtractSubCrvEx", "_NoEcho _-Runscript (ExtractSubCrvEx)"
+
+'Call ExtractSubCrvEx
+Sub ExtractSubCrvEx()
+	dim aCrvs: aCrvs = Rhino.GetObjects("Select curves",4,,true)
+	If not isArray(aCrvs) then exit sub
+	Rhino.UnselectAllObjects()
+	dim sCrv
+	For each sCrv in aCrvs
+		
+		Rhino.FlashObject sCrv,True
+		Rhino.FlashObject sCrv,True
+		Rhino.SelectObject sCrv
+		Rhino.Command"_ExtractSubCrv"
+		
+	Next
+End Sub

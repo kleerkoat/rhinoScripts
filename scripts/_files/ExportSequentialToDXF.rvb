@@ -1,0 +1,53 @@
+Option Explicit
+'Script written by Mitch
+'Version 6 September 2012
+
+Private oldLockSet
+If IsEmpty(oldLockSet) Then oldLockSet = False
+
+'Call ExportSequentialToDXF()
+Sub ExportSequentialToDXF
+	
+	Dim strMsg,strFoldPath,strBaseName,intSeqNo,strSeqNo,intDigs,blnLock,arrObjs,strFilePath
+	Dim arrLock : ReDim arrLock(-1)
+	strMsg = "Choose a folder for the exported files"
+	
+	strFoldPath = Rhino.BrowseForFolder(, strMsg, "Sequential DXF Export")
+	If IsNull(strFoldPath) Then Exit Sub
+	
+	strBaseName = Rhino.GetString("Base file name?")
+	If IsNull(strBaseName) Then Exit Sub
+	If Trim(strBaseName) = "" Then Exit Sub
+	
+	intSeqNo = Rhino.GetInteger("Starting number for file suffix",, 0)
+	If IsNull(intSeqNo) Then Exit Sub
+	
+	intDigs = Rhino.GetInteger("Number of digits in suffix?", 1, 1)
+	If IsNull(intDigs) Then Exit Sub
+	
+	blnLock = Rhino.GetBoolean("Lock objects after export?", Array("Lock", "No", "Yes"), Array(oldLockSet))
+	If Not IsArray(blnLock) Then Exit Sub
+	oldLockSet = blnLock(0)
+		
+	Do
+		arrObjs = Rhino.GetObjects("Select geometry to export and Enter when done",,,, True)
+		If Not IsArray(arrObjs) Then Exit Do
+		
+		strSeqNo = Cstr(intSeqNo)
+		Do While Len(strSeqNo) < intdigs
+			strSeqNo = "0" & strSeqNo
+		Loop
+			
+		strFilePath = chr(34) & strFoldPath & strBaseName & "-" & strSeqNo & ".dxf" & chr(34)
+		Call Rhino.Command("_-Export " & strFilePath & " _Enter")
+		If blnLock(0) Then
+			arrLock = Rhino.JoinArrays(arrLock, arrObjs)
+			Call Rhino.LockObjects(arrObjs)
+		End If
+		intSeqNo = intSeqNo + 1
+	Loop
+
+	If blnLock(0) Then
+		If Ubound(arrLock) > -1 Then Call Rhino.UnlockObjects(arrLock)
+	End If
+End Sub

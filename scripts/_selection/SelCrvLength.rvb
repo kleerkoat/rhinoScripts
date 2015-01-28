@@ -1,0 +1,51 @@
+﻿Option Explicit
+
+Private olddblMin, olddblMax
+
+If IsEmpty (olddblMin) Then
+	olddblMin = 1
+End If
+
+If IsEmpty (olddblMax) Then
+	olddblMax = 2
+End If
+
+
+Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+Rhino.AddAlias "SelCrvLength","_NoEcho _-Runscript (SelCrvLength)"
+
+'selects curves by max and min length
+Sub SelCrvLength
+
+	Dim aCrvs, sCrv
+	aCrvs = Rhino.ObjectsByType (4)
+  
+	If IsArray(aCrvs) Then
+		
+		Dim dblMin:dblMin = Rhino.getReal("Minimum length",olddblMin)
+		If Not isNumeric(dblMin) Then Exit Sub
+		oldDblMin = dblMin
+		
+		Dim dblMax: dblMax = Rhino.getReal("Maximum length",olddblMax)
+		If Not isNumeric(dblMax) Then Exit Sub
+		oldDblMax = dblMax
+		
+	Else MsgBox "No curves found"
+		Exit Sub
+	End If
+   
+  
+	Rhino.EnableRedraw(False)
+
+	For Each sCrv In aCrvs 
+		If Rhino.CurveLength(sCrv)>= dblMin Then
+			If Rhino.CurveLength(sCrv)<= dblMax Then
+				Rhino.SelectObject sCrv
+			End If
+		End If
+	Next
+    
+	Rhino.EnableRedraw(True)
+    
+End Sub
+  

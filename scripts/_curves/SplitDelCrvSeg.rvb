@@ -1,0 +1,83 @@
+' ****************************** RhinoScript.org ******************************
+'
+'   Split and Delete Curve Segments by circles, version 1
+'
+'   by Aram, published Aug 11, 2011
+'
+'
+'   It takes as input a main curve(s) and splitting by circles. It will split the main curve(s) at all intersections with the splitting circles and then delete segments that are less than circle itself. All what you need to run script select all curves with the splitting circles and hit the enter. See http://www.youtube.com/watch?v=Dy4pkZ9UPvg
+'
+'
+'
+'
+'   This RhinoScript Tool has been downloaded from RhinoScript.org.
+'
+'   Rhino versions: Rhino 4
+'
+'   LICENSE INFORMATION:
+'   This script is published under the GNU General Public License, version 3
+'   or any later version, and thus comes WITHOUT ANY WARRANTY. You can get
+'   the complete license text here: www.rhinoscript.org/gpl
+'
+' ****************************** RhinoScript.org ******************************
+
+
+
+Option Explicit
+'Script written by Aram Hovsepyan
+'Script copyrighted by Aram Hovsepyan
+'Script version Thursday, August 11, 2011
+'Call SplitDelCrvSeg()
+Sub SplitDelCrvSeg()
+	'Get user input
+	Dim allCrv : allCrv = Rhino.GetObjects("Select curves",4)
+	If Not IsArray(allCrv) Then Exit Sub
+	
+	Dim arrCircles(), arrCurve()
+	Dim arrCirclesCount, i, arrCurveCount
+	arrCirclesCount = 0
+	arrCurveCount = 0
+	For i=0 To UBound(allCrv)
+		If Rhino.isCircle(allCrv(i)) Then
+			ReDim Preserve arrCircles(arrCirclesCount)
+			arrCircles(arrCirclesCount) = allCrv(i)
+			arrCirclesCount = arrCirclesCount + 1
+		Else
+			ReDim Preserve arrCurve(arrCurveCount)
+			arrCurve(arrCurveCount) = allCrv(i)
+			arrCurveCount = arrCurveCount + 1
+		End If
+	Next
+	Call Rhino.Print("Circle count = " & arrCirclesCount)
+	Call Rhino.Print("Curve count = " & arrCurveCount)
+	
+	If arrCirclesCount = 0 Or arrCurveCount = 0 Then Exit Sub
+	Dim j, arrCCX, arrParams(), intCount
+	
+	For i=0 To UBound(arrCurve)
+		ReDim Preserve arrParams(0)
+		intCount = 1
+		For j=0 To UBound(arrCircles)
+
+			arrCCX = Rhino.CurveCurveIntersection(arrCurve(i), arrCircles(j))
+			
+			If IsArray(arrCCX) Then
+				ReDim Preserve arrParams(intCount)
+				arrParams(intCount-1) = arrCCX(0,5)
+				arrParams(intCount) = arrCCX(1,5)
+				intCount = intCount + 2
+			End If
+		Next
+		
+		'Split the curve at the parameters 
+		'Delete small segments
+		If intCount > 1 Then
+			Dim arrSplitCrvs : arrSplitCrvs = Rhino.SplitCurve(arrCurve(i),arrParams)
+
+			For j=1 To UBound(arrSplitCrvs) Step 2
+				Rhino.DeleteObject(arrSplitCrvs(j))
+			Next
+		End If
+	Next
+	Call Rhino.DeleteObjects(arrCircles)
+End Sub

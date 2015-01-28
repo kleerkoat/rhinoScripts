@@ -1,0 +1,2 @@
+circlepatternimgsubCirclePattern.rvb  This script uses the RhinoScript GDI Bitmap Extension. In order for this script to work properly, you must download and correctly configure the plugin. The script prompts the user to select an image. Image types supported are JPEG, TIFF, PNG, BMP, EXIF, GIF, ICO, and RLE.
+There is also a scale control. Circles are drawn with center at the x,y coordinate. The radius is driven by the luminance at the pixel. Circles should never intersect.

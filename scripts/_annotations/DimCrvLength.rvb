@@ -1,0 +1,74 @@
+Option Explicit
+
+'Call DimCurveLength()
+
+Sub DimCurveLength()
+
+	Dim Curves, Curve, arrPoint, Length, ArcFormat, Value, Tolerant, Exponent, num, den, unit
+
+	Curves = Rhino.GetObjects("Select curves", 4,True, True)
+
+	If Not isArray(Curves) Then Exit Sub
+
+	Rhino.Enableredraw(False)
+
+	For Each Curve In Curves
+
+		arrPoint = Rhino.CurveMidPoint(Curve)
+		' this could be replaced with a bounding box center point
+		Length = Rhino.CurveLength(Curve)
+		'arrPoint (0) = arrPoint(0)-10
+       
+		' -----------------------------------
+		' -- Variables
+		Value = Length
+		Tolerant = True
+		Exponent = 3
+		' ------------------------------------
+		'  Returns architectural format of decimal Value
+		'  * Tolerant > True = round up;   False = round down
+		'  * Exponent > Smallest unit of measurement = 1 / (2 ^ Exponent)
+		'              (smallest unit limited to 1 / 1073741824)
+		'Dim num, den, unit
+		' ----- Set only for this out-of-function experience
+		num = 0
+		den = 0
+		unit = 0
+		ArcFormat = ""
+		' ----- END OF set only...
+
+		If Value < 0 Then
+			ArcFormat = "-"
+			Value = Abs(Value)
+		End If
+		If Value >= 1 Then
+			ArcFormat = ArcFormat & CStr(Int(Value)) & " "
+			Value = Value - Int(Value)
+		End If
+		If Exponent > 30 Then
+			Exponent = 30
+		End If
+		unit = 2 ^ Exponent
+		If Tolerant Then
+			num = Int(Value * unit + 0.5)
+		Else
+			num = Int(Value * unit)
+		End If
+		If num >= 1 Then
+			den = unit
+			Do While (num And 1) = 0
+				num = num \ 2
+				den = den \ 2
+			Loop
+			ArcFormat = ArcFormat & CStr(num) & "/" & CStr(den)
+		End If       
+       
+           
+		' ------------------------------------
+       
+		Rhino.AddTextDot ArcFormat&"""",arrPoint
+
+
+	Next
+	Rhino.Enableredraw(True)
+End Sub

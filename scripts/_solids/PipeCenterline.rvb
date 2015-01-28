@@ -1,0 +1,84 @@
+Option Explicit
+
+
+'Rhino.AddStartUpScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "PipeCL", "_NoEcho _-RunScript (PipeCL)"
+
+Sub PipeCenterLine()
+
+	dim sPipe: sPipe  = Rhino.GetObject("Select surface",8,True, True)
+	If isnull(sPipe) then exit sub
+	
+	Rhino.EnableRedraw(false)
+	
+	dim Flip: Flip = False
+	If not Rhino.IsSurfaceClosed(sPipe,0) then
+	
+		Rhino.Command "_Dir _SwapUV _Enter", false
+		Flip= true
+		
+		If not Rhino.IsSurfaceClosed(sPipe,0) then
+		
+			Rhino.EnableRedraw(true)
+			MsgBox "The surface does not appear to be a pipe"
+			Rhino.Command "_Dir _SwapUV _Enter", false
+			Exit sub
+		End If
+	End if
+	
+		
+	dim aDomU: aDomU = Rhino.SurfaceDomain (sPipe, 0)
+	dim aDomV:	aDomV = Rhino.SurfaceDomain (sPipe, 1)
+    
+	dim aparam: aparam  = Array(0.25,0.75)
+
+	Dim aLoft(1), i, aIso, dblDomU, dblDomV,Param
+	i = 0
+
+	
+	For Each param In aParam
+		
+		dblDomU = (Param * (aDomU(1)- aDomU(0))) + aDomU(0)
+		dblDomV = MidParam(sPipe)(1)
+		aIso = Rhino.ExtractIsoCurve (sPipe , Array(dblDomU,dblDomV), 1)
+		aLoft(i) =aIso(0)
+		i = i+1
+		
+	Next
+
+	Dim sLoft: sLoft  = Rhino.addLoftSrf(aLoft)(0)
+	Rhino.DeleteObjects aLoft
+	dim aLoftParam: aLoftParam = Array(MidParam(sLoft)(0), MidParam(sLoft)(1))
+
+	aIso = Rhino.ExtractIsoCurve (sLoft , aLoftParam, 1)
+	Rhino.DeleteObject sLoft
+	Rhino.UnselectAllObjects
+	If Flip = true Then
+		Rhino.SelectObject sPipe
+		Rhino.Command "_Dir _SwapUV _Enter", false
+		Rhino.UnselectAllObjects
+	End If
+	
+	Rhino.SelectObjects aIso
+	Rhino.EnableRedraw(true)
+  
+End Sub
+
+
+
+Function MidParam(sSrf)
+	'find the midlle parameter pair of a surface
+	Dim uDom,VDom
+	
+	UDom = Rhino.SurfaceDomain(sSrf,0)
+	VDom = Rhino.SurfaceDomain(sSrf,1)
+	
+	Dim Umid, VMid
+	
+	UMid = UDom(0) + (0.5*(UDom(1)-Udom(0)))
+	
+	VMid =  VDom(0)+ (0.5*(VDom(1)-Vdom(0)))
+	
+	MidParam = array(UMid,Vmid)
+	
+End Function

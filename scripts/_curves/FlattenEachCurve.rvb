@@ -1,0 +1,279 @@
+﻿Option Explicit
+'Script written by <Simon Kallioinen>'
+'Script copyrighted by <Simon Aulis Kallioinen EF>'
+'Script version den 17 june 2008 15:10:30'
+
+
+'Call FlattenEachCurve()
+Sub FlattenEachCurve()
+	Dim strObject, arrPoint, arrPoints, arrObjects, intL, i
+	intL = 0
+	arrObjects = Rhino.GetObjects("Select objects", 4, True, True)
+	Dim arrItems, arrDefaults, arrResults, blnVal
+	arrItems = Array( "DeleteInput", "No", "Yes", _ 
+		"LowestXpoint", "No", "Yes", _
+		"HighestXpoint", "No", "Yes", _
+		"LowestYpoint", "No", "Yes", _                  
+		"HighestYpoint", "No", "Yes", _                  
+		"LowestZpoint", "No", "Yes", _                  
+		"HighestZpoint", "No", "Yes")
+	arrDefaults = Array(False, False, False, False, False, True, False)
+	Dim strFolder : strFolder = Rhino.InstallFolder & "\Plug-ins\"
+	
+	If  IsNull(Rhino.GetSettings(strFolder & "Squirrel.ini", "FlattenEachCurve", "DeleteInput")) Then
+	Else
+		arrDefaults(0) = Rhino.GetSettings(strFolder & "Squirrel.ini", "FlattenEachCurve", "DeleteInput")
+		arrDefaults(1) = Rhino.GetSettings(strFolder & "Squirrel.ini", "FlattenEachCurve", "LowX")
+		arrDefaults(2) = Rhino.GetSettings(strFolder & "Squirrel.ini", "FlattenEachCurve", "HiX")
+		arrDefaults(3) = Rhino.GetSettings(strFolder & "Squirrel.ini", "FlattenEachCurve", "LowY")
+		arrDefaults(4) = Rhino.GetSettings(strFolder & "Squirrel.ini", "FlattenEachCurve", "HiY")
+		arrDefaults(5) = Rhino.GetSettings(strFolder & "Squirrel.ini", "FlattenEachCurve", "LowZ")
+		arrDefaults(6) = Rhino.GetSettings(strFolder & "Squirrel.ini", "FlattenEachCurve", "HiZ")
+		For i = 0 To 6
+			If arrDefaults(i) = "True" Then
+				arrDefaults(i) = True
+			End If
+			If arrDefaults(i) = "False" Then
+				arrDefaults(i) = False
+			End If
+		Next
+	End If	
+	
+	arrResults = Rhino.GetBoolean("Flattening to", arrItems, arrDefaults)
+	If IsArray(arrResults) Then
+		Dim blnDelInput, blnLowX, blnHighX, blnLowY, blnHighY, blnLowZ, blnHighZ
+		blnDelInput  = arrResults(0)
+		blnLowX   = arrResults(1)
+		blnHighX  = arrResults(2)
+		blnLowY   = arrResults(3)
+		blnHighY  = arrResults(4)
+		blnLowZ   = arrResults(5)
+		blnHighZ  = arrResults(6)
+		
+	End If
+	
+	Rhino.EnableRedraw(False)
+	
+	If IsArray(arrObjects) Then
+      
+		For Each strObject In arrObjects  
+			'Get DEGREE
+			Dim intDegree, intPoints
+			intDegree = Rhino.CurveDegree (strObject)
+      
+			'If intDegree < 2 Then
+			Dim dblZpos, arrPointsNew, intI
+		
+			Dim strPlane, arrClosestPt, arrOrigin, arrNormal
+				
+			arrPoints = Rhino.CurvePoints(strObject)
+			intPoints = UBound(arrPoints)
+     
+			'For Low Z
+			If blnLowZ Then
+				arrOrigin = Array(0,0,-99999999999999)
+				arrNormal = Array(0,0,-1)
+				strPlane = Rhino.AddPlaneSurface(Rhino.PlaneFromNormal (arrOrigin, arrNormal), 99999999999999, 99999999999999)
+				
+				arrClosestPt = Rhino.CurveClosestObject(strObject, strPlane)
+				
+				Rhino.DeleteObject(strPlane)
+				
+				dblZpos = arrClosestPt(2)(2)
+	
+				arrPoints = Rhino.CurvePoints(strObject)
+				
+				If IsArray(arrPoints) Then
+					arrPointsNew = arrPoints
+					intI = 0
+				
+				
+					For Each arrPoint In arrPoints'
+						arrPointsNew(intI) = Array(arrPoint(0),arrPoint(1), dblZpos)
+						intI = intI+1
+										
+					Next
+    
+					ReDim Preserve arrPointsNew(intPoints-intDegree+1)
+					arrPoints = Rhino.AddCurve (arrPointsNew, intDegree)
+					intL = intL + 1				
+					Rhino.Print ("Flattening... Press ESC to Cancel.")
+				
+				End If
+			End If
+    
+			'For High Z
+			If blnHighZ Then
+				
+				arrOrigin = Array(0,0,99999999999999)
+				arrNormal = Array(0,0,1)
+				strPlane = Rhino.AddPlaneSurface(Rhino.PlaneFromNormal (arrOrigin, arrNormal), 99999999999999, 99999999999999)
+				
+				arrClosestPt = Rhino.CurveClosestObject(strObject, strPlane)
+				
+				Rhino.DeleteObject(strPlane)
+				
+				dblZpos = arrClosestPt(2)(2)
+	
+				arrPoints = Rhino.CurvePoints(strObject)
+				If IsArray(arrPoints) Then
+					arrPointsNew = arrPoints
+					intI = 0
+					For Each arrPoint In arrPoints
+						arrPointsNew(intI) = Array(arrPoint(0),arrPoint(1), dblZpos)
+						intI = intI+1
+  
+					Next
+				
+					ReDim Preserve arrPointsNew(intPoints-intDegree+1)
+    
+					arrPoints = Rhino.AddCurve (arrPointsNew, intDegree)
+					intL = intL + 1
+					Rhino.Print ("Flattening... Press ESC to Cancel.")
+					
+				End If
+			End If
+    
+			'For Low Y
+			If blnLowY Then
+				arrOrigin = Array(0,-99999999999999,0)
+				arrNormal = Array(0,-1,0)
+				strPlane = Rhino.AddPlaneSurface(Rhino.PlaneFromNormal (arrOrigin, arrNormal), 99999999999999, 99999999999999)
+				
+				arrClosestPt = Rhino.CurveClosestObject(strObject, strPlane)
+				
+				Rhino.DeleteObject(strPlane)
+				
+				dblZpos = arrClosestPt(2)(1)
+	
+				arrPoints = Rhino.CurvePoints(strObject)
+				
+				If IsArray(arrPoints) Then
+					arrPointsNew = arrPoints
+					intI = 0
+					For Each arrPoint In arrPoints
+						arrPointsNew(intI) = Array(arrPoint(0), dblZpos, arrPoint(2))
+						intI = intI+1
+  
+					Next
+				
+					ReDim Preserve arrPointsNew(intPoints-intDegree+1)
+    
+					arrPoints = Rhino.AddCurve (arrPointsNew, intDegree)
+					intL = intL + 1
+					Rhino.Print ("Flattening... Press ESC to Cancel.")
+					
+				End If
+			End If    
+			'For High Y
+			If blnHighY Then
+				arrOrigin = Array(0,99999999999999,0)
+				arrNormal = Array(0,1,0)
+				strPlane = Rhino.AddPlaneSurface(Rhino.PlaneFromNormal (arrOrigin, arrNormal), 99999999999999, 99999999999999)
+				
+				arrClosestPt = Rhino.CurveClosestObject(strObject, strPlane)
+				
+				Rhino.DeleteObject(strPlane)
+				
+				dblZpos = arrClosestPt(2)(1)
+	
+				arrPoints = Rhino.CurvePoints(strObject)
+				If IsArray(arrPoints) Then
+					arrPointsNew = arrPoints
+					intI = 0
+					For Each arrPoint In arrPoints
+						arrPointsNew(intI) = Array(arrPoint(0), dblZpos, arrPoint(2))
+						intI = intI+1
+  
+					Next
+				
+					ReDim Preserve arrPointsNew(intPoints-intDegree+1)
+    
+					arrPoints = Rhino.AddCurve (arrPointsNew, intDegree)
+					intL = intL + 1
+					Rhino.Print ("Flattening... Press ESC to Cancel.")
+					
+				End If
+			End If      
+			'For Low X
+			If blnLowX Then
+				arrOrigin = Array(-99999999999999,0,0)
+				arrNormal = Array(-1,0,0)
+				strPlane = Rhino.AddPlaneSurface(Rhino.PlaneFromNormal (arrOrigin, arrNormal), 99999999999999, 99999999999999)
+				
+				arrClosestPt = Rhino.CurveClosestObject(strObject, strPlane)
+				
+				Rhino.DeleteObject(strPlane)
+				
+				dblZpos = arrClosestPt(2)(0)
+	
+				arrPoints = Rhino.CurvePoints(strObject)
+				If IsArray(arrPoints) Then
+					arrPointsNew = arrPoints
+					intI = 0
+					For Each arrPoint In arrPoints
+						arrPointsNew(intI) = Array(dblZpos, arrPoint(1), arrPoint(2))
+						intI = intI+1
+  
+					Next
+    
+					ReDim Preserve arrPointsNew(intPoints-intDegree+1)
+				
+					arrPoints = Rhino.AddCurve (arrPointsNew, intDegree)
+					intL = intL + 1
+					Rhino.Print ("Flattening... Press ESC to Cancel.")
+					
+				End If
+			End If  
+			'For High X
+			If blnHighX Then
+				arrOrigin = Array(99999999999999,0,0)
+				arrNormal = Array(1,0,0)
+				strPlane = Rhino.AddPlaneSurface(Rhino.PlaneFromNormal (arrOrigin, arrNormal), 99999999999999, 99999999999999)
+				
+				arrClosestPt = Rhino.CurveClosestObject(strObject, strPlane)
+				
+				Rhino.DeleteObject(strPlane)
+				
+				dblZpos = arrClosestPt(2)(0)
+	
+				arrPoints = Rhino.CurvePoints(strObject)
+				If IsArray(arrPoints) Then
+					arrPointsNew = arrPoints
+					intI = 0
+					For Each arrPoint In arrPoints
+						arrPointsNew(intI) = Array(dblZpos, arrPoint(1), arrPoint(2))
+						intI = intI+1
+  
+					Next
+				
+					ReDim Preserve arrPointsNew(intPoints-intDegree+1)
+    
+					arrPoints = Rhino.AddCurve (arrPointsNew, intDegree)
+					intL = intL + 1
+					Rhino.Print ("Flattening... Press ESC to Cancel.")
+					
+				End If
+			End If  
+			If blnDelInput Then
+				Rhino.DeleteObject (strObject)
+			End If    
+		Next 
+        
+		Rhino.Print (CStr (intL) + " objects created")
+	
+	End If
+		
+	'Rhino.SaveSettings Rhino.InstallFolder & "Squirrel.ini", "FlattenEachCurve", "DeleteInput",CStr(blnDelInput)
+	'Rhino.SaveSettings Rhino.InstallFolder & "Squirrel.ini", "FlattenEachCurve", "LowX",CStr(blnLowX)
+	'Rhino.SaveSettings Rhino.InstallFolder & "Squirrel.ini", "FlattenEachCurve", "HiX",CStr(blnHighX)
+	'Rhino.SaveSettings Rhino.InstallFolder & "Squirrel.ini", "FlattenEachCurve", "LowY",CStr(blnLowY)
+	'Rhino.SaveSettings Rhino.InstallFolder & "Squirrel.ini", "FlattenEachCurve", "HiY",CStr(blnHighY)
+	'Rhino.SaveSettings Rhino.InstallFolder & "Squirrel.ini", "FlattenEachCurve", "LowZ",CStr(blnLowZ)			
+	'Rhino.SaveSettings Rhino.InstallFolder & "Squirrel.ini", "FlattenEachCurve", "HiZ",CStr(blnHighZ)	
+	
+	Rhino.EnableRedraw(True)
+	
+End Sub
+
+

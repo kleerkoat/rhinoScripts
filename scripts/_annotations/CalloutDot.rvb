@@ -1,0 +1,37 @@
+Option Explicit
+'Script written by Ryan Gilmore
+'Script version Saturday, June 30, 2012 10:49:20 AM
+
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "CalloutDot", "noEcho _-Runscript (CalloutDot)"
+
+'Call CalloutDot()
+Sub CalloutDot()
+	Dim strObject, arrPoint, strCallout, intStyle, arrPline
+
+	arrPline = Rhino.GetPolyline
+
+	If IsArray(arrPline) Then
+
+		strObject = Rhino.AddPolyline(arrPline) 
+	Else Exit Sub
+
+	End If
+	
+	strCallout = Rhino.StringBox("Enter text for callout:",, "Callout Text.")
+	
+	If Rhino.IsCurve(strObject) Then
+	
+			arrPoint = Rhino.CurveEndPoint(strObject)
+			Rhino.AddTextDot strCallout, arrPoint
+			
+		End If
+	
+	If Rhino.CurveArrows(strObject) <> 1 Then
+
+		Rhino.CurveArrows strObject, 1
+
+	End If
+
+End Sub

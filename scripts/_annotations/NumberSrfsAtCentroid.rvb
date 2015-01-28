@@ -1,0 +1,23 @@
+Option Explicit
+'Script written by Mitch
+'Script version Thursday, September 30, 2010
+
+Sub NumberSrfsAtCentroid()
+	Dim arrObjs,i,arrPt,arrClPt,dot,group
+	arrObjs=Rhino.GetObjects("Select surfaces or polysurfacs to number",8+16,,True)
+	If not IsArray(arrObjs) Then Exit Sub
+	Call Rhino.EnableRedraw(False)
+	For i=0 to UBound(arrObjs)
+		arrPt=Rhino.SurfaceAreaCentroid(arrObjs(i))(0)		
+		If IsArray(arrPt) Then
+			arrClPt=Rhino.BrepClosestPoint(arrObjs(i),arrPt)(0)
+			If IsArray(arrCLPt) Then arrPt=arrClPt
+			dot=Rhino.AddTextDot(Cstr(i+1),arrPt)
+			group=Rhino.AddGroup()
+			Call Rhino.AddObjectsToGroup(Array(dot,arrObjs(i)),group)
+		End If		
+	Next
+	Call Rhino.EnableRedraw(True)
+End Sub
+
+Call NumberSrfsAtCentroid()

@@ -1,0 +1,304 @@
+Option Explicit
+'Script written by Pascal
+' Monday, August 11, 2008 
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "ArraySpan","_NoEcho _-Runscript (ArraySpan)"
+
+
+Private oldNum, OldGap, OldCen
+
+If isEmpty(oldNum) Then
+	oldNum = 3
+End If
+
+
+If IsEmpty(OldGap) Then
+	OldGap = 1
+End If
+
+If IsEmpty(OldCen) Then
+	OldCen = "No"
+End If
+'makes an array along the line specified by the user.
+'allows a preview, and editing of number, span, gap.
+
+Sub ArraySpan()
+
+	Dim aObj: aObj = Rhino.GetObjects("Select objects to array",,True,True)
+	
+	If Not isArray(aobj) Then Exit Sub
+	
+	Dim aBB: aBB = Rhino.BoundingBox(aObj,Rhino.CurrentView)
+
+	Dim XDist:XDist = Rhino.Distance(aBB(0), aBB(1)) + Oldgap
+	Dim YDist: YDist =  Rhino.Distance(aBB(0), aBB(3)) + Oldgap
+	
+	Dim aSpanX: aSpanX = Rhino.GetPoints(True,,"Start of array","End of array",2)
+
+	If Not isArray(aSpanX)then exit sub
+	If  UBound(aSpanX) <> 1  Then Exit Sub
+	
+	Dim Cen: Cen = Rhino.GetString("Center array?",OldCen,array("Yes", "No"))
+	If isnull(cen) Then Exit Sub
+	OldCen = Cen
+	
+	Dim Dir: dir = 0
+	Dim SpanX: SpanX = Rhino.Distance(aSpanX(0), aSpanX(1))
+	
+	Dim Draw: Draw = True
+	If SpanX < XDist Then Draw = False
+	Dim aMarkers : aMarkers = Rhino.AddPoints(aSpanX)
+	
+	Dim apts(1)
+	
+	aPts(0) = array(aBB(0), aBB(1))
+	aPts(1) = array(aBB(0), aBB(3))
+	
+	If Not IsArray(aPts) Then Exit Sub
+	Dim Line, num, aLast, sOK
+	num = OldNum
+	
+	'intRepeat is the max number of repeats that will fit
+	Dim intRepeat:	intRepeat = int(SpanX/XDist)
+
+	If OldNum<IntRepeat Then intRepeat = OldNum
+	
+	Dim tempDist:tempDist = (intRepeat*Xdist)-XDist
+
+	Dim dblGap, X, str, aTemp, intRep
+	
+	If Draw = False Then
+		
+		intRepeat = 1
+		MsgBox "Span is shorter than the objects and the gap combined. No preview can be drawn."
+		
+	End If
+	
+	Do
+		
+		Rhino.EnableRedraw(False)
+
+		XDist = Rhino.Distance(aPts(dir)(0), aPts(dir)(1)) + OldGap
+	
+		If Draw = True Then
+			intRepeat = int(SpanX/XDist)
+		Else intRepeat = 1
+			
+		End If
+		
+		If OldNum < IntRepeat Then intRepeat = OldNum
+		
+		tempDist = (intRepeat*XDist)- XDist
+		
+		If Draw = True Then
+			aLast = MakeArray(aSpanX, aObj, intRepeat, tempDist, aPts, dir,Cen, XDist, OldGap)
+		End If
+		
+		'intRep is the number of repeats actually made, used to report to the command line only
+		If isArray(aLast) Then
+			intRep = (UBound(aLast)+1)/(UBound(aObj)+1)
+		End If
+		
+		Rhino.EnableRedraw
+		
+		If OldGap <> 1 Then
+			str = intRep &" copies are spaced " &Oldgap &" units apart. Press Enter or click OK to accept."
+		Else
+			str = intRep &" copies are spaced " &Oldgap &" unit apart. Press Enter or click OK to accept."
+		End If
+		
+		sOk = Rhino.GetString(str,"OK",array("OK","MaxNumber","Gap","Span", "Flip"))
+		
+		If IsNull(sOK) Then
+			Rhino.DeleteObjects aLast
+			Rhino.DeleteObjects aMarkers
+			Exit Sub
+		End If
+		
+		If lcase(sOK) = "maxnumber" Then
+
+			Num = Rhino.GetInteger("Number of items",OldNum,2)
+		
+			If isNull(num) Then
+				Rhino.DeleteObjects aMarkers
+				Exit Sub
+			End If
+			
+			OldNum = Num
+			Rhino.DeleteObjects aLast
+			
+		ElseIf lcase(sOK) = "gap" Then
+			dblGap = Rhino.GetReal("Set gap between objects",Oldgap)
+			
+			If Not isNumeric (dblgap) Or isNull(dblGap) Then 
+				Rhino.DeleteObjects aLast
+				Rhino.DeleteObjects aMarkers
+				Exit Sub
+			End If
+			
+			oldGap = dblgap
+			
+			If isArray(alast) Then
+				Rhino.DeleteObjects aLast
+			End If
+			
+		ElseIf lCase(sOK) = "span" Then
+		
+			aSpanX = Rhino.GetPoints(True,,"Start of array","End of array",2)
+			
+			If isNull(aSpanX) Or Not isArray(aSpanX) Then
+				Rhino.DeleteObjects aMarkers
+				
+				If isArray(alast) Then
+					Rhino.DeleteObjects aLast
+				End If
+				
+				Exit Sub
+			End If
+			
+			If  UBound(aSpanX) <> 1 Then
+				Rhino.DeleteObjects aMarkers
+				
+				If isArray(alast) Then
+					Rhino.DeleteObjects aLast
+				End If	
+				
+				Exit Sub
+			End If
+			
+			SpanX = Rhino.Distance(aSpanX(0), aSpanX(1))
+			Rhino.DeleteObjects aMarkers
+			aMarkers = Rhino.AddPoints(aSpanX)
+			
+			If isArray(aLast) Then
+				Rhino.DeleteObjects aLast
+			End If
+			
+		ElseIf lCase(sOK) = "flip" Then
+	
+			If isArray(aLast) Then
+				Rhino.DeleteObjects aLast
+			End If
+			
+			If Dir = 0 Then
+				dir = 1
+			Else dir = 0
+			End If
+			
+		ElseIf lCase(sOK) = "ok" Then Exit Do
+			
+		End If
+
+		If dir = 0 Then
+			
+			If SpanX < XDist Then 
+				Draw = False
+			Else Draw = True
+			End If
+		Else 
+			If SpanX < YDist Then 
+				Draw = False
+			Else Draw = True
+			End If
+			
+		End If
+
+		
+		
+	Loop Until isNull(sOK) Or sOK = ""
+	
+	Rhino.DeleteObjects aMarkers
+	
+	'*********************************************************************************
+	'	Rhino.DeleteObjects aObj'<<<<<<<<< comment(') or delete this line to keep orignals
+	'*********************************************************************************
+	
+	If Oldgap<> 1 Then
+		str = "Arrayed "&intrep & " copies, spaced " &OldGap &" units apart."
+	Else
+		str = "Arrayed "&intrep & " copies, spaced " &OldGap &" unit apart."
+	End If
+	
+	Rhino.Print str
+	
+End Sub
+
+Function MakeArray(aSpanX,aObj,intRepeat, tempDist, aPts, dir, Cen, XDist, gap)
+	
+	If tempdist = 0 Then tempdist =1
+	Dim abase: abase = apts(dir)
+	Dim MidSpan: MidSpan = AveragePoints (aSpanX)
+	Dim tempVec: tempVec = Rhino.VectorUnitize(Rhino.VectorCreate(aSpanX(1), aSpanX(0)))
+	Dim MidVec: Midvec = Rhino.Vectorscale (tempVec,(tempDist+(Xdist-gap))/2)
+	tempVec = Rhino.VectorScale(tempVec,TempDist)
+	Dim atempSpan : atempSpan = aSpanX
+	aTempSpan(1) = Rhino.PointAdd(aSpanX(0),tempVec)
+	Dim Line: Line = Rhino.AddLine(atempSpan(0),aTempSpan(1))
+
+	Dim aTemp: aTemp = Rhino.OrientObjects (aObj, aBase, aSpanX ,1)
+	
+	Rhino.UnselectAllObjects
+	Rhino.EnableRedraw(False)
+	
+	If isArray(aTemp) Then
+		Rhino.SelectObjects(atemp)
+	
+		If LCase(Cen) = "yes" Then
+			Dim TempBase: Tempbase = Rhino.PointAdd (aSpanX(0),MidVec)
+
+			Rhino.MoveObjects aTemp, tempBase , MidSpan
+			Rhino.MoveObject Line, tempBase, MidSpan
+		End If
+				
+		Rhino.Command "_-ArrayCrv SelID " &Line &" " & intRepeat, False
+		Rhino.UnselectAllObjects
+		Dim aLast
+		
+		If Rhino.LastCommandResult = 0 Then
+			aLast = Rhino.JoinArrays(aTemp,Rhino.LastCreatedObjects)
+		End If
+		
+	End If
+	
+	If Not isNull(Line) Then
+		Rhino.DeleteObject Line
+	End If
+	
+	Rhino.EnableRedraw
+
+	MakeArray = aLast
+	
+End Function
+
+
+
+Function AveragePoints(arrPts)
+	'Finds the average location of an array
+	'of points.
+
+	Dim X, Y, Z
+	Dim i
+	
+	X = 0
+	Y = 0
+	Z = 0
+
+	For i=0 To UBound (arrPts)
+			
+		'add all the X values
+		X = X+arrPts(i)(0)
+	
+		'add all th Y values
+		Y = Y+arrPts(i)(1)			
+	
+		'add all the Z values
+		Z = Z+arrpts(i)(2)
+	Next
+	
+	'Divide by the number of points to
+	'get the average  for each
+	'create the output array from the 3 averages
+	AveragePoints  =array(X/(UBound(arrPts)+1), Y/(UBound(arrPts)+1), Z/(UBound(arrPts)+1))
+
+End Function

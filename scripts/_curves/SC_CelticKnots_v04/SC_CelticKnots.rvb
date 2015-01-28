@@ -1,0 +1,93 @@
+' Celtic Knot Generator (from RSC suite)
+' v0.4, (c) 2010 Safak Cinar
+
+Function CurveIntersectsWithCurves(Curve,Curves)
+	CurveIntersectsWithCurves = True
+	For i=0 To UBound(Curves)
+		X = Rhino.CurveCurveIntersection(Curves(i),Curve)
+		If Not IsNull(X) Then Exit Function 
+	Next
+	CurveIntersectsWithCurves = False
+End Function
+
+Function CelticKnotFill(Boundary,Walls,Primitives,Parity)
+	Ops = Array("00","40","41","1020","42","3032","1121","101132","43","1323","3133","103113","1222","301213","111233","10111213")
+	CelticKnotFill = False
+	If Not IsArray(Walls) Then 
+		BoundaryCurves = Array(Boundary)
+	Else
+		BoundaryCurves = Walls
+		ReDim Preserve BoundaryCurves(UBound(BoundaryCurves)+1)
+		BoundaryCurves(UBound(BoundaryCurves))=Boundary
+	End If    
+	BB = Rhino.BoundingBox(BoundaryCurves)
+	Rhino.EnableRedraw(False)
+	NT = (Int(BB(2)(0)-0.01)-Int(BB(0)(0)+0.01)+1) * ((Int(BB(2)(1)-0.01)-Int(BB(0)(1)+0.01))+1)
+	NC = 0 
+	Rhino.Print("Generating celtic knot fill... Please check status bar for progress indication.")
+	For j=Int(BB(0)(1)+0.01) To Int(BB(2)(1)-0.01)
+		For i=Int(BB(0)(0)+0.01) To Int(BB(2)(0)-0.01)
+			NC = NC+1
+			Call Rhino.StatusbarMessage("Celtic Knot Fill, " & Round(100*NC/NT) & " complete...")
+			If Rhino.PointInPlanarClosedCurve(Array(i+0.5,j+0.5,0),Boundary)=1 Then
+				x=i+0.5
+				y=j+0.5
+				n=0
+				For k=1 To 4
+					TestLine = Rhino.AddLine(Array(x,y,0),Array(x+Cos((k-1)*2*Atn(1)),y+Sin((k-1)*2*Atn(1)),0))
+					If Not CurveIntersectsWithCurves(TestLine,BoundaryCurves) Then n=n+2^(k-1)
+					Call Rhino.DeleteObject(TestLine)
+				Next
+				For k=1 To Len(Ops(n))/2
+					ObjIndex = Eval(Mid(Ops(n),k*2-1,1))
+					RotAngle = Eval(Mid(Ops(n),k*2,1))*90
+					If Not Parity Then 
+						MP=Array(1,1,0) 
+						If ObjIndex=3 Then MP=Array(0,1,0)
+						If ObjIndex=4 Then MP=Array(1,0,0)
+						NewObj = Rhino.MirrorObjects(Primitives(ObjIndex),Array(0,0,0),MP,True)
+						Call Rhino.RotateObjects(NewObj,Array(0,0,0),RotAngle)
+					Else
+						NewObj = Rhino.RotateObjects(Primitives(ObjIndex),Array(0,0,0),RotAngle,,True)
+					End If
+					Call Rhino.MoveObjects(NewObj,Array(x,y,0))
+				Next
+			End If
+		Next
+	Next
+	Rhino.Print("Celtic knot fill complete. Refreshing display, please be patient...")
+	Rhino.EnableRedraw(True)
+	CelticKnotFill = True
+End Function
+
+Function DoCelticKnotFill
+
+	Rhino.Print("Celtic knot fill, (c) 2010 Safak Cinar. Version 0.4 (2010 April 1)")
+
+	Boundary = Rhino.GetObject("Select planar, closed boundary",4,True,False)
+	If IsNull(Boundary) Then Exit Function
+	If Not Rhino.IsCurveClosed(Boundary) Then Exit Function
+	If Not Rhino.IsCurvePlanar(Boundary) Then Exit Function
+	Walls = Rhino.GetObjects("Select internal walls (optional)",4,True,False)
+	Parity = Rhino.GetBoolean("Parity", Array("Winding","Even","Odd"), Array(False))
+  
+	Filename = Rhino.OpenFileName ("Template file", "Celtic Knot Templates|CelticKnots*.3dm", "C:\Users\ryan\AppData\Roaming\McNeel\Rhinoceros\5.0\scripts\_curves\SC_CelticKnots_v04\")
+	If IsNull(FileName) Then Exit Function
+	Call Rhino.Command("-_Import " & Chr(34) & Filename & Chr(34) & " Enter",False)
+	Dim Primitives(4)
+	For i=0 To 4
+		Primitives(i) = Rhino.ObjectsByLayer("RSC_CelticKnots_" & i)
+		Call Rhino.ObjectLayer(Primitives(i),Rhino.CurrentLayer)
+		Call Rhino.DeleteLayer("RSC_CelticKnots_" & i)
+	Next
+
+	Call CelticKnotFill(Boundary,Walls,Primitives,Parity(0))
+  
+	For i=0 To 4
+		Call Rhino.DeleteObjects(Primitives(i))
+	Next
+  
+End Function
+
+DoCelticKnotFill
+Rhino.EnableRedraw(True)

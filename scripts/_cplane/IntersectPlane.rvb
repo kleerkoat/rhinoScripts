@@ -1,0 +1,288 @@
+Option Explicit
+'Script written by Pascal
+'RMA
+'Script version Friday, April 04, 2008
+
+'finds the intersections of objects and infinite planes defined by
+'1. A selected planar surface of any size
+'2. The current cplane
+'3. World and local XY,ZX,YZ planes (Local XY = Current cplane of course)
+'4. Named Cplanes
+'5. 3Point user defined planes.
+
+'Rhino.AddStartUpScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "IntersectPlane", "_NoEcho _-Runscript IntersectPlane"
+'Rhino.AddAlias "TrimWithPlane", "_NoEcho _-Runscript TrimWithPlane"
+
+Private sOldPlaneType, OldCplaneType
+
+If isEmpty(sOldPlaneType) Then
+	sOldPlaneType = "Select"
+End If
+
+If isEmpty(OldCPlaneType) Then
+	OldCPlaneType = "WorldXY"
+End If
+
+Sub TrimWithPlane()
+	
+	Dim aTrim: atrim = IntersectThePlane(True)
+
+	If isArray(aTrim) Then
+		Rhino.UnselectAllObjects
+		Rhino.SelectObjects aTrim
+	
+		Rhino.Command "_Trim"
+	
+		Rhino.DeleteObjects atrim
+	End If
+	
+	
+End Sub
+
+Sub IntersectPlane
+	
+	Dim aresult: aresult = IntersectThePlane(False)
+	
+End Sub
+
+Function IntersectThePlane(trim)
+	
+	Dim aPlaneType: aPlaneType = array("Select","CurrentCPlane","CPlanes","NamedCplane","3pt", "CutPlane")
+	Dim aCplaneTypes: aCplaneTypes = array("XY","XZ","YZ","WorldXY","WorldZX","WorldYZ")
+		
+	Dim aObj: aObj = Rhino.GetObjects("Select objects to intersect. Press Enter when done.",,True,True)
+	If Not isArray(aObj) Or isnull(aObj) Then Exit Function
+	
+	Dim sPlaneType: sPlaneType = Rhino.GetString("Plane type", sOldPlaneType,aPlaneType)
+	
+	If Not isNull(sPlaneType) Then
+		If CheckValidArray(aPlaneType,sPlaneType) Then 
+			sOldPlaneType = sPlaneType
+		Else Exit Function
+		End If
+	Else Exit Function
+	End If
+
+	Select Case UCase(sPlaneType)
+		
+		Case "Select"
+
+			Dim sPlane: sPlane = Rhino.GetObject("Select plane to intersect",8)
+			If isnull(sPlane) Then Exit Function
+			Dim aPlane
+	
+			If Rhino.IsSurfacePlanar(sPlane) Then
+		
+				Dim aParamU: aParamU = Rhino.SurfaceDomain(sPlane,0)
+				Dim dblParamU : dblparamU = (aParamU(1)+ aParamU(0))/2
+				Dim aParamV : aParamV = Rhino.SurfaceDomain(sPlane,1)
+				Dim dblParamV : dblParamV=(aParamV(1)+ aParamV(0))/2
+				Dim aParam: aParam = array(dblParamU,dblParamV)
+
+				aPlane = Rhino.SurfaceFrame(sPlane,aParam)
+			Else
+				MsgBox "The test object must be planar"
+			End If
+		
+		Case "CURRENTCPLANE"
+			aPlane = Rhino.ViewCPlane (Rhino.CurrentView)
+		
+		Case "CPLANES"
+			Dim sCplaneType:	sCPlaneType = Rhino.GetString("Choose Cplane",OldCPlaneType,aCplaneTypes)
+			If Not isnull(sCPlaneType) Then
+				If CheckValidArray(aCplaneTypes,sCPlaneType)Then
+					OldCPlaneType = sCplaneType
+					Dim Temp
+					
+					Select Case UCase(sCPlaneType)
+						
+						Case "XY"
+							aPLane = Rhino.ViewCPlane(Rhino.CurrentView)
+						Case "XZ"
+							aPlane = Rhino.ViewCPlane(Rhino.CurrentView)
+							Temp = Rhino.RotatePlane(aPlane,90,aPlane(1))
+							aPlane = Temp
+						Case "YZ"
+							aPlane = Rhino.ViewCPlane(Rhino.CurrentView)
+							Temp = Rhino.RotatePlane(aPlane,90,aPlane(2))
+							aPlane = Temp
+						Case "WORLDXY" 
+							aPlane =Rhino.WorldXYPlane
+						Case "WORLDZX"
+							aPlane =Rhino.WorldZXPlane
+						Case "WORLDYZ"
+							aPlane =Rhino.WorldYZPlane
+						Case else 
+							Exit Function
+						
+					End Select	
+				
+				Else Exit Function
+				End If
+			
+			Else Exit Function
+			End If
+		
+		Case "NAMEDCPLANE"
+			Dim aNamed: aNamed = Rhino.NamedCPlanes
+			If isArray(aNamed) Then
+				Dim sNamed: sNamed = Rhino.ListBox(aNamed, "Select saved Cplane","Saved Cplanes")
+				If isnull(sNamed) Then Exit Function
+				aPlane = Rhino.NamedCPlane(sNamed)
+			Else 
+				MsgBox "The NamedCPlanes option allows selection of CPlanes that are named and saved If the file." _
+					&vbNewline &"No named CPlanes were found If the file."
+				Exit Function
+			
+			End If
+		Case "3PT"
+			Dim aPlanepts: aPlanePts = Rhino.GetPoints(True,False,"First plane point", "Next plane point",3)
+		
+			If isArray(aPlanePts) Then
+				If Ubound(aPlanePts) = 2 Then
+					aPlane = Rhino.PlanefromPoints(aPlanePts(0),aPlanePts(1), aPlanePts(2))
+				Else Exit Function
+				End If
+			Else Exit Function
+			End If
+		
+		Case "CUTPLANE"
+			
+			dim aPts:aPts = Rhino.getPoints(True,true,"Start of cut plane","End of cut plane",2)
+			If not isArray(aPts) or Ubound(aPts)<>1 then exit function
+			redim preserve aPts(2)
+			aPts(2) = Rhino.PointAdd(aPts(0),Rhino.ViewCPlane (Rhino.CurrentView)(3))
+			aPlane = Rhino.PlanefromPoints(aPts(0),aPts(1), aPts(2))
+		
+		Case Else
+			Exit Function
+	End Select
+
+	Rhino.EnableRedraw(False)
+	
+	Dim CrntPlane: CrntPlane = Rhino.ViewCplane(Rhino.CurrentView)
+	Rhino.ViewCPlane Rhino.CurrentView,aPlane 
+	Dim aBBPlane: aBBPlane = Rhino.BoundingBox(aObj,Rhino.CurrentView,False)
+	Dim dblDist: dblDist = Rhino.Distance (aBBPlane(0), aBBPlane(6)) 
+	
+	Dim NewOrigin: NewOrigin = AveragePoints(aBBPlane)
+	aPlane = Rhino.MovePlane (aPlane,Rhino.XformCPlaneToWorld(array(newOrigin(0), newOrigin(1),0),aPlane))
+	
+	Dim VecX: vecX = Rhino.VectorScale(aPlane(1),dblDist)
+	Dim VecY: VecY = Rhino.VectorScale(aPlane(2), dblDist)
+	Dim vecXY: vecXY = Rhino.VectorAdd(VecX,VecY)
+	VecXY = Rhino.VectorScale(VecXY, 0.5)
+	VecXY = Rhino.vectorreverse(vecXY)
+	Dim NewOrigin1:NewOrigin1 = Rhino.PointAdd(aPLane(0),VecXY)
+	
+	aPlane = Rhino.MovePlane (aPlane,NewOrigin1)
+	
+	Dim sTestPlane: sTestPlane = Rhino.AddPlaneSurface(aPlane,dblDist,dblDist)
+	
+	Dim sObj, aLast, sLast, aresult(), n
+	n = 0
+	
+	If trim = False Then
+		For Each sObj In aObj
+			Rhino.UnselectAllObjects
+			Rhino.SelectObject(sobj)
+			Rhino.SelectObject sTestPlane
+			Rhino.Command "_Intersect _NoEcho ",False
+		
+			If Rhino.LastCommandResult = 0 Then
+				aLast = Rhino.SelectedObjects
+			End If
+		
+			If IsArray(aLast) Then
+				For Each sLast In aLast
+					ReDim Preserve aResult(n)
+					aResult(n) = sLast
+					n = n +1 
+				Next
+			End If
+		Next
+	
+		If isUpperBound(aResult) Then
+			Rhino.SelectObjects aResult
+		End If	
+	End If
+	
+	If Trim = False Then
+		Rhino.DeleteObject sTestPlane
+		Rhino.Print n & " intersections found."
+		IntersectThePlane = aResult
+	Else
+		IntersectThePlane = array(sTestPlane)
+		Rhino.UnselectAllObjects
+		Rhino.SelectObject sTestPlane
+		Rhino.Command "_SetObjectDisplayMode _Ghosted"
+	End If
+	
+	Rhino.ViewCPlane Rhino.CurrentView, CrntPlane
+	Rhino.EnableRedraw(True)
+
+	
+End Function
+
+
+Function IsUpperBound(ByRef arr)
+
+	IsUpperBound = False
+
+	If IsArray(arr) Then
+
+		On Error Resume Next
+
+		UBound arr
+
+		If Err.Number = 0 Then IsUpperBound = True
+
+	End If
+
+End Function
+
+Function CheckValidArray(arrCheck, strToCheck)
+	'not case sensitive
+	dim strCheck
+
+	CheckValidArray =False
+
+	For Each strCheck In arrCheck
+		If UCase(strToCheck) = UCase(strCheck) Or strToCheck = ""Then
+			CheckValidArray = True
+			Exit Function
+		End If
+	Next
+
+End Function
+
+Function AveragePoints(arrPts)
+	'Finds the average location of an array
+	'of points.
+
+	Dim X, Y, Z
+	Dim i
+	
+	X = 0
+	Y = 0
+	Z = 0
+
+	For i=0 To UBound (arrPts)
+			
+		'add all the X values
+		X = X+arrPts(i)(0)
+	
+		'add all th Y values
+		Y = Y+arrPts(i)(1)			
+	
+		'add all the Z values
+		Z = Z+arrpts(i)(2)
+	Next
+	
+	'Divide by the number of points to
+	'get the average  For Each
+	'create the output array from the 3 averages
+	AveragePoints  =array(X/(UBound(arrPts)+1), Y/(UBound(arrPts)+1), Z/(UBound(arrPts)+1))
+
+End Function

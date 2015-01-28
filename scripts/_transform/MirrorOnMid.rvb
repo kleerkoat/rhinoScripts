@@ -1,0 +1,34 @@
+Option Explicit
+'Script written by Pascal
+'Script version Thursday, May 21, 2009 
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "MirrorOnMid", "_NoEcho _-Runscript (MirrorOnMid)"
+
+'Call MirrorOnMid()
+Sub MirrorOnMid()
+
+	Dim aObj: aObj = Rhino.GetObjects("Select objects to mirror",,,True,True)
+	If Not IsArray(aObj) Then Exit Sub
+	
+	Dim sline: sLine = Rhino.GetObject("Select line",4)
+	If isNull(Sline) Then Exit Sub
+	
+	Dim VecDir: VecDir = Rhino.CurveTangent(sLine,Rhino.CurveClosestPoint(sLine,Rhino.CurveMidPoint(sLine)))
+	
+	Dim Plane: Plane = Rhino.PlaneFromNormal(Rhino.CurveMidPoint(sLine),vecDir)
+	
+	Dim spt1: sPt1 = "W"& Rhino.Pt2Str(Plane(0),,True)
+
+	Dim spt2: sPt2 = "W" & Rhino.Pt2Str(Rhino.PointAdd(plane(0),plane(1)),,True)
+	
+	Dim spt3: sPt3 = "W" & Rhino.Pt2Str(Rhino.PointAdd(plane(0),plane(2)),,True)
+		
+
+	Rhino.UnselectAllObjects
+	Rhino.SelectObjects aObj
+	Rhino.Command "_Mirror _3Point " &sPt1 &spt2 &sPt3
+	
+End Sub
+
+

@@ -1,0 +1,36 @@
+﻿  Sub VPoint
+
+    Dim strView
+    strView = Rhino.CurrentView
+    If Rhino.ViewProjection(strView) <> 1 Then
+      Rhino.ViewProjection strView,2
+      Rhino.Print "Viewport set to parallel projection!"
+    End If
+
+    Dim arrOptions, strOption, arrCamera
+    arrOptions = Array("NE Isometric", "NW Isometric", "SE Isometric", "SW Isometric", "User Defined")
+    strOption = Rhino.ListBox(arrOptions, "Select viewing direction", "VPoint")
+    If IsNull(strOption) Then Exit Sub
+
+    Select Case strOption
+      Case "NE Isometric" arrCamera = Array( 1, 1,1)
+      Case "NW Isometric" arrCamera = Array(-1, 1,1)
+      Case "SE Isometric" arrCamera = Array( 1,-1,1)
+      Case "SW Isometric" arrCamera = Array(-1,-1,1)
+      Case Else arrCamera = Rhino.GetPoint("View point")
+    End Select
+    If Not IsArray(arrCamera) Then Exit Sub
+
+    Dim arrTarget, v
+    arrTarget = Array(0,0,0)
+    v = Rhino.VectorCreate(arrCamera, arrTarget)
+    If Rhino.IsVectorTiny(v) Then Exit Sub
+
+    Rhino.EnableRedraw False    
+    Rhino.ViewCameraTarget strView, arrCamera, arrTarget
+    Rhino.ZoomExtents strView
+    Rhino.EnableRedraw True
+
+  End Sub
+
+Call VPoint

@@ -1,0 +1,1508 @@
+Option Explicit
+
+'Global variable to show or hide disclaimer before running the script
+'can be changed viw setup script
+Private blnDisclaimer
+blnDisclaimer = False 'SETUP MARKER: Show Disclaimer
+
+
+'Script written by willemderks.com
+'Script birth            March 29, 2011
+'Script current version    May 18, 2011 
+
+'This script is written to export selected Rhino objects as 2D geometry to an SVG file.
+'The exported objects are converted to their curve/text representations
+'projected on the Rhino world XY plane
+'
+'The SVG file is formatted for the use with Inkscape to maintain layer information as well
+'as geometric scale on the XY plane.
+
+'For more info see comments within the script
+
+
+
+
+
+'___________________________________________________________________________________________________
+'___________________________________________________________________________________________________
+
+
+'ToDo:
+
+'global switches + UI for
+'  -outline text
+
+
+'Issues:
+
+'Geometry in block will all placed on the layer the block is in.
+'  to solve this, the block needs to be exploded before sorting objects by layer
+'  to clean up afterwards, the exploded block geometry needs to be tagged for later deletion.
+
+'Text
+'no multiline text support
+'certain characters within a text might cause an invalid SVG to be created
+'mirrored text is not supported and will be exported incorrect
+
+'Hatches
+'Solid hatches with 'holes' will not be filled properly.
+
+
+'-Layer-order is arbitrary (based on layers encountered through selected objects)
+' to solve this there need to be a separate array with layers in order
+'-For better management of the issues above it would be wise to create a string per svg layer group
+' so create an array of strings representing layers that can be appended to.
+
+'Wishes
+' testing for compatibility with adobe illustrator especially the scale
+
+'_________________________________________________________________________________________________
+'___________________________________________________________________________________________________
+
+
+
+
+'This global boolean will tell wether to create a fill stype or not
+'The variable must explicitly be set to True when an object is passes that needs to be filled.
+'The function generating the fill style string will reset the switch to False (Default)
+Private blnSVGfillSwitch
+blnSVGfillSwitch = False
+
+
+'Transformation matrix to transform from Rhino coordinates to SVG coordinates
+Private SVGXform
+SVGXform=Null
+
+Sub SetSVGXform(arrObj,dblScale)
+	'creates a transform matrix to convert Rhino coordinates to inkscape SVG coordinates
+	'-svg origin starts at the upper left corner of the document
+	'-svg x positive is to the right of origin
+	'-svg y positive is below the origin (so we need to mirror over the rhino x axis)
+	
+	
+	Dim dblUnitScale 'scale to convert file units to inch
+	dblUnitScale = Rhino.UnitScale (8 , Rhino.UnitSystem()) * dblScale
+		
+	Dim dblFactor
+	'Inkscape has a built in DPI of 90
+	dblFactor = 90*dblUnitScale
+	
+	SVGXform = Rhino.XformScale (dblFactor , -dblFactor , dblFactor)
+	'adjust Xform translation for X and Y
+	SVGXform(0,3)= -dblFactor* Rhino.BoundingBox(arrObj)(3)(0)
+	SVGXform(1,3)=  dblFactor* Rhino.BoundingBox(arrObj)(3)(1)
+		
+	'note that SVGXform(0,0) equals the scale factor
+	
+End Sub
+
+
+
+
+
+
+
+'                 _ 
+' _ __ ___   __ _(_)_ __  
+'| '_ ` _ \ / _` | | '_ \ 
+'| | | | | | (_| | | | | |
+'|_| |_| |_|\__,_|_|_| |_|
+'
+
+
+
+Call ExportInkScapeSVG() 'SETUP MARKER: run via Alias
+
+Sub ExportInkScapeSVG()
+
+	If blnDisclaimer Then
+		If ShowDisclaimer <>6 Then
+			Exit Sub
+		End If
+	End If
+	
+	
+	'collect geometry
+	'TODO ?? filter possible objects
+	Dim arrObj
+	arrObj = Rhino.GetObjects("Select geometry to export as Inkscape SVG file",1+2+4+8+16+1073741824+512+8192+4096+65536)
+	If isNull(arrObj) Then Exit Sub
+	
+	
+	'CheckSVGcompatibility will check objects for planarity to world XY plane
+	'and take appropriate actions:
+	'- Either discard  objects with a warning
+	'- or return transformed object copies to make them compatible
+	'Only SVG export compatible objects will be returned.
+	
+	
+		
+	'ToDo
+	'get settings (eg text outline , surface wires or silhouettes, etc..)
+
+
+	
+	
+	'set translation Xform
+	Dim dblScale
+	dblScale = 1 / Rhino.RealBox("Set scale for export. Output scale 1 : ? ",1,"Set SVG export scale")
+	Call SetSVGXform(arrObj,dblScale)
+
+	'get filename
+	Dim strFileName
+	strFileName = Rhino.SaveFileName ("Export", "Inkscape SVG (*.svg)|*.svg||")
+	If isNull(strFileName) Then Exit Sub
+	
+	
+	'Create floating viewport to ensure correct silhouette creation
+	Call Rhino.Command("!_-NewFloatingViewport _Enter",False)
+	Call Rhino.ViewProjection (Rhino.CurrentView(,False),1)
+	Call Rhino.ViewCameraTarget(Rhino.CurrentView(,False),array(0,0,1),array(0,0,0))
+	
+	
+	Dim strFile ' string with the svg file data
+	'create svg 'Head' string
+	strFile = FileHeadStr(arrObj,dblScale)
+	'append svg 'Geometry' string
+	strFile = strFile & CreateGeometryString(arrObj) & "</svg>"
+	
+	Call Rhino.Command("!_CloseViewport ",False)
+	'Clear global variables
+	Call OnCancelScript
+
+
+	'create file, write string to it and close
+	Dim fso, SVGfile, i
+	Set fso = CreateObject("Scripting.FileSystemObject")
+	Set SVGfile = fso.CreateTextfile(strFileName, True)
+	SVGfile.Write(strFile)
+	Call SVGfile.Close()
+	Set fso = Nothing
+	
+	Call Rhino.StatusBarProgressMeter ()
+
+
+	Dim blnOfferInkscapePDF, IntCreatePDF
+	blnOfferInkscapePDF = True 'SETUP MARKER: Offer InkscapePDF
+	
+	
+	If blnOfferInkscapePDF Then
+		IntCreatePDF = Rhino.MessageBox ("Convert SVG to PDF via Inkscape ?"&Chr(13)&"Notice: SVG will be deleted" ,4, "SVG to PDF")
+		If IntCreatePDF = 6 Then
+			Call SVGtoPDFviaInkscape(strFileName)
+		End If
+	
+	End If
+End Sub
+
+Function CreateGeometryString(arrObj)
+	
+	'This function will return the string describing the objects passed in SVG format.
+	'All object types are accepted for selcting yet some are discarded as in "not supported".
+	
+		
+	'first sort objects by layer
+	'NOTE: layer order is arbitrary
+	Dim arrObjPerLayer
+	arrObjPerLayer = SortObjPerLayer(arrObj)
+	'this returns an array with arrays of objects per layer
+	'the need for this is to create a special SVG inkscape group,
+	'as in inkscape layers are defined as groups with an inkscape 'tag'
+	
+	
+	Dim strGeometry
+	
+	Dim intLayer,intObj,N, UB
+	Dim strLayerName
+	
+	UB = Ubound(arrObj)
+	N=0
+	
+	Call Rhino.StatusBarProgressMeter ("SVG Export progress", 0, UB , True , True)
+	Call Rhino.EnableRedraw(False)
+	
+	'itterate through LAYERS
+	
+	For intLayer=0 to Ubound(arrObjPerLayer)
+		'get layer name by first object of array
+		strLayerName = Rhino.ObjectLayer(arrObjPerLayer(intLayer)(0))
+		'append layer-group string
+		strGeometry = strGeometry &_
+			"<g"& VbLf &_
+			"  inkscape:label="&Chr(34)&Cstr(strLayerName)&Chr(34)& VbLf & _
+			"  inkscape:groupmode="&Chr(34)&"layer"&Chr(34)& VbLf & _
+			"  id="&Chr(34)&Cstr(strLayerName)&Chr(34)&">"& VbLf
+		
+		'itterate through OBJECTS on the layer and append their svg string
+		For intObj=0 to Ubound(arrObjPerLayer(intLayer))
+			strGeometry = strGeometry & ObjectSvgString(arrObjPerLayer(intLayer)(intObj))
+			N = N+1
+			
+			
+			If N mod 100 = 0 Then
+				Call Rhino.StatusBarProgressMeter (N ,True)
+			End If
+			
+		Next
+		
+		'close layer-group element
+		strGeometry = strGeometry & "</g>" & VbLf
+			
+
+
+		
+	Next
+	
+		
+	CreateGeometryString=strGeometry
+	
+	Call Rhino.EnableRedraw(True)
+	
+	
+	
+End Function 'CreateGeometryString
+
+Function ObjectSvgString(Obj)
+	
+	'Function returns the string describing the object as SVG elements
+	'including their style.
+	
+	'All object types  are accepted yet some are discarded as in "not supported".
+	
+	'List below are not yet implemented Rhino object types
+	'
+	'	0  		Unknown Object
+	'	256			Light           'not usefull
+	'	16384		Grip            'not usefull
+	'	32768		Detail          'not usefull
+	'	131072		Morph Control   'not usefull
+	'	134217728	Cage            'not usefull
+	'	268435456	Phantom         'not usefull
+	'	536870912	Clipping Plane  'not usefull
+
+	' Known other unsupported Rhino features:
+	' arrowheads
+	
+ 
+	Dim strSVGObj 'the string describing the object as SVG elements
+	
+	Dim intType
+	intType = Rhino.ObjectType(Obj)
+	
+	Select Case intType
+		Case 1,2 'point | pointcloud
+			strSVGObj = createSVGpoints(Obj)
+		
+		Case 8,16,1073741824 'surface | polysurface | extrusion
+			strSVGObj = createSVGsurfaces(Obj)
+		
+		Case 512  'annotation | textobject
+			strSVGObj = createSVGannotation(Obj)
+				
+		Case 8192 'Text Dot
+			strSVGObj = createSVGtextdot(Obj)
+		
+		Case 4096 'Block
+			strSVGObj = createSVGblock(Obj)
+		
+		Case 65536	'Hatch
+			strSVGObj = createSVGhatch(Obj)
+				
+		Case 4 'Curve
+			strSVGObj = createSVGcurve(Obj)
+				
+		Case 32 'Mesh
+			'ToDo write mesh wires or just silhouette
+			strSVGObj = "<!-- Rhino Mesh object not supported for SVG export. RhinoID: "&Obj&" -->"& VbLf
+						
+		Case Else
+			strSVGObj ="<!-- A Rhino ObjectType:"&intType&" that is not supported. RhinoID: "&Obj&" -->"& VbLf
+	End Select
+	
+		
+	ObjectSvgString=strSVGObj
+	
+		
+End Function 'ObjectSvgString
+
+
+Function SVGtoPDFviaInkscape(strSVGFileName)
+	
+	Dim fso
+	Set fso = CreateObject("Scripting.FileSystemObject")
+	
+	Dim strInkscapeEXE 'path and file
+	strInkscapeEXE = _
+   "C:\Program Files (x86)\Inkscape\inkscape.exe"'SETUP MARKER: Inkscape Executable
+	
+	'check if EXE file exists
+	If Not fso.FileExists(strInkscapeEXE) Then
+		strInkscapeEXE = Rhino.OpenFileName ("Get Inkscape executable" , "Inkscape executable (.exe)|*.exe")
+	End If 
+	
+	If isNull(strInkscapeEXE) Then
+		Set fso = Nothing
+		Call Rhino.MessageBox("No valid Inkscape executable found exiting script")
+		Exit Function
+	End If
+	
+		
+	Dim strPDFfileName
+	strPDFfileName = left(strSVGfileName,(len(strSVGfileName)-3))  &  "pdf"
+		
+	Dim str
+	str = strInkscapeEXE&" "&Chr(34)&strSVGfileName&Chr(34)&" --export-pdf="&Chr(34)&strPDFfileName&Chr(34)
+		
+	'run inkscape from commandline to convert SVG to PDF
+	Dim shell
+	Set shell = CreateObject("WScript.Shell")
+	'run inkscape and wait for it to be finished
+	shell.Run  str, 1, true
+	
+	'open created PDF
+	shell.Run Chr(34)&strPDFfileName&Chr(34), 1 ,False
+	Set shell = Nothing
+	
+	
+	
+	'Delete SVG file
+	If fso.FileExists(strSVGFileName) Then
+		fso.DeleteFile strSVGFileName
+	End If 
+	
+	Set fso = Nothing
+
+	
+End Function
+
+
+
+'                 _ 
+' _ __ ___   __ _(_)_ __  
+'| '_ ` _ \ / _` | | '_ \ 
+'| | | | | | (_| | | | | |
+'|_| |_| |_|\__,_|_|_| |_|
+'
+
+
+
+
+
+
+
+
+
+
+
+'         _     _           _   _                         
+'    ___ | |__ (_) ___  ___| |_| |_ _   _ _ __   ___  ___ 
+'   / _ \| '_ \| |/ _ \/ __| __| __| | | | '_ \ / _ \/ __|
+'  | (_) | |_| | |  __/ |__| |_| |_| |_| | |_| |  __/\__ \
+'   \___/|_.__// |\___|\___|\__|\__|\__, | .__/ \___||___/
+'             |__/                   |___/|_|              
+
+
+'COMPOUND OBJECTS
+
+Function createSVGsurfaces(Obj)
+	
+	'This function will take surfaces,  polysurfaces and extrusions as input.
+	'Represented via curves from _ExtractWireframe command and _Silhouette command
+	'TODO  remove duplicate curves??
+	
+	Dim str
+	Dim i
+	Dim arrObj
+	
+		
+	'create object group
+	str = "<g>"& VbLf
+		
+	'create wireframe group
+	str = str & "<g>"& VbLf
+
+	Call Rhino.UnselectAllObjects()
+	Call Rhino.Command("!_-ExtractWireframe _SelId "&Obj&" _Enter",False)
+	'Return the created geometry
+	arrObj = Rhino.LastCreatedObjects (False,0)
+	'Tag as garbage
+	Call Rhino.ObjectName(arrObj,"SVGexportGarbage")
+	'Match layer and color (layer is actually irrelevant as the layer is set by the originating (poly)surface or extrusion
+	Call Rhino.ObjectLayer(arrObj,Rhino.ObjectLayer(Obj))
+	Call Rhino.ObjectColor(arrObj,Rhino.ObjectColor(Obj))	
+	
+	'pass objects
+	For i=0 to Ubound(arrObj)
+		str = str & ObjectSvgString(arrObj(i))
+	Next
+	Call Rhino.DeleteObjects(arrObj)
+				
+	'close wireframe group
+	str = str & "</g>"& VbLf
+			
+	
+	'create silhouette group
+	str = str & "<g>"& VbLf
+
+
+	Call Rhino.UnselectAllObjects()
+	Call Rhino.Command("!_-Silhouette _SelId "&Obj&" _Enter",False)
+	'Return the created geometry
+	arrObj = Rhino.LastCreatedObjects (False,0)
+	'Tag as garbage
+	Call Rhino.ObjectName(arrObj,"SVGexportGarbage")
+	'Match layer and color (although layer is irrelevant as the layer is set by the originating (poly)surface or extrusion
+	Call Rhino.ObjectLayer(arrObj,Rhino.ObjectLayer(Obj))
+	Call Rhino.ObjectColor(arrObj,Rhino.ObjectColor(Obj))
+	
+	'pass objects
+	For i=0 to Ubound(arrObj)
+		str = str & ObjectSvgString(arrObj(i))
+	Next
+	Call Rhino.DeleteObjects(arrObj)
+				
+	'close silhouette group
+	str = str & "</g> "& VbLf
+	
+	'close object group
+	createSVGsurfaces = str & "</g>"& VbLf
+	
+	
+End Function 'createSVGsurfaces
+
+Function createSVGannotation(Obj)
+	
+	Dim str, i
+	Dim objCopy, arrObj
+		
+
+	If Rhino.IsText(Obj) Then
+		
+		Dim dir
+		dir =  Abs(Rhino.TextObjectPlane (Obj)(3)(2))
+		'check if text is aligned to XY plane
+		If dir = Cdbl(1) Then
+			createSVGannotation = createSVGtext(Obj)
+		Else
+			createSVGannotation = "<!-- non aligned text -->"& VbLf
+		End If
+		
+	Else 'annotation / dimension object
+		
+		'copy object
+		objCopy = Rhino.CopyObject(Obj)
+		'Tag as garbage
+		Call Rhino.ObjectName(objCopy,"SVGexportGarbage")
+			
+		Call Rhino.UnselectAllObjects()
+		'Explode copy 
+		Call Rhino.Command("!_-Explode _SelId "&objCopy&" _Enter",False)
+		'Return the created geometry
+		arrObj = Rhino.LastCreatedObjects (False,0)
+		'Tag as garbage
+		Call Rhino.ObjectName(arrObj,"SVGexportGarbage")
+		'In case ConvertToBeziers was set to not delete the input
+		Call Rhino.DeleteObject (objCopy)
+		Call Rhino.UnselectAllObjects()
+				
+		'create a group
+		str = "<g>"& VbLf
+		
+		'pass objects
+		For i=0 to Ubound(arrObj)
+			If Rhino.IsCurveClosed(arrObj(i))Then
+				blnSVGfillSwitch = True				
+			End If
+			str = str & ObjectSvgString(arrObj(i))
+		Next
+		
+		'close the group
+		str = str & "</g>"& VbLf
+				
+		'delete objects
+		Call Rhino.DeleteObjects(arrObj)
+			
+		createSVGannotation = str
+					
+	End If
+	
+End Function 'createSVGannotation
+
+Function createSVGblock(Obj)
+
+	Dim str,i,ObjCopy,arrObj
+	
+	str = "<g>"& VbLf
+		
+	ObjCopy = Rhino.CopyObject(Obj)
+	'Tag as garbage
+	Call Rhino.ObjectName(ObjCopy,"SVGexportGarbage")
+	arrObj = Rhino.ExplodeBlockInstance (ObjCopy)
+	'Tag as garbage
+	Call Rhino.ObjectName(arrObj,"SVGexportGarbage")
+	
+	For i=0 to Ubound(arrObj)
+		str = str & ObjectSvgString(arrObj(i))
+	Next
+	Call Rhino.DeleteObjects(arrObj)
+	
+	str = str & "</g>"& VbLf
+	
+	
+	createSVGblock = str
+
+	
+End Function 'createSVGblock
+
+Function createSVGhatch(Obj)
+
+	Dim str,i,ObjCopy,arrObj
+		
+	If Rhino.HatchPattern (Obj)="Solid"Then 
+		blnSVGfillSwitch = True		
+	End If
+			
+	arrObj = Rhino.ExplodeHatch(Obj,False)
+	'Tag as garbage
+	Call Rhino.ObjectName(arrObj,"SVGexportGarbage")
+		
+	str = "<g>"& VbLf
+	For i=0 to Ubound(arrObj)
+		str = str & ObjectSvgString(arrObj(i))
+	Next
+	str = str & "</g>"& VbLf
+	
+	Call Rhino.DeleteObjects(arrObj)
+		
+	createSVGhatch = str
+	
+	
+End Function 'createSVGhatch 
+
+
+'ALL POINTS
+
+Function createSVGpoints(Obj)
+	'return SVG string for points and pointclouds
+	If Rhino.ObjectType(Obj) = 1 Then 'point
+		createSVGpoints = createSVGpointSymbol(Rhino.PointCoordinates(Obj),Rhino.ObjectColor(Obj))
+	End If
+	If Rhino.ObjectType(Obj) = 2 Then 'pointcloud
+		Dim i,str,arrPts
+		arrPts = Rhino.PointCloudPoints (Obj)
+		str = "<g>"& VbLf
+		For i=0 to Ubound(arrPts)
+			str = str&createSVGpointSymbol(arrPts(i),Rhino.ObjectColor(Obj))
+		Next
+		createSVGpoints = str & "</g>"& VbLf
+	End If
+End Function 'createSVGpoints
+
+Function createSVGpointSymbol(arrPt,lngColor)
+	'function returns SVG string for point
+	Dim dblSize
+	dblSize = 5 'magic number: an arbitrary choice
+	dblSize = 5 * SVGXform(0,0) 'scale to overall unit to file scale
+	Dim str,ptA
+	ptA = Rhino.PointTransform(arrPt, SVGXform)      
+	str = "<polygon transform="&Chr(34)&"translate("&ptA(0)&" "&ptA(1)&") rotate(45) "&Chr(34)&_
+		" points="&Chr(34)&" -"&dblSize&",-"&dblSize&"  "&dblSize&",-"&dblSize&"  "&dblSize&","&dblSize&"  -"&dblSize&","&dblSize&" "&Chr(34)
+	
+	blnSVGfillSwitch = True
+	str = str & createSVGstyle(lngColor)
+	createSVGpointSymbol = str
+	
+End Function 'createSVGpointSymbol
+
+
+'ALL CURVES
+
+Function createSVGcurve(ByVal Obj)
+
+	'Function will identify the type of curve and return SVG string for it
+	
+
+	Dim str
+	Dim blnToDo
+	blnToDo=True
+
+	Dim i,j,Flarge,Fsweep
+	Dim arrID,arrA
+	Dim ptA,ptB,ptC,ptD,ptQ
+	Dim dblA,dblB,dblC,dblD,dblE
+	Dim vecA,vecB
+
+	
+	'Line
+	If Rhino.IsLine(Obj) and blnToDo Then
+		ptA= Rhino.PointTransform(Rhino.CurveStartPoint(Obj), SVGXform)
+		ptB= Rhino.PointTransform(Rhino.CurveEndPoint(Obj)  , SVGXform)
+		str =" <line x1="&Chr(34)&ptA(0)&Chr(34)&" y1="&Chr(34)&ptA(1)&Chr(34)&" x2="&Chr(34)&ptB(0)&Chr(34)&" y2="&Chr(34)&ptB(1)&Chr(34)& VbLf
+		blnToDo=False
+	End If
+	
+			
+	'Polyline (closed or open)
+	If Rhino.IsPolyline(Obj)and blnToDo Then
+		arrA = Rhino.PolylineVertices(Obj)
+		If Rhino.IsCurveClosed(Obj)	Then 
+			str = "<polygon points="
+			str = str & Chr(34)
+			for i=0 to Ubound(arrA)-1
+				str = str&svgStr(arrA(i))
+			next
+			str = str & Chr(34) & VbLf
+		Else
+			str = "<polyline points="
+			str = str & Chr(34)
+			for i=0 to Ubound(arrA)
+				str = str&svgStr(arrA(i))
+			next
+			str = str & Chr(34) & VbLf
+		End If	
+		blnToDo=False
+	End If
+
+	
+	If blnToDo Then
+		'The curve is checked for being planar to the world XY plane.
+		'if not; a copy is projected on the world XY plane
+		Obj = MakeCurveSVGcompatible(Obj)
+	End If
+		
+		
+	'Circle
+	If Rhino.IsCircle(Obj) and blnToDo Then
+		ptA = Rhino.PointTransform(Rhino.CircleCenterPoint(Obj), SVGXform)
+		dblA = SVGXform(0,0)*Rhino.CircleRadius(Obj)
+		str = " <circle cx="&Chr(34)&ptA(0)&Chr(34)&" cy="&Chr(34)&ptA(1)&Chr(34)&" r="&Chr(34)&dblA&Chr(34)& VbLf
+		blnToDo=False
+	End If
+
+	'Ellipse
+	If Rhino.IsEllipse(Obj)And blnToDo Then
+		ptA = Rhino.PointTransform(Rhino.EllipseCenterPoint(Obj), SVGXform)       'ellipse center point
+		arrA = Rhino.PointArrayTransform(Rhino.EllipseQuadPoints (Obj), SVGXform) 'ellipse quad points
+		ptC = array(Rhino.Distance(ptA,arrA(0)),Rhino.Distance(ptA,arrA(2)),0)    'ellipse X and Y radius length as array(X,Y,O)
+		vecA = Rhino.VectorCreate(arrA(0),ptA)'vector to X quad
+		dblA = Rhino.VectorAngle(vecA,array(1,0,0))'angle X quad to X axis
+		If vecA(1) <0 then
+			dblA = -dblA 'negative angle when x axis pointing down
+		End If
+		str = "<ellipse transform="&Chr(34)&"translate("&ptA(0)&" "&ptA(1)&") rotate("&dblA&")"&Chr(34)&" rx="&Chr(34)&ptC(0)&Chr(34)&" ry="&Chr(34)&ptC(1)&Chr(34)& VbLf
+		blnToDo=False		
+	End If
+	
+	
+	'Arc
+	If Rhino.IsArc(Obj) and blnToDo Then
+		'create path
+		
+		ptA = Rhino.CurveStartPoint(Obj)
+		ptB = Rhino.CurveEndPoint (Obj)
+		dblA = SVGXform(0,0)*Rhino.ArcRadius(Obj)
+		
+		'If Rhino.CurveLength (Obj) > Rhino.Pi*Rhino.ArcRadius(Obj) Then
+		If Rhino.ArcAngle (Obj) > 180 Then
+			Flarge = 1
+		Else
+			Flarge = 0
+		End if
+		
+		
+		'vecA arc CentrePoint to arc StrartPoint
+		'vecB Tangent arc Startpoint
+		VecA = Rhino.VectorUnitize (Rhino.VectorCreate(ptA ,Rhino.ArcCenterPoint(Obj)))
+		VecB = Rhino.VectorUnitize (Rhino.CurveTangent (Obj, Rhino.CurveDomain (Obj)(0)))
+		
+		'Calculate Z component of cross product to determine orientation (Sweep)
+		If VecA(1)*VecB(0) - VecA(0)*VecB(1)> 0 then
+			Fsweep = 1
+		Else
+			Fsweep = 0
+		End If
+            
+		
+		str = "<path d="&Chr(34)&"M"&svgStr(ptA) 'Start path and startpoint
+		str = str &"A"&  dblA&","&dblA&" "       'radius x,radius y
+		str = str &"0 "                          'x-axisrotation
+		str = str &Flarge&","&Fsweep&" "         'large-arc-flag and sweep-flag
+		str = str & svgStr(ptB) & Chr(34)        'endpoint
+                
+		blnToDo=False   
+	End If
+	
+	
+	
+	
+		
+	
+	
+	'Elliptical Arc
+	If Rhino.IsEllipticalArc (Obj) and blnToDo Then
+	
+		'create path
+		
+		ptA = Rhino.CurveStartPoint(Obj)
+		ptB = Rhino.CurveEndPoint(Obj)
+		ptC = Rhino.CurveMidPoint(Obj)
+		ptD = Rhino.EllipseCenterPoint(Obj)
+		ptQ = Rhino.EllipseQuadPoints(Obj)(0)
+		
+		'X and Y radius
+		dblA = SVGXform(0,0)*Rhino.Distance(ptD,ptQ) 
+		dblB = SVGXform(0,0)*Rhino.Distance(ptD,Rhino.EllipseQuadPoints(Obj)(2))
+		
+		'Xaxis Rotation angle between first ellipse quad point and world x-axis
+		dblC = Rhino.Angle2(array(ptQ,ptD),array(array(0,0,0),array(1,0,0)))(0)
+		'If the ellipse x-axis is pointong down theangle has to be corrected.
+		If ptD(1) > ptQ(1)then
+			dblC = 180-dblC
+		End If
+		
+		
+		'vecA is the average vector of center->start and center->end
+		vecA = Rhino.VectorUnitize( Rhino.VectorAdd(Rhino.VectorCreate(ptA,ptD),Rhino.VectorCreate(ptB,ptD)))
+		'vecB is the vector from center->curve mid
+		vecB = Rhino.VectorUnitize( Rhino.VectorCreate(ptC,ptD))
+		'Dot product will tell if the vecA is pointing in same or opposite direction of the vecB
+		If Rhino.VectorDotProduct(vecA, vecB) < 0 Then
+			Flarge = 1
+		Else
+			Flarge = 0
+		End if
+
+		
+		
+		'vecA center->start
+		'vecB Tangent vector at start
+		VecA = Rhino.VectorUnitize (Rhino.VectorCreate(ptA ,ptD))
+		VecB = Rhino.VectorUnitize (Rhino.CurveTangent (Obj, Rhino.CurveDomain (Obj)(0)))
+		'Calculate Z component of cross product to determine orientation (Sweep)
+		If VecA(1)*VecB(0) - VecA(0)*VecB(1)> 0 then
+			Fsweep = 1
+		Else
+			Fsweep = 0
+		End If
+            			
+		str = "<path d="&Chr(34)&"M"&svgStr(ptA) 'Start path and startpoint
+		str = str &"A"&  dblA&","&dblB&" "       'radius x,radius y
+		str = str &dblC&" "                      'x-axisrotation
+		str = str &Flarge&","&Fsweep&" "         'large-arc-flag and sweep-flag
+		str = str & svgStr(ptB) & Chr(34)        'endpoint
+                
+		blnToDo=False   
+			
+		
+	End If
+
+	
+	
+	'Remaining Curve or polyCurve
+	If (Rhino.IsPolyCurve(Obj) Or Rhino.IsCurve(Obj) ) and blnToDo Then
+		str = createSVGpath(Obj)
+		blnToDo=False
+	End If
+
+	
+	'Check for error and append Style
+	If Not blnToDo Then
+		str = str & createSVGstyle(Obj)
+	Else
+		str ="<!-- Unsupported curve object that was unable to be written to SVG. RhinoID: "&Obj&" -->"& VbLf
+	End If
+
+	
+	'Return full curve SVGstring (geometry and style)
+	createSVGcurve = str
+	
+	
+	
+	
+End Function 'CreateSVGcurve
+
+Function createSVGpath(Obj)
+	Dim str,arrA,i,arrID,arrIn
+	
+	If Rhino.IsPolyCurve(Obj) Then
+		arrIn = Rhino.ExplodeCurves (Obj , False ,False)
+		'Tag as garbage
+		Call Rhino.ObjectName(arrIn,"SVGexportGarbage")
+	Else
+		arrIn = array( Rhino.CopyObject(Obj))
+		'Tag as garbage
+		Call Rhino.ObjectName(arrIn,"SVGexportGarbage")
+	End If
+	
+	arrID = ConvertToBezierIfNeeded(arrIn)
+	'Tag as garbage
+	Call Rhino.ObjectName(arrIn,"SVGexportGarbage")
+	
+	Dim temp
+	temp = Rhino.CurvePoints (arrID(0))
+
+	'initiale path and set first move to coordinate
+	str = "<path d="& Chr(34)&"M"&svgStr(Rhino.CurvePoints (arrID(0))(0))
+	
+	
+	For i=0 to Ubound(arrID)
+		str = str & createSVGpathSection(arrID(i))
+	Next
+	Call Rhino.DeleteObjects(arrID)	
+	
+	'close path definition quotes
+	str = str & Chr(34)
+	
+	'write style
+	str = str & createSVGstyle(Obj)
+		
+	createSVGpath = str
+	
+End Function 'createSVGpath
+
+Function createSVGpathSection(Obj)
+	
+	'funtion wil return a section of an SVG part describing the curve
+	'this fuction will return a string that can be appended to an already 'initialized' path string
+	Dim str
+	Dim i
+	Dim ptA,ptB,ptC,ptD,ptQ
+	Dim dblA,dblB,dblC
+	Dim vecA,vecB,vecC
+	Dim Flarge,FSweep
+	Dim blnToDo
+	Dim arrA,arrB
+	
+	
+	blnToDo=True
+	
+	
+	'Line
+	If Rhino.IsLine(Obj) and blnToDo Then
+		ptB= Rhino.PointTransform(Rhino.CurveEndPoint(Obj)  , SVGXform)
+		str = "L "&ptB(0)&" "&ptB(1)&" "
+		
+		blnToDo=False
+	End If
+	
+	'Arc
+	If Rhino.IsArc(Obj) and blnToDo Then
+		ptA = Rhino.CurveStartPoint(Obj)
+		ptB = Rhino.CurveEndPoint (Obj)
+		dblA = SVGXform(0,0)*Rhino.ArcRadius(Obj)
+		
+		'If Rhino.CurveLength (Obj) > Rhino.Pi*Rhino.ArcRadius(Obj) Then
+		If Rhino.ArcAngle (Obj) > 180 Then
+			Flarge = 1
+		Else
+			Flarge = 0
+		End if
+
+			
+		'vecA arc CentrePoint to arc StrartPoint
+		'vecB Tangent arc Startpoint
+		VecA = Rhino.VectorUnitize (Rhino.VectorCreate(ptA ,Rhino.ArcCenterPoint(Obj)))
+		VecB = Rhino.VectorUnitize (Rhino.CurveTangent (Obj, Rhino.CurveDomain (Obj)(0)))
+		
+		'Calculate Z component of cross product to determine orientation (Sweep)
+		If VecA(1)*VecB(0) - VecA(0)*VecB(1)> 0 then
+			Fsweep = 1
+		Else
+			Fsweep = 0
+		End If
+            		
+		str = str &"A"&  dblA&","&dblA&" "       'radius x,radius y
+		str = str &"0 "                          'x-axisrotation
+		str = str &Flarge&","&Fsweep&" "         'large-arc-flag and sweep-flag
+		str = str & svgStr(ptB) & " "            'endpoint
+		
+		blnToDo=False
+	End If
+		
+	
+	
+	'Elliptical Arc
+	If Rhino.IsEllipticalArc (Obj) and blnToDo Then
+		
+		'create path
+		
+		ptA = Rhino.CurveStartPoint(Obj)
+		ptB = Rhino.CurveEndPoint(Obj)
+		ptC = Rhino.CurveMidPoint(Obj)
+		ptD = Rhino.EllipseCenterPoint(Obj)
+		ptQ = Rhino.EllipseQuadPoints(Obj)(0)
+		
+		'X and Y radius
+		dblA = SVGXform(0,0)*Rhino.Distance(ptD,ptQ) 
+		dblB = SVGXform(0,0)*Rhino.Distance(ptD,Rhino.EllipseQuadPoints(Obj)(2))
+		
+		'Xaxis Rotation angle between first ellipse quad point and world x-axis
+		dblC = Rhino.Angle2(array(ptQ,ptD),array(array(0,0,0),array(1,0,0)))(0)
+		'If the ellipse x-axis is pointong down theangle has to be corrected.
+		If ptD(1) > ptQ(1)then
+			dblC = 180-dblC
+		End If
+		
+		
+		'vecA is the average vector of center->start and center->end
+		vecA = Rhino.VectorUnitize( Rhino.VectorAdd(Rhino.VectorCreate(ptA,ptD),Rhino.VectorCreate(ptB,ptD)))
+		'vecB is the vector from center->curve mid
+		vecB = Rhino.VectorUnitize( Rhino.VectorCreate(ptC,ptD))
+		'Dot product will tell if the vecA is pointing in same or opposite direction of the vecB
+		If Rhino.VectorDotProduct(vecA, vecB) < 0 Then
+			Flarge = 1
+		Else
+			Flarge = 0
+		End if
+
+				
+		'vecA center->start
+		'vecB Tangent vector at start
+		VecA = Rhino.VectorUnitize (Rhino.VectorCreate(ptA ,ptD))
+		VecB = Rhino.VectorUnitize (Rhino.CurveTangent (Obj, Rhino.CurveDomain (Obj)(0)))
+		'Calculate Z component of cross product to determine orientation (Sweep)
+		If VecA(1)*VecB(0) - VecA(0)*VecB(1)> 0 then
+			Fsweep = 1
+		Else
+			Fsweep = 0
+		End If
+            	
+		str = str &"A"&  dblA&","&dblB&" "       'radius x,radius y
+		str = str &dblC&" "                      'x-axisrotation
+		str = str &Flarge&","&Fsweep&" "         'large-arc-flag and sweep-flag
+		str = str & svgStr(ptB) & " "            'endpoint
+              
+		blnToDo=False
+	End If
+		
+	
+	
+	
+	If blnToDo Then
+		arrA= Rhino.CurvePoints (Obj)
+		If Ubound(arrA) = 3 Then
+			'here we assume we are left with a bezier with 4 controlpoints...
+			str = str &"C"
+			For i=1 to 3
+				str = str & svgStr(arrA(i))
+			Next
+		Else
+			For i=1 to Ubound(arrA)
+				arrB = Split(svgStr(arrA(i)),",")
+				str = "L " 
+				str = str & arrB(0) & " "
+				str = str & arrB(1)
+			Next
+		End If
+		blnToDo=False
+	End If
+	
+		
+	
+	
+	
+	createSVGpathSection = str
+	
+	
+	
+End Function 'createSVGpathSection
+
+
+'TEXT
+
+Function createSVGtextdot(Obj)
+	
+	Dim str
+	Dim ptA
+	ptA = Rhino.PointTransform(Rhino.TextDotPoint (Obj), SVGXform)    
+	Dim font,text,fill
+	font = "Ariel" 'Magic string an arbitrary choice as the default textdot font.
+	text = Rhino.TextDotText (Obj)
+	fill = RGBtoHex(Rhino.ObjectColor(Obj))
+	
+	text = MakeTextStringCompatible(text)
+	
+	Dim height
+	height = 10 'Magic number textdot text height an arbitrary choice
+	height = Cstr(height)&"pt" 	
+	
+	str =" <text x="&Chr(34)&ptA(0)&Chr(34)&" y="&Chr(34)&ptA(1)&Chr(34)&_
+		" style="&Chr(34)&"-inkscape-font-specification:"&font&";font-family:"&font&Chr(34)&_
+		" font-size="&Chr(34)&Cstr(height)&Chr(34)&_
+		" fill="&Chr(34)&fill&Chr(34)&_
+		" text-anchor="&Chr(34)&"middle"&Chr(34)&_
+		" dominant-baseline="&Chr(34)&"central"&Chr(34)&_
+		" >"&_
+		text & VbLf &_
+		"</text>"& VbLf
+
+	
+	createSVGtextdot = str
+
+
+End Function 'createSVGtextdot
+
+Function createSVGtext(Obj)
+	
+	
+	'TODO get/set text orientation
+	' Rhino.TextObjectPlane(strObject)
+	
+	
+	Dim str
+	Dim ptA
+	ptA = Rhino.PointTransform(Rhino.TextObjectPoint (Obj), SVGXform)    
+	Dim font,text,fill,angle,strRotate
+	font = Rhino.TextObjectFont(Obj)
+	text = Rhino.TextObjectText (Obj)
+	fill = RGBtoHex(Rhino.ObjectColor(Obj))
+	
+	'replace special characters by unicode
+	text = MakeTextStringCompatible(text)
+		
+	angle =-1 * Rhino.Angle (array(0,0,1),Rhino.TextObjectPlane (Obj)(1))(0)
+	
+	If Rhino.TextObjectPlane (Obj)(3)(2) = -1 Then
+		angle = 180-angle
+	End If
+
+	strRotate = "transform="&Chr(34)&"rotate("&Cstr(angle)&","&ptA(0)&","&ptA(1)&")"&Chr(34)&" "
+
+
+	Dim height 'scale height to convert file units to mm
+	height = (Rhino.TextObjectHeight(Obj)* SVGXform(0,0))
+	height = height*1.11 'Magicnumber: this is an approximation based on trial and error
+	height = Cstr(height)&"pt" 	
+	
+	str =" <text "& strRotate & "x="&Chr(34)&ptA(0)&Chr(34)&" y="&Chr(34)&ptA(1)&Chr(34)&_
+		" style="&Chr(34)&"-inkscape-font-specification:"&font&";font-family:"&font&Chr(34)&_
+		" font-size="&Chr(34)&Cstr(height)&Chr(34)&_
+		" fill="&Chr(34)&fill&Chr(34)&_
+		" >"&_
+		text & VbLf &_
+		"</text>"& VbLf
+	
+	
+	'Rhino.TextObjectPlane (Obj)
+	'Rhino.TextObjectStyle (Obj)
+	'	0	Normal.
+	'   1 	Bold.
+	'	2	Italic.
+ 
+
+
+	createSVGtext = str
+
+End Function
+
+Function createSVGtextOutline(Obj)
+		
+	'TODO
+	'explode text
+	'pass curves as group with fill
+	'close group
+	'delete objects
+	
+	
+End Function	
+
+
+
+'         _     _           _   _                         
+'    ___ | |__ (_) ___  ___| |_| |_ _   _ _ __   ___  ___ 
+'   / _ \| '_ \| |/ _ \/ __| __| __| | | | '_ \ / _ \/ __|
+'  | (_) | |_| | |  __/ |__| |_| |_| |_| | |_| |  __/\__ \
+'   \___/|_.__// |\___|\___|\__|\__|\__, | .__/ \___||___/
+'             |__/                   |___/|_|              
+
+
+
+
+
+
+
+' ______     ______       _        _
+'/ ___\ \   / / ___|  ___| |_ _ __(_)_ __   __ _ ___
+'\___ \\ \ / / |  _  / __| __| '__| | '_ \ / _` / __|
+' ___| |\ V /| |_| | \__ \ |_| |  | | | | | |_| \__ \
+'|____/  \_/  \____| |___/\__|_|  |_|_| |_|\__, |___/
+'                                          |___/
+
+
+Function createSVGstyle(ObjOrlngColor)
+	'Create a string with the SVG style.
+	'The global blnSVGfillSwitch will create a fill style when True else a stroke style
+	'In a later stadium different attributs need to be passed as arguments
+	' eg fill,stroke stroke width etc based on input object
+	
+	Dim strColor,fill,fillrule,stroke,strokewidth,miterlimit
+	
+
+	'convert ObjectColor/PassedColor to hexcolor (#FFFFFF)
+	If isNumeric(ObjOrlngColor) Then
+		strColor = RGBtoHex(ObjOrlngColor)
+	Else
+		strColor = RGBtoHex(Rhino.ObjectColor(ObjOrlngColor))
+	End If
+		
+	
+		
+	
+	If blnSVGfillSwitch Then 'create fill style
+		blnSVGfillSwitch = False
+		
+		fill     = strColor
+		fillrule = "evenodd"
+		stroke   = "none"
+		
+		createSVGstyle =_
+			" fill="&Chr(34)&fill&Chr(34)&_
+			" fill-rule="&Chr(34)&fillrule&Chr(34)&_
+			" stroke="&Chr(34)&stroke&Chr(34)&_
+			" />"& VbLf
+		
+		
+	Else  'create stroke style
+		
+		fill        = "none"
+		stroke      = strColor
+		strokewidth = 1
+		miterlimit  = 1.5
+		
+		createSVGstyle =_
+			" fill="&Chr(34)&fill&Chr(34)&_
+			" stroke="&Chr(34)&stroke&Chr(34)&_
+			" stroke-width="&Chr(34)&strokewidth&Chr(34)&_
+			" stroke-linecap="&Chr(34)&"round"&Chr(34)&_
+			" stroke-linejoin="&Chr(34)&"miter"&Chr(34)&_
+			" stroke-miterlimit="&Chr(34)&miterlimit&Chr(34)&_
+			" />"& VbLf
+		
+	End if	
+		
+		
+		
+End Function
+
+Function svgStr(ptA)
+	'create svg point representaion string: "x,y "
+	'from rhino array(x,y,z) point
+	Dim ptB
+	ptB=Rhino.PointTransform(ptA, SVGXform)
+	svgStr=ptB(0)&","&ptB(1)&" "
+End Function
+
+Function RGBtoHex(lngRGB)
+	
+	'Convert RBG-long to Hex-color string.
+	
+	Dim r,g,b
+	r = lngRGB Mod 256
+	g = (lngRGB \ 256 ) Mod 256
+	b = (lngRGB \ 256 \ 256 ) Mod 256 
+
+	
+	Dim rH,gH,bH
+
+	If r < 16 Then
+		rH = 0 & Hex(r)
+	Else
+		rH = Hex(r)
+	End If
+	
+	If g < 16 Then
+		gH = 0 & Hex(g)
+	Else
+		gH = Hex(g)
+	End If
+	
+	If b < 16 Then
+		bH = 0 & Hex(b)
+	Else
+		bH = Hex(b)
+	End If
+	
+	'Return string for hex color representation like: #FFFFFF
+	RGBtoHex = "#"&rH&gH&bH
+
+End Function 'RGBtoHex
+
+Function FileHeadStr(arrObj,dblScale)
+	
+	'generates string for file head.
+	
+	'arrObj argument is the array with exported objects
+	'their boundingbox dimension is used to set the SVG width,height and viewbox.
+	
+	'dblScale argument is double representing the Scale factor at wich the SVG is exported.
+	'it is used to scale SVG width,height and viewbox.
+	
+	Dim UnitTommFactor
+	UnitTommFactor = Rhino.UnitScale (2)*dblScale
+	
+	Dim arrBBox
+	arrBBox = Rhino.BoundingBox(arrObj)
+	
+	
+	Dim strWidth,strHeight
+	
+	strWidth  = (arrBBox(1)(0) - arrBBox(0)(0))*UnitTommFactor
+	strHeight = (arrBBox(3)(1) - arrBBox(0)(1))*UnitTommFactor
+	
+	If strWidth  = 0 then strWidth  = 1
+	If strHeight = 0 then strHeight = 1
+	
+	strWidth  = Cstr(strWidth)  &"mm"
+	strHeight = Cstr(strHeight) &"mm"
+	
+	
+	Dim arrBBoxCenter, inkscapeViewCenterX,inkscapeViewCenterY
+	arrBBoxCenter = Rhino.PointDivide(Rhino.PointAdd(arrBBox(0),arrBBox(2)),2)
+	
+
+	inkscapeViewCenterX = Rhino.PointTransform(arrBBoxCenter,SVGXform)(0)
+	inkscapeViewCenterY = Rhino.PointTransform(arrBBoxCenter,SVGXform)(1)
+	
+	
+	'String generated below is based on empirical examination of inkscape formatted SVG.
+	
+	FileHeadStr ="<?xml version="&Chr(34)&"1.0"&Chr(34)&" encoding="&Chr(34)&"UTF-8"&Chr(34)&" standalone="&Chr(34)&"no"&Chr(34)&"?>"& VbLf & _
+		"<!-- Created with Rhino via a script written by willemderks.com -->"& VbLf & _
+		"<!-- Based on Inkscape file format (http://www.inkscape.org/) -->"& VbLf & _
+		""& VbLf & _
+		"<svg"& VbLf & _
+		"   width="&Chr(34)&strWidth&Chr(34)  & VbLf & _
+		"   height="&Chr(34)&strHeight&Chr(34) & VbLf & _
+		"   viewBox="&Chr(34)&"0 0 "&strWidth&" "&strHeight&Chr(34)&VbLf & _
+		"   id="&Chr(34)&"svg2"&Chr(34)& VbLf & _
+		"   version="&Chr(34)&"1.1"&Chr(34)& VbLf & _
+		"   xmlns:dc="&Chr(34)&"http://purl.org/dc/elements/1.1/"&Chr(34)& VbLf & _
+		"   xmlns:cc="&Chr(34)&"http://creativecommons.org/ns#"&Chr(34)& VbLf & _
+		"   xmlns:rdf="&Chr(34)&"http://www.w3.org/1999/02/22-rdf-syntax-ns#"&Chr(34)& VbLf & _
+		"   xmlns:svg="&Chr(34)&"http://www.w3.org/2000/svg"&Chr(34)& VbLf & _
+		"   xmlns="&Chr(34)&"http://www.w3.org/2000/svg"&Chr(34)&""& VbLf & _
+		"   xmlns:sodipodi="&Chr(34)&"http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"&Chr(34)& VbLf & _
+		"   xmlns:inkscape="&Chr(34)&"http://www.inkscape.org/namespaces/inkscape"&Chr(34)& VbLf & _
+		"   inkscape:version="&Chr(34)&"0.48.0 r9654"&Chr(34)&""& VbLf & _
+		"   sodipodi:docname="&Chr(34)&"New document 1"&Chr(34)&">"& VbLf & _
+		"  <defs"& VbLf & _
+		"     id="&Chr(34)&"defs4"&Chr(34)&" />"& VbLf & _
+		"  <sodipodi:namedview"& VbLf & _
+		"     id="&Chr(34)&"base"&Chr(34)& VbLf & _
+		"     pagecolor="&Chr(34)&"#ffffff"&Chr(34)& VbLf & _
+		"     bordercolor="&Chr(34)&"#666666"&Chr(34)& VbLf & _
+		"     borderopacity="&Chr(34)&"1.0"&Chr(34)& VbLf & _
+		"     inkscape:pageopacity="&Chr(34)&"0.0"&Chr(34)& VbLf & _
+		"     inkscape:pageshadow="&Chr(34)&"2"&Chr(34)& VbLf & _
+		"     inkscape:cx="&Chr(34)&inkscapeViewCenterX&Chr(34)& VbLf & _
+		"     inkscape:cy="&Chr(34)&inkscapeViewCenterY&Chr(34)& VbLf & _
+		"     inkscape:document-units="&Chr(34)&"mm"&Chr(34)& VbLf & _
+		"     showgrid="&Chr(34)&"false"&Chr(34)&""& VbLf & _
+		"     inkscape:window-maximized="&Chr(34)&"1"&Chr(34)&" />"& VbLf
+	
+	
+End Function
+
+
+
+' ______     ______       _        _
+'/ ___\ \   / / ___|  ___| |_ _ __(_)_ __   __ _ ___
+'\___ \\ \ / / |  _  / __| __| '__| | '_ \ / _` / __|
+' ___| |\ V /| |_| | \__ \ |_| |  | | | | | |_| \__ \
+'|____/  \_/  \____| |___/\__|_|  |_|_| |_|\__, |___/
+'                                          |___/
+
+
+
+
+Function ConvertToBezierIfNeeded(ByVal arrA)
+	
+	Dim i
+	Dim arrB,arrNext
+	
+	For i = 0 to Ubound(arrA)
+		
+		If Not( Rhino.IsLine(arrA(i)) ) And Not( Rhino.IsArc(arrA(i)) ) And Not( Rhino.IsEllipticalArc (arrA(i))) Then
+			arrNext = CurveToBeziers(arrA(i))
+			'arrA(i) will be deleted by CurveToBeziers			
+		Else
+			arrNext = array(arrA(i))
+		End If
+	
+		If isEmpty(arrB) Then
+			arrB = arrNext
+		Else
+			arrB = Rhino.JoinArrays(arrB,arrNext)
+		End If
+		
+		
+	Next
+
+	ConvertToBezierIfNeeded = arrB
+	
+End Function
+
+Function CurveToBeziers(ByVal Obj)
+	
+	Dim arrObj
+	
+	Call Rhino.UnselectAllObjects()
+	'Convert curve to beziers
+	Call Rhino.Command("!_ConvertToBeziers _SelId "&Obj&" _Enter _Enter",False)
+	'Return the created beziers
+	arrObj = Rhino.LastCreatedObjects (False,0)
+	'Tag as garbage
+	Call Rhino.ObjectName(arrObj,"SVGexportGarbage")
+	'In case ConvertToBeziers was set to not delete the input
+	Call Rhino.DeleteObject (Obj)
+	Call Rhino.UnselectAllObjects()
+		
+	CurveToBeziers = arrObj
+	
+End Function 'CurveToBezier
+
+Function MakeCurveSVGcompatible(Obj)
+	
+	Dim i,blnProject
+	Dim plane
+
+	'check if curve is planar and if so if it's planbe is parallel to the XY plane 
+	blnProject = False
+
+	plane = Rhino.CurvePlane (Obj)
+	If isNull(plane) Then
+		blnProject = True
+	ElseIf abs(plane(3)(2)) <> 1 Then 'absolute z value of plane normal should be 1
+		blnProject = True
+	End If	
+
+
+
+	If blnProject Then	'the curve needs to be projected to the XY plane 
+		Obj = Rhino.TransformObject(Obj,Rhino.XformPlanarProjection (Rhino.WorldXYPlane ()),True)
+		'Tag as garbage
+		Call Rhino.ObjectName(Obj,"SVGexportGarbage")
+	End If
+	
+	
+	MakeCurveSVGcompatible = Obj
+		
+End Function
+
+Function SortObjPerLayer(arrObj)
+	
+	Call Rhino.StatusBarProgressMeter ("SVG Export preparing", 0, (Ubound(arrObj)+1)*2 , True , True)
+	
+	
+	Dim i,j,arrSorted,arrNames
+	ReDim arrNames(Ubound(arrObj))
+	
+	For i=0 to Ubound(arrObj)
+		arrNames(i) = Rhino.ObjectLayer(arrObj(i))
+		Call Rhino.StatusBarProgressMeter (1,False)
+	Next
+	
+	arrNames = Rhino.CullDuplicateStrings(arrNames)
+		
+	ReDim arrSorted(Ubound(arrNames))
+		
+	Dim temp
+	Redim temp(0)
+	
+	For i=0 to Ubound(arrSorted)
+		arrSorted(i) = temp
+	Next
+	
+	
+	For i=0 to Ubound(arrObj)
+		For j=0 to Ubound(arrNames)
+			If arrNames(j)= Rhino.ObjectLayer(arrObj(i))Then
+				If isEmpty(arrSorted(j)(0)) Then
+					arrSorted(j)(0) = arrObj(i)
+				Else
+					temp = arrSorted(j)
+					Redim Preserve temp ((Ubound(temp)+1))
+					arrSorted(j) = temp 
+					arrSorted(j)(Ubound(arrSorted(j))) = arrObj(i)
+				End If
+				
+			End If
+		Next
+		Call Rhino.StatusBarProgressMeter (1,False)
+	Next
+		
+	SortObjPerLayer = arrSorted
+	
+	Call Rhino.StatusBarProgressMeter ()
+	
+End Function 'SortObjPerLayer
+
+Function ArrayReverse(ByRef arr)
+	Dim i, ub, ub2, tmp
+	ub = UBound(arr)
+	ub2 = Int(ub / 2)
+	For i = 0 To ub2
+		tmp = arr(i)
+		arr(i) = arr(ub - i)
+		arr(ub - i) = tmp
+	Next
+End Function
+
+Function MakeTextStringCompatible(str)
+	
+	'this is pure coding patchwork and could do with a
+	'more complete and failproof solution
+	
+	'Replace &
+	str = Replace(str,chr(38),"&amp;")
+	
+	'Replace <
+	str = Replace(str,chr(60),"&lt;")
+	
+	'Replace >
+	str = Replace(str,chr(62),"&gt;")
+		
+	'Replace °
+	str = Replace(str,chr(176),"&#x00B0;")
+	
+	'Replace Ø
+	str = Replace(str,chr(216),"&#x00F8;")
+	
+	MakeTextStringCompatible=str
+	
+End Function
+
+Function ShowDisclaimer 'Disclaimer message 
+ 
+	Dim strTXT
+	strTXT = strTXT& "This script will (attempt to) export geometry to an SVG file"&Chr(13)
+	strTXT = strTXT& Chr(13)
+	strTXT = strTXT& "NOTICE: "&Chr(13)
+	strTXT = strTXT& "This script is presented 'as is' and usage is at your own risk"&Chr(13)
+	strTXT = strTXT& Chr(13)
+	strTXT = strTXT& "I took care not to edit existing geometry in any way nor leave geometry behind"&Chr(13)
+	strTxt = strTXT& "However there is no 100% guarantee this script is flawless."&Chr(13)
+	strTXT = strTXT& "So, if the file is of importance to you, make sure to create a copy of it"&Chr(13)
+	strTXT = strTXT& "and run the script on that copy, discarding it afterwards"&Chr(13)
+	strTXT = strTXT& Chr(13)
+	strTXT = strTXT& "Feel free to contact me about anything related to this script"&Chr(13)
+	strTXT = strTXT& "email: mail@willemderks.com"&Chr(13)
+	strTXT = strTXT& Chr(13)
+	strTXT = strTXT&Chr(13)&"Proceed?"&Chr(13)
+    
+	ShowDisclaimer = Rhino.MessageBox (strTXT,4,"Use at your own risk!")
+ 		
+End Function
+
+Sub OnCancelScript
+	Dim arrObj
+	arrObj = Rhino.ObjectsByName("SVGexportGarbage")
+	If Not isNull(arrObj) Then 
+		Rhino.DeleteObjects(arrObj)
+	End If
+	
+	SVGXform = Null
+	blnSVGfillSwitch = Null
+
+	Call Rhino.EnableRedraw (True)
+End Sub

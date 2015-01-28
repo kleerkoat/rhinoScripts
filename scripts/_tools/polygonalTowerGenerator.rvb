@@ -1,0 +1,47 @@
+'Rhinoscript: parametric modeling
+'From KokkugiaWiki
+'
+'associative modeling through scripting
+'although we are focusing on developing scripts for generative design processes, we will digress briefly in order to explore the associative logics utilised in parametric models.
+'rhinocript enables us to quickly develop 3d models that are capable of having all their driving parameters (the variables in the script) as dependent on each other.
+'
+'polygonal twisting tower
+'the example below demonstrates how a very simple and short script is capable of generating the set out for a number of different tower geometries. this script hasn't yet linked any of the variables to drive each other. Try modifying this script in able to vary the tower height and plan proportionally to each other, and have the angle of rotation also change pending on the number of segments in the polygonal plan.
+Option Explicit
+'------------------------------------------------------------------------------
+' twisting polygonal tower generator	
+' author: rob stuart-smith | 2008 | www.kokkugia.com
+'------------------------------------------------------------------------------
+
+Call Main()
+Sub Main()
+
+	Dim arrFlrs, i,j
+	Dim strFlr, strLine, strFlrSrf
+	
+	Dim dblRad: dblRad = 10
+	Dim intSegs: intSegs = 4
+	Dim intFlrs: intFlrs = 20
+	Dim dblHeight: dblHeight = 3.5
+
+	Rhino.EnableRedraw False
+	For j = 0 To 10
+		ReDim arrFlrs(0)
+		For i = 0 To intFlrs
+			ReDim Preserve arrFlrs(i)
+			arrFlrs(i)  = Rhino.AddCircle(Rhino.WorldXYPlane, dblRad)
+			Rhino.MoveObject arrFlrs(i), Array(0,0,0), Array(j*dblRad*2.5,0,i*dblHeight)
+			Rhino.RotateObject arrFlrs(i), Array(j*dblRad*2.5,0,i*dblHeight), i*10
+			Rhino.RebuildCurve arrFlrs(i),1, (intSegs+j)
+			strFlr = Rhino.OffsetCurve (arrFlrs(i),Array(j*dblRad*2.5,0,i*dblHeight) , 0.5)
+			strFlrSrf = Rhino.AddPlanarSrf (strFlr )
+			strLine = Rhino.AddLine (Array(j*dblRad*2.5,0,i*dblHeight),Array(j*dblRad*2.5,0,i*dblHeight-1))
+			Rhino.ExtrudeSurface strFlrSrf(0), strLine, True
+			Rhino.DeleteObject strFlrSrf(0)
+			Rhino.DeleteObject strLine
+		Next
+		Rhino.AddLoftSrf arrFlrs
+		Rhino.DeleteObjects arrFlrs
+	Next
+	Rhino.EnableRedraw True
+End Sub

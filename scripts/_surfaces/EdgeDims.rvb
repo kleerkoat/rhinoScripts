@@ -1,0 +1,146 @@
+﻿Option Explicit
+'Script written by Pascal
+'Tuesday, October 07, 2008 
+
+Private DblOldOffset
+
+If isEmpty(dblOldOffset) Then
+	dblOldOffset = 1.0
+End If
+
+Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+Rhino.AddAlias "EdgeDims","_NoEcho _-Runscript (EdgeDims)"
+
+Sub EdgeDims()
+	Dim aObj: aObj = Rhino.GetObjects("Select objects.",8,,True)
+	If Not IsArray(aObj) Then Exit Sub
+	
+	Dim dblOffset: dblOffset = Rhino.GetReal("Dimension offset",dblOldOffset)
+	If Not IsNumeric(dblOffset) Then Exit Sub
+	
+	DblOldOffset = dblOffset
+	
+	Rhino.EnableRedraw(False)
+	Dim sObj, atemp,sTemp,sPt1,sPt2, aCent, sPt, apt, str
+	Dim atemp2, stemp2, aNew(), sNew, n, aArcCent, dblArcOffset
+	
+	For Each sObj In aObj
+		
+		aCent = Rhino.SurfaceAreaCentroid(sObj)(0)
+		
+		aTemp = Rhino.DuplicateSurfaceBorder(sObj)
+		
+		For Each sTemp In aTemp
+			Rhino.SimplifyCurve stemp
+			atemp2 = Rhino.ExplodeCurves(array(stemp),True)
+			
+			If Not IsArray(atemp2) Then
+				atemp2 = array(stemp)
+			End If
+			
+			For Each stemp2 In aTemp2
+			ReDim Preserve aNew(n)
+				aNew(n) = stemp2
+				n = n +1
+			Next
+		Next
+		For Each sNew In anew
+			
+			If Not Rhino.IsArc(sNew)And Not Rhino.IsCircle(sNew) Then
+				
+				spt1 = Rhino.Pt2Str(Rhino.CurveStartPoint(sNew),,True)
+				spt2 = Rhino.Pt2Str(Rhino.CurveEndPoint(sNew),,True)
+				spt = Rhino.Pt2Str(GetCurveSide(sObj,sNew, aCent,dblOffset))
+				Rhino.Command "_DimAligned " &spt1 &spt2 &sPt, False
+				
+			ElseIf Rhino.IsArc(snew) Then
+				
+				dblarcOffset = Rhino.ArcRadius(snew)
+				aArcCent = Rhino.ArcCenterPoint(sNew)
+				apt = GetArcSide( sobj,sNew, aArcCent,dblArcOffset)
+				Spt = Rhino.Pt2Str(apt,,True)			
+				Rhino.UnselectAllObjects
+				Rhino.SelectObject sNew
+				str = "_DimRadius " & sPt 
+				Rhino.Command str, False
+				'	Rhino.AddPoint apt
+				
+			ElseIf Rhino.IsCircle(sNew) Then
+				
+				dblarcOffset = Rhino.CircleRadius(snew)
+				aArcCent = Rhino.CircleCenterPoint(sNew)
+				apt = GetArcSide( sobj,sNew, aArcCent,dblArcOffset)
+				Spt = Rhino.Pt2Str(apt,,True)			
+				Rhino.UnselectAllObjects
+				Rhino.SelectObject sNew
+				str = "_DimRadius " & sPt 
+				Rhino.Command str, False	
+
+			End If
+	
+		Next
+		Rhino.DeleteObjects  aNew
+	Next
+
+	Rhino.EnableRedraw True
+	
+End Sub
+
+
+Function GetCurveSide(sObj,sCrv,aPt, dblOffset)
+
+	'get the parameter, then 3d point on the curve closest to the user defined point
+	Dim Param: Param = Rhino.CurveClosestPoint(sCrv, apt)
+	Dim CrvPt: CrvPt = Rhino.EvaluateCurve(sCrv,Param)
+
+	'Find a tangent vector of the curve at that point
+	Dim aTanDir: aTanDir = Rhino.CurveEvaluate(sCrv,Param,1)
+
+	'the current Cplane's Z direction
+	Dim VecZ: VecZ = Rhino.ViewCPlane(Rhino.CurrentView)(3)
+
+	'Rotate the tangent vector 90 deg. on the vertical vector to be a perpendicular vector.
+	Dim aPerpDir: aPerpDir =Rhino.VectorUnitize(Rhino.VectorRotate(aTanDir(1),90,VecZ))
+	
+	'Find a point perp from the curve on one side of the curve.
+	Dim apt1: aPt1=Rhino.PointAdd(Crvpt,Rhino.VectorScale(aPerpDir,dblOffset))
+	'	Rhino.AddPoint aPt1
+	
+	'Reverse the perp direction and find a point perp on the other side.
+	Dim apt2: aPt2=Rhino.PointAdd(Crvpt,Rhino.VectorScale(Rhino.VectorReverse(aPerpDir),dblOffset))
+
+	'Test whether the test point is closest is on the surface being dimensioned
+
+	Dim aResult
+
+	If Rhino.IsPointOnSurface (sObj,aPt1) Then
+		aResult = aPt2
+	Else 
+		aResult = apt1
+	End If
+	
+	GetCurveSide = aResult
+	
+
+End Function
+
+Function GetArcSide(sObj, sCrv, aPt ,dblOffset)
+	
+	Dim aResult
+	
+	Dim vecDir: vecDir =Rhino.VectorScale( Rhino.VectorUnitize(Rhino.VectorCreate(Rhino.CurveMidPoint(sCrv),apt)),dblOffset)
+	
+	
+	If Rhino.IsPointOnSurface(sObj, aPt) Then
+		
+		aResult = Rhino.PointAdd(Rhino.CurveMidPoint(sCrv),vecdir)
+
+	Else
+		'	Rhino.AddPoint (Rhino.CurveMidPoint (sCrv))
+		aResult = Rhino.PointAdd(Rhino.CurveMidPoint(sCrv),Rhino.VectorReverse(vecdir))
+		
+	End If
+	
+	GetArcSide = aResult
+	
+End Function

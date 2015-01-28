@@ -1,0 +1,34 @@
+Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version Friday, October 29, 2010
+
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "Rotate3dRepeater","_-Runscript (Rotate3dRepeater)"
+
+'Call Rotate3dRepeater()
+
+Sub Rotate3dRepeater()
+
+	Dim aObj: aObj = Rhino.GetObjects("Select objects to rotate",,,true,True)
+	If not isArray(aObj) Then exit sub
+	
+	Dim aPts: aPts = Rhino.GetPoints(True, False, "Start of rotation axis", "End of rotation axis",2)
+	If not isArray(aPts) then exit sub
+	If UBound(aPts) <> 1 then exit sub
+	
+	Dim spt1, sPt2
+	spt1 = "W" & Rhino.Pt2Str(aPts(0),,True)
+	spt2 = "W" & Rhino.Pt2Str(aPts(1), ,True)
+	
+	dim cmdStr:	cmdStr = "_Rotate3D " &spt1 & spt2
+	
+	Do
+		
+		Rhino.Command cmdStr, False
+		
+	Loop While Rhino.LastCommandResult = 0
+	
+	
+End Sub

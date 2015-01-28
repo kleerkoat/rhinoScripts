@@ -1,0 +1,21 @@
+Option Explicit
+Call Main()
+Sub Main()
+	
+	Dim i,j,arrObjects,blnTest,arrCurves()
+	arrObjects=Rhino.GetObjects("Pick some objects.")
+	j=0
+	For i=0 To Ubound(arrObjects)
+		blnTest=Rhino.IsCurve(arrObjects(i))
+		
+		If blnTest=True Then
+			
+			ReDim Preserve arrCurves(j)
+			arrCurves(j)=arrObjects(i)
+			j=j+1
+		End If
+					
+	Next
+	
+	Call Rhino.SelectObjects(arrCurves)
+End Sub

@@ -1,0 +1,99 @@
+Option Explicit
+'Script written by Pascal
+'Script copyrighted by RMA
+'Script version Wednesday, October 24, 2007
+'Allows you to set two points on an object and orient the object to a 
+'curve so that the points fall on the curve. Adds the following alias-
+
+Private sOldCopy
+
+If isEmpty(sOldCopy) Then
+	sOldCopy = "Yes"
+End If
+
+Sub OrientCrv2Pt()
+	
+	Dim aObj: aObj = Rhino.GetObjects("Select objects to orient",,True,True,True)
+	
+	If Not isArray(aObj) Then Exit Sub
+	
+	Dim sCopy: sCopy = Rhino.GetString("Copy?",sOldCopy,array("Yes", "No"))
+	If isnull(sCopy) Then Exit Sub
+	sOldCopy = sCopy
+	
+	Dim abase: aBase = Rhino.GetPoints(True,,"Set first base point", "Set second base point",2)
+	If Not isarray(abase) Then Exit Sub
+	
+	Dim sTarg:	starg = Rhino.GetObject("Select target curve",4)
+	If isnull(starg) Then Exit Sub
+
+	Dim aPt(1)
+	aPt(0) = Rhino.GetPointOnCurve(sTarg,"Set first target point")
+	If Not isArray(aPt(0)) Then Exit Sub
+	
+	apt(1) = Rhino.GetPointOnCurve(starg, "Set a point on the curve near the desired target point")
+	If Not isArray(aPt(0)) Then Exit Sub
+	
+	Rhino.EnableRedraw(False)
+	
+	Dim Dist: Dist = Rhino.Distance (aBase(0), aBase(1))
+	Dim param: Param = Rhino.CurveClosestPoint(starg,aPt(0))
+	Dim plane: Plane = Rhino.CurveFrame(starg,Param)
+	Dim sSphere: sSphere = Rhino.addSphere(apt(0),Dist)
+	
+	Dim aInt:aInt = Rhino.CurveSurfaceIntersection(starg,sSphere)
+	Rhino.DeleteObject sSphere
+	
+	Dim aTest(), i
+	If isArray(aInt) Then
+		For i = 0 To Ubound(aInt)
+			ReDim Preserve atest(i)
+			atest (i) = aInt(i,1)
+		Next
+	End If
+	
+	Dim temp: temp = Rhino.PointArrayClosestPoint (aTest, apt(1))
+	Dim atarg: atarg = aTest(temp)
+
+	Dim stargPt: stargPt = "W" & Rhino.Pt2str(atarg,,True)
+	Dim sRef:sRef = "W" & Rhino.Pt2str(aPt(0),,True)
+	Dim sbase1: sbase1 = "W" & Rhino.Pt2str(abase(0),,True)
+	Dim sbase2:sbase2 = "W" & Rhino.Pt2str(abase(1),,True)
+
+	Dim Vecbase: vecbase = Rhino.VectorCreate(aBase(1), abase(0))
+	Vecbase = Rhino.VectorUnitize(VecBase)
+	Dim Vectarg: vectarg = Rhino.VectorCreate( aPt(0), aTarg)
+	VecTarg = Rhino.VectorUnitize(VecTarg)
+	
+	Dim basePlane: BasePlane = Rhino.PlaneFromNormal(aBase(0),Vecbase)
+	Dim targplane: targPlane = Rhino.PlaneFromNormal(atarg,Vectarg)
+	
+	Dim aNew: aNew = remapToPlane(aObj, BasePlane, TargPlane)
+	
+	Dim str
+		
+	Rhino.EnableRedraw(True)
+	
+	If isArray(aNew) Then
+		
+		Rhino.UnselectallObjects
+		Rhino.SelectObjects aNew
+		str = "_Rotate3D " &sRef &sTargPt
+		Rhino.Command str,False
+		
+	End If
+
+End Sub
+
+
+Function RemapToPlane(aObj, Plane1, Plane2)
+	
+	Dim aXform: aXForm = Rhino.XformRotation(Plane1, Plane2)
+
+	Dim result: Result = Rhino.TransformObjects (aObj, aXform, True)  'bln Copy
+	RemapToPlane = Result
+	
+End Function
+
+'Rhino.AddAlias "OrientCrv2Pt", "_noEcho _-Runscript OrientCrv2Pt"
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile

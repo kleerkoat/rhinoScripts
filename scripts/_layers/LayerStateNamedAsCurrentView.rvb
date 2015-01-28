@@ -1,0 +1,6 @@
+Option Explicit
+'Call LayerStateNamedAsCurrentView()
+Sub LayerStateNamedAsCurrentView()
+	Call Rhino.Command("_-LayerStateManager _S "&chr(34) & Rhino.CurrentView()&chr(34) & " _Enter")
+	Call Rhino.Print("Current LayerState saved as: '"&Rhino.CurrentView()&"'.")
+End Sub

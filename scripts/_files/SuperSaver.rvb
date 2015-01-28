@@ -1,0 +1,18 @@
+ Option Explicit
+ Sub SuperSaver()
+   Rhino.Command "_Save"
+   If (0 = Rhino.LastCommandResult()) Then
+     Dim objShell, objFolder, objFolderItem, objInfo
+     Set objShell = CreateObject("Shell.Application")
+     Set objFolder = objShell.NameSpace(Rhino.DocumentPath)
+     If (Not objFolder Is Nothing) Then
+       Set objFolderItem = objFolder.ParseName(Rhino.DocumentName)
+       If (Not objFolderItem Is Nothing) Then
+         Call objFolderItem.InvokeVerbEx("properties", "summary")
+       End If
+       Set objFolderItem = Nothing
+     End If
+     Set objFolder = Nothing
+     Set objShell = Nothing
+   End If
+ End Sub

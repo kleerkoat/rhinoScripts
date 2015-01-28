@@ -1,0 +1,176 @@
+Option Explicit
+'Script written by Pascal
+'Script version Monday, June 12, 2009 
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "MinCrvRad", "_NoEcho _-Runscript (MinCrvRad)"
+'Rhino.AddAlias "UpdateCurvature", "_NoEcho _-Runscript (UpdateCurvature)"
+Private oldCrv
+If isEmpty(oldCrv) Then
+	OldCrv = 10
+End If
+
+'Call MinRad()
+
+Sub FindCurvatureSpan (sCrv, MinCrv,sGrp)
+	
+	Dim i, testPt,targPt, n, X, temp, temp2
+	Dim sLine, inc, c, oldTest, lastpts
+	Dim OldTarg, dist,aPts, incMin, testCrv, aNew, ptObj, Param
+	X = False
+	
+	incMin = .0005
+	Dim intDiv: intDiv = 1000
+	c = 0
+
+	Dim lineColor: lineColor = vbred
+	 
+	inc = Rhino.CurveLength(sCrv)/intDiv
+	n = 1
+	c = 0
+	Dim Rad, oldParam, flip, OldN
+	Flip = False
+	
+	Do 
+
+		testPt = Rhino.CurveArcLengthPoint(sCrv,n,True)
+		
+
+		If isArray(testPt) Then 
+		
+			Param = Rhino.CurveClosestPoint(sCrv,TestPt)
+			temp = Rhino.CurveCurvature (sCrv,Param)';(3)
+			
+			If Not isNull(temp) Then
+				rad = round(temp(3),3)
+		
+				If Rad < MinCrv Then
+					X = True
+					If Flip = False Then
+					
+						RefineCurvature sCrv,oldtest,oldParam,inc, Oldn, minCrv,sGrp
+					
+					End If
+			
+				End If
+			End If
+			oldTest = testpt
+			OldParam = Param
+			oldn = n
+			n = n + Inc
+		
+			
+		End If
+		
+	Loop Until isNull(testPt)
+	
+	If X = False Then Rhino.Print "The script did not find any locations with radius below " & MinCrv & "." 
+
+End Sub
+
+
+Sub MinCrvRad()
+
+	Dim SCrv: sCrv = rhino.GetObject ("Select curve",4,True)
+	Dim str, MinCrv
+	
+	If Rhino.IsAttributeData(sCrv) Then
+		str = 	Rhino.GetAttributeData(sCrv,"Curvature","CurvaturePts")
+		minCrv = 	Rhino.GetAttributeData(sCrv,"Curvature","MinCrv")
+	End If
+	
+	If IsNull(str) Then str = ""
+	
+	If IsNull(MinCrv) Or isEmpty(MinCrv) Then 
+			
+		MinCrv = rhino.GetReal("Minimum curvature",OldCrv, rhino.UnitAbsoluteTolerance*10)
+	
+		If Not IsNumeric(MinCrv) Then Exit Sub
+		OldCrv= MinCrv
+		
+	End If
+	
+	Dim aPts:apts = split(str,chr(59))
+	
+	If IsArray(aPts) Then Rhino.DeleteObjects aPts
+			
+	Dim sGrp: sGrp = Rhino.AddGroup
+	
+	Rhino.EnableRedraw(False)
+	FindCurvatureSpan sCrv, MinCrv, sGrp
+	Rhino.ReverseCurve sCrv
+	FindCurvatureSpan sCrv, MinCrv, sGrp
+	Rhino.EnableRedraw(True)
+	
+End Sub
+
+
+Sub RefineCurvature(ByVal sCrv,testPt,Param,ByVal inc, n,MinCrv, sGrp)
+	inc = .1*inc
+	Dim incMin: incMin = .000005
+	If inc<=incMin Then Exit Sub
+	Dim rad, oldn,apts(), str, c
+	oldN = n
+	n = n + inc
+	c = 0
+	
+
+	Do
+		
+		testPt = Rhino.CurveArcLengthPoint(sCrv,n,True)
+		Param = Rhino.CurveClosestPoint(sCrv,TestPt)
+		rad = round(Rhino.CurveCurvature (sCrv,Param)(3),3)	
+		
+		If rad <= MinCrv Then
+			
+			If inc <= 10*incMin Then
+				ReDim Preserve aPts(c)
+				apts(c) = Rhino.AddPoint (testPt)
+				Rhino.ObjectColor apts(c) ,vbWhite
+				
+				If Rhino.IsAttributeData(sCrv) Then
+					str = 	Rhino.GetAttributeData(sCrv,"Curvature","CurvaturePts")
+				End If
+				
+				If IsNull(str) Then str = ""
+				str = str & chr(59) &aPts(c)
+				Rhino.SetAttributeData sCrv,"Curvature","CurvaturePts",str
+				c = c + 1
+			End If
+			
+			inc = .1 * inc
+			n = Oldn + inc
+			
+		Else
+			
+			'	Rhino.ObjectColor Rhino.AddPoint (testPt),vbGreen 'TEST
+			Oldn = n
+			n = n + inc
+		
+			
+		End If
+		
+
+	Loop Until inc <= incMin
+
+	If isUpperbound(aPts) Then Rhino.AddObjectsToGroup apts,sgrp
+	
+	If c = 0 Then Rhino.Print "The script did not find any locations with radius below " & MinCrv & "." 
+	
+End Sub
+
+Function IsUpperBound(ByRef arr)
+
+	IsUpperBound = False
+
+	If IsArray(arr) Then
+
+		On Error Resume Next
+
+		UBound arr
+
+		If Err.Number = 0 Then IsUpperBound = True
+
+	End If
+
+End Function

@@ -1,0 +1,85 @@
+Option Explicit
+'Script written and copyrighted by Jaroslaw Bieda
+'Script version Saturday, January 23, 2010 8:22:04 PM
+
+'Call UnrollCrvsWithPts()
+Sub UnrollCrvsWithPts()
+
+On Error Resume Next
+
+'getting curves
+Dim arrCurves : arrCurves=Rhino.GetObjects("Curves?",4,,True)
+if isnull(arrCurves) then Exit Sub
+'getting points
+Dim arrPoints : arrPoints=Rhino.GetObjects("Points?",1)
+if isnull(arrPoints) then Exit Sub
+'start point
+Dim arrS : arrS=Rhino.GetPoint("Unroll start point?")
+if isnull(arrS) then Exit Sub
+'Y-spacing
+Dim dbD : dbD=Rhino.GetPointOnLine("Unroll spacing distance?",arrS,array(arrS(0),arrS(1)-1,arrS(2)),True)
+dbD=Rhino.Distance(arrS,dbD)
+if isnull(dbD) then Exit Sub
+
+'other variables
+Dim i,j,arrLS,arrLE,idDot,arrCP,dbP,arrP,idResult,dbDS,dbPD,idP
+Dim arrLines : ReDIm arrLines(Ubound(arrCurves))
+Dim strGrp : strGrp=Rhino.AddGroup()
+
+'tolerance
+Dim dbT : dbT=Rhino.UnitAbsoluteTolerance()
+
+'adding unrolled curves as lines
+Call Rhino.EnableRedraw(False)
+for i=0 to Ubound(arrCurves)
+	idDot=Rhino.AddTextDot(Cstr(i+1),Rhino.CurveStartPoint(arrCurves(i)))
+	Call Rhino.ObjectColor(idDot,vbCyan)
+	Call Rhino.AddObjectToGroup(idDot,strGrp)
+	arrLS=Rhino.PointAdd(arrS,array(0,i*dbD,0))
+	arrLE=Rhino.PointAdd(arrLS,array(Rhino.CurveLength(arrCurves(i)),0,0))
+	arrLines(i)=Rhino.AddLine(arrLS,arrLE)
+	Call Rhino.MatchObjectAttributes(arrLines(i),arrCurves(i))
+	idDot=Rhino.AddTextDot(Cstr(i+1),Rhino.CurveStartPoint(arrLines(i)))
+	Call Rhino.ObjectColor(idDot,vbCyan)
+	Call Rhino.AddObjectToGroup(idDot,strGrp)
+
+next
+Call Rhino.EnableRedraw(True)
+
+'adding points on unrolled lines
+Call Rhino.EnableRedraw(False)
+for i=0 to Ubound(arrLines)
+	Call Rhino.Prompt("Processing curve #"&cstr(i+1)&"/"&Cstr(Ubound(arrCurves)+1))
+	for j=0 to Ubound(arrPoints)
+		arrP=Rhino.PointCoordinates(arrPoints(j))
+		'point is on curve
+		if Rhino.IsPointOnCurve(arrCurves(i),arrP) then
+			'start point
+			if FastDistance(arrP,Rhino.CurveStartPoint(arrCurves(i)))<=dbT*3 then
+				Call Rhino.AddPoint(Rhino.CurveStartPoint(arrLines(i)))
+			'end point
+			ElseIf FastDistance(arrP,Rhino.CurveStartPoint(arrCurves(i)))<=dbT*3 then
+				Call Rhino.AddPoint(Rhino.CurveEndPoint(arrLines(i)))
+			Else 'any other point
+				dbP=Rhino.CurveClosestPoint(arrCurves(i),arrP)
+				dbDS=Rhino.CurveDomain(arrCurves(i))(0)
+				idResult=Rhino.TrimCurve(arrCurves(i),array(dbDS,dbP),False)
+				if not isnull(idResult) then
+					dbPD=Rhino.CurveLength(idResult)
+					Call Rhino.DeleteObject(idResult)
+					'adding new point and matching its attributes with original one
+					idP=Rhino.AddPoint(Rhino.CurveArcLengthPoint(arrLines(i),dbPD))
+					Call Rhino.MatchObjectAttributes(idP,arrPoints(j))
+				End If
+				
+			End If
+		End If
+	next
+next
+Call Rhino.EnableRedraw(True)
+
+End Sub
+
+Function FastDistance(byref P1,byref P2) 'fast distance calculation
+	FastDistance=Sqr((P1(0)-P2(0))*(P1(0)-P2(0))+(P1(1)-P2(1))*(P1(1)-P2(1))+(P1(2)-P2(2))*(P1(2)-P2(2)))
+End Function

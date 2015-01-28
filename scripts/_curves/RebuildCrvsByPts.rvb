@@ -1,0 +1,18 @@
+Option Explicit
+'Script written by Lucio Zadra
+'Script copyrighted by Zadra Giuseppe
+'Script version martedì 6 marzo 2012 22.01.44
+
+'Call RebuildCrvsByPts()
+Sub RebuildCrvsByPts()
+	Dim CrvArray, StrObject, numPoints, ArrPoints
+	CrvArray = Rhino.GetObjects("Select the curves to PointRebuild", 4,, VbTrue)
+	NumPoints = Rhino.GetReal("Number of points for rebuilding", 10)
+	If IsArray(CrvArray) Then
+		For Each StrObject In CrvArray
+			ArrPoints = Rhino.DivideCurve(StrObject, NumPoints)
+			Rhino.AddCurve ArrPoints
+		Next
+	End If
+End Sub
+

@@ -1,0 +1,119 @@
+' Script for Rhinoceros 3.0 & 4.0 
+' shorten open curve end(s) by a specified distance
+' Last Edit 03092008 Clement Greiner
+
+Option Explicit
+Sub ShortenCrvs()
+
+Dim arrAllowed
+Dim arrCurves, StrCurve
+Dim StrExtMode
+Dim arrPoints
+Dim StartPoint, EndPoint
+Dim dblCrvLength, dblExtLength
+Dim arrSplitResult, arrResult(), count
+
+arrAllowed = GET_OpenCurves
+
+If Not IsArray(arrAllowed) Then Rhino.Print "An open curve to unextend was not found in this document !" : Exit Sub
+arrCurves = Rhino.GetObjects("Select open curves to unextend", 4, vbTrue, vbTrue, vbTrue, arrAllowed)
+If Not IsArray(arrCurves) Then Rhino.Print "Command canceled." : Exit Sub
+
+dblExtLength = Rhino.GetReal("Enter shorten distance", 1, Cdbl(Rhino.UnitAbsoluteTolerance) )
+If IsNull(dblExtLength) Then Rhino.Print "Command canceled." : Exit Sub
+
+' define default extension mode (Both, Start, End)
+StrExtMode = "Both"
+
+' define mode to use
+StrExtMode = Rhino.GetString("Decide from which side the curve will be shortened", StrExtMode, Array("Start","End","Both") )
+If IsNull(StrExtMode) Then Rhino.Print "Command canceled." : Exit Sub
+
+Rhino.EnableRedraw (vbFalse)
+Rhino.UnselectObjects arrCurves
+count = 0
+For Each StrCurve In arrCurves
+	    ' check if the curve can be extended with the desired length (both sides)
+        dblCrvLength = Rhino.CurveLength(StrCurve)
+        If StrExtMode = "Both" And dblCrvLength < dblExtLength * 2 + Cdbl(Rhino.UnitAbsoluteTolerance) Then
+            Rhino.Print "Curve to short to unextend both sides by " & dblExtLength & " / ObjectID = " & StrCurve
+        ElseIf StrExtMode = "Start" And dblCrvLength < dblExtLength + Cdbl(Rhino.UnitAbsoluteTolerance) Then
+            Rhino.Print "Curve to short to unextend by " & dblExtLength & " / ObjectID = " & StrCurve
+        Else
+            Rhino.SelectObject StrCurve
+            ' get the split points
+            If StrExtMode = "Both" Or StrExtMode = "Start" Then
+                arrPoints = Rhino.DivideCurveLength(StrCurve, dblExtLength)
+                Redim Preserve arrPoints(1)
+                StartPoint = Rhino.AddPoint (arrPoints(1))
+            End If
+
+            If StrExtMode = "Both" Or StrExtMode = "End" Then
+                Rhino.Command "_Flip", vbFalse
+                arrPoints = Rhino.DivideCurveLength(StrCurve, dblExtLength)
+                Redim Preserve arrPoints(1)
+                EndPoint = Rhino.AddPoint (arrPoints(1))
+                Rhino.Command "_Flip", vbFalse
+            End If
+
+            ' split the curve
+            If StrExtMode = "Both" Then
+                Rhino.Command "_Split _SelID " & StartPoint & " _SelID " & EndPoint & " Enter", vbFalse
+                Rhino.DeleteObjects Array(StartPoint,EndPoint)
+            ElseIf StrExtMode = "Start" Then
+                Rhino.Command "_Split _SelID " & StartPoint & " Enter", vbFalse
+                Rhino.DeleteObject StartPoint
+            ElseIf StrExtMode = "End" Then
+                Rhino.Command "_Split _SelID " & EndPoint & " Enter", vbFalse
+                Rhino.DeleteObject EndPoint
+            End If
+
+            ' make an array for selection
+            arrSplitResult = Rhino.SelectedObjects
+            Redim Preserve arrResult(count)
+            arrResult(count) = GET_SplitResult(arrSplitResult, dblExtLength, StrExtMode)
+            Rhino.UnSelectObject arrResult(count)
+            count = count + 1
+        End If
+Next
+
+Rhino.EnableRedraw (vbTrue)
+If count > 0 Then
+	Rhino.SelectObjects arrResult
+	Rhino.Print CStr(Ubound(arrResult)+1) & " curves added to selection."
+End If
+
+End Sub
+
+Private Function GET_SplitResult(arrSplitCurves, dblSearchLength, StrMode)
+If StrMode = "Both" Then
+	Rhino.DeleteObjects Array(arrSplitCurves(0),arrSplitCurves(2))
+	GET_SplitResult = arrSplitCurves(1)
+ElseIf StrMode = "Start" Then
+	Rhino.DeleteObject arrSplitCurves(1)
+	GET_SplitResult = arrSplitCurves(0)
+ElseIf StrMode = "End" Then
+	Rhino.DeleteObject arrSplitCurves(0)
+	GET_SplitResult = arrSplitCurves(1)
+End If
+End Function
+
+Private Function GET_OpenCurves
+Dim arrCrvs, c, strCrv, arrOpenCurves()
+arrCrvs = Rhino.ObjectsByType(4)
+If Not IsArray(arrCrvs) Then GET_OpenCurves = -1 : Exit Function
+c = 0
+For Each strCrv In arrCrvs
+	If Rhino.IsCurveClosed(strCrv) And Rhino.IsObjectSelected(strCrv) Then
+		Rhino.UnselectObject(strCrv)
+	Else
+		If Rhino.IsObjectSelectable(StrCrv) And Not Rhino.IsCurveClosed(strCrv) Then
+			Redim Preserve arrOpenCurves(c)
+			arrOpenCurves(c) = strCrv
+			c = c + 1
+		End If
+	End If
+Next
+If c > 0 Then GET_OpenCurves = arrOpenCurves Else GET_OpenCurves = -1
+End Function
+

@@ -1,0 +1,23 @@
+Option Explicit
+'Script written by <Don Lewis>
+'Script copyrighted by <Lewis Tool & Engineering LLC>
+'Script version October 2008
+
+'091211- ryan changed script to allow multiple selections
+
+'Call RandomCurveColor)
+Sub RandomCurveColor()
+	
+
+	Dim arrCurve,lngColor
+	
+	Do
+		lngColor = RGB(0,0,0)
+		arrCurve = Rhino.GetObjects("Select Curves",4,1,1,0)
+		If IsNull (arrCurve) Then Exit Do
+		Randomize
+		lngColor = RGB(Int(256*Rnd),Int(256*Rnd),Int(256*Rnd))
+		Call Rhino.ObjectColor(arrCurve,lngColor)
+	Loop
+
+End Sub

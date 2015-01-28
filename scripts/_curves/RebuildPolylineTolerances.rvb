@@ -1,0 +1,82 @@
+' ****************************** RhinoScript.org ******************************
+'
+'   Simplify Polyline, version 1
+'
+'   by Damon Sidel, published May 23, 2011
+'
+'
+'   Simple tool to simplify polylines (curves with degree 1). It asks for a maximum angle and maximum distance between control points, then creates a new curve with fewer control points such that straight sections of the curve have fewer control points. Since this version only uses the previous In the next version, I hope to add one more level
+'
+'
+'
+'
+'   This RhinoScript Tool has been downloaded from RhinoScript.org.
+'
+'   Rhino versions: Rhino 4
+'
+'   LICENSE INFORMATION:
+'   This script is published under the GNU General Public License, version 3
+'   or any later version, and thus comes WITHOUT ANY WARRANTY. You can get
+'   the complete license text here: www.rhinoscript.org/gpl
+'
+' ****************************** RhinoScript.org ******************************
+
+
+
+Option Explicit
+'Script written by Damon Sidel
+'Script copyrighted by Damon Sidel
+'Script version Sunday, May 23, 2011 3:20 PM
+
+'Tool to simplify polylines (curves with degree 1). It asks for a maximum angle 
+'and maximum distance between control points, then creates a new curve with fewer 
+'control points such that straight sections of the curve have fewer control points. 
+
+'Call RebuildPolylineTolerances()
+Sub RebuildPolylineTolerances()
+	
+	Dim MAX_ANGLE, MAX_DIST
+
+	Dim strPolyline : strPolyline = Rhino.GetObject("Select the polyline to be rebuilt",4)
+	If IsNull(strPolyline) Then Exit Sub
+	
+	Dim intCurvePointCount : intCurvePointCount = Rhino.CurvePointCount(strPolyline)
+	
+	MAX_ANGLE = Rhino.GetReal("What maximum angle do you want?",20)
+	If IsNull(MAX_ANGLE) Then Exit Sub
+	
+	MAX_DIST = Rhino.GetReal("What maximum distantce do you want?",10)
+	If IsNull(MAX_DIST) Then Exit Sub
+	
+	Dim arrCurvePoints : arrCurvePoints = Rhino.CurvePoints(strPolyline)
+	
+	Dim i, j, arrPrev, arrCurr, arrNext, dblAngle, dblDist
+	ReDim arrNewCurvePoints(0) : arrNewCurvePoints(0) = arrCurvePoints(0)
+	j=1
+	For i=0 To intCurvePointCount-3
+		
+		arrPrev = arrNewCurvePoints(j-1)
+		arrCurr = arrCurvePoints(i+1)
+		arrNext = arrCurvePoints(i+2)
+		dblAngle = Rhino.Angle2(Array(arrCurr,arrPrev),Array(arrCurr,arrNext))
+		dblDist = Rhino.Distance(arrCurr, arrPrev)
+				
+		Call Rhino.Print(CStr(180-dblAngle(0)))
+
+		If (dblDist < MAX_DIST) And (180.0-dblAngle(0) < MAX_ANGLE) Then
+			'Don't include the point and leave j as-is
+		Else
+			ReDim Preserve arrNewCurvePoints(j)
+			arrNewCurvePoints(j) = arrCurr
+			j = j+1
+		End If
+		
+	Next
+	
+	ReDim Preserve arrNewCurvePoints(j)
+	arrNewCurvePoints(j) = arrCurvePoints(intCurvePointCount-1)
+	
+	Call Rhino.AddCurve(arrNewCurvePoints,1)
+	'Call Rhino.DeleteObject(strPolyline)
+	
+End Sub

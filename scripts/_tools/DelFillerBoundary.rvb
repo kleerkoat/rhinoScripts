@@ -1,0 +1,18 @@
+Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version Monday, March 26, 2007 10:44:26 AM
+
+Call deleteFillerBoundary()
+Sub deleteFillerBoundary()
+		
+	Dim strName
+	
+	strName = "fillerBoundary"
+	
+	Rhino.Command "SelName " & strName & " enter "
+	Rhino.Command "Delete "
+	
+
+
+End Sub

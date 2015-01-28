@@ -1,0 +1,25 @@
+Option Explicit
+
+'Script written by Davide del Giudice
+'Script copyrighted by Co-de-iT www.co-de-it.com
+'Script version Tuesday, 02 March 2010 19:20:27
+
+'Call LabelLengthAndNumber()
+Sub LabelLengthAndNumber()
+
+Dim arrobjects,arrPoint,arrLength,arrPoint2
+Dim strobjects,strDot,strDot2,count
+arrobjects=rhino.GetObjects("select curve")
+
+For Each strobjects In arrobjects
+count=count+1
+arrPoint = Rhino.CurveEndPoint(strObjects)
+arrPoint2 = Rhino.CurveStartPoint(strObjects)
+arrLength=rhino.CurveLength (strObjects)
+strDot=Rhino.AddTextDot (" "& count, arrPoint)
+strDot2=Rhino.AddTextDot (" "& round(arrLength,1), arrPoint2)
+Call Rhino.ObjectColor(strDot, RGB(count/5,count/10,count+5))
+Call Rhino.ObjectColor(strDot2, RGB(count/2,count/10,count+100))
+Next
+
+End Sub

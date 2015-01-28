@@ -1,0 +1,34 @@
+Option Explicit
+'Script  by Mitch Heynick
+'Version 4 January, 2012
+
+'Call ModifyAllIdenticalText()
+Sub ModifyAllIdenticalText()
+
+	Dim strSel,selTxt,arrTxtObjs,strNewtxt,strObj,n
+	strSel = Rhino.GetObject("Select a text string to modify", 512, True)
+	If IsNull(strSel) Then Exit Sub
+	If Not Rhino.IsText(strSel) Then Exit Sub
+	selTxt = Rhino.TextObjectText(strSel)
+
+	arrTxtObjs = Rhino.ObjectsByType(512)
+	If Not IsArray(arrTxtObjs) Then 
+		Call Rhino.Print("No text objects found in file")
+		Exit Sub
+	End If
+	
+	strNewTxt = Rhino.EditBox(selTxt, "Original text = " & selTxt, "Modify Text")
+	If IsNull(strNewTxt) Then Exit Sub
+	
+	n = 0
+	For Each strObj In arrTxtObjs
+		If Rhino.IsText(strObj) And Rhino.IsObjectSelectable(strObj) Then
+			If Rhino.TextObjectText(strObj) = selTxt Then
+				Call Rhino.TextObjectText(strObj, strNewTxt)
+				n = n + 1			
+			End If			
+		End If
+	Next
+	Call Rhino.MessageBox("Modified " & Cstr(n) & " text entries")
+	
+End Sub

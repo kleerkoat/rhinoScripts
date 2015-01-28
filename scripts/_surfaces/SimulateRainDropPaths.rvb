@@ -1,0 +1,218 @@
+'Script written and copyrighted by David Rutten
+'Reconstructivism.net
+'December 7th 2004 revision
+Option Explicit
+
+Sub SimulateRainDropPaths()
+	Dim DropStart
+	Dim blnSmoothPath
+	Dim blnFancyPreview
+	Dim blnStopOnEdge
+	Dim SampleStepSize
+	Dim Tolerance
+	Dim idObject
+	Dim strResult, arrOptions
+	Dim arrPaths(), P, retVal
+	Dim selMesh
+
+	blnSmoothPath = Rhino.GetSettings(Rhino.InstallFolder & "Gelfling.ini", "DropSimulation", "Smooth")
+	If IsNull(blnSmoothPath) Then blnSmoothPath = vbFalse Else blnSmoothPath = CBool(blnSmoothPath)
+	blnFancyPreview = Rhino.GetSettings(Rhino.InstallFolder & "Gelfling.ini", "DropSimulation", "Fancy")
+	If IsNull(blnFancyPreview) Then blnFancyPreview = vbFalse Else blnFancyPreview = CBool(blnFancyPreview)
+	blnStopOnEdge = Rhino.GetSettings(Rhino.InstallFolder & "Gelfling.ini", "DropSimulation", "StopOnEdge")
+	If IsNull(blnStopOnEdge) Then blnStopOnEdge = vbFalse Else blnStopOnEdge = CBool(blnStopOnEdge)
+	SampleStepSize = Rhino.GetSettings(Rhino.InstallFolder & "Gelfling.ini", "DropSimulation", "SampleStepSize")
+	If IsNull(SampleStepSize) Then SampleStepSize = 100 * Rhino.UnitAbsoluteTolerance Else SampleStepSize = CDbl(SampleStepSize)
+	Tolerance = Rhino.UnitAbsoluteTolerance
+
+	idObject = Rhino.GetObject("Pick a surface for raindrop simulation", 8+16, vbTrue, vbTrue)
+	If IsNull(idObject) Then Exit Sub
+	
+	Rhino.EnableRedraw False
+		Rhino.Command "-_Mesh _PolygonDensity=50 _Enter", vbFalse
+		selMesh = Rhino.LastCreatedObjects
+		If IsNull(selMesh) Then
+			msgBox "Geometry could not be meshes", vbOkOnly Or vbCritical, "Drop simulation"
+			Exit Sub
+		Else
+			Rhino.HideObjects selMesh
+		End If
+	Rhino.EnableRedraw True
+
+	P = 0
+	Do
+		arrOptions = Array("Stepsize", _
+						   "Tolerance", _
+						   "Smooth_" & Bln2Str(blnSmoothPath), _
+						   "Animate_" & Bln2Str(blnFancyPreview), _
+						   "Simulate", _
+						   "Finish")
+		strResult = Rhino.GetString("Drop-path simulation", "Simulate", arrOptions)
+		If IsNull(strResult) Then strResult = "Finish"
+		If IsNumeric(strResult) Then
+			SampleStepSize = Abs(CDbl(strResult))
+			If SampleStepSize = 0 Then SampleStepSize = 100*Rhino.UnitAbsoluteTolerance
+		Else
+			Select Case UCase(Left(strResult, 2))
+			Case "ST"
+				strResult = Rhino.GetReal("Specify a new sample step size", SampleStepSize, 10*Tolerance)
+				If Not IsNull(strResult) Then SampleStepSize = strResult
+			Case "TO"
+				strResult = Rhino.GetReal("Specify a new sample progression tolerance", Tolerance, Rhino.UnitAbsoluteTolerance/100, SampleStepSize/10)
+				If Not IsNull(strResult) Then Tolerance = strResult
+			Case "SM"
+				blnSmoothPath = Not blnSmoothPath
+			Case "QU"
+				blnStopOnEdge = Not blnStopOnEdge
+			Case "AN"
+				blnFancyPreview = Not blnFancyPreview
+			Case "SI"
+				DropStart = Rhino.GetPointOnMesh(selMesh(0), "Pick a point to start the simulation")
+				If Not IsNull(DropStart) Then
+					retVal = SimulateDrop(idObject, DropStart, blnSmoothPath, blnFancyPreview, blnStopOnEdge, SampleStepSize, Tolerance)
+					If IsNull(retVal) Then
+						msgBox "An error occured during the simulation", vbOkOnly, "Drop simulation"
+					Else
+						ReDim Preserve arrPaths(P)
+						arrPaths(P) = retVal
+						P = P+1
+					End If
+				End If
+			Case "FI"
+				Exit Do
+			Case Else
+				Rhino.Command strResult
+			End Select
+		End If
+	Loop
+	
+	Rhino.EnableRedraw False
+		Rhino.ShowObjects selMesh
+		Rhino.DeleteObjects selMesh
+		If P > 0 Then
+			Rhino.SelectObjects arrPaths
+			Rhino.UnselectObject idObject
+		End If
+	Rhino.EnableRedraw True
+
+	Rhino.SaveSettings Rhino.InstallFolder & "Gelfling.ini", "DropSimulation", "Smooth", blnSmoothPath
+	Rhino.SaveSettings Rhino.InstallFolder & "Gelfling.ini", "DropSimulation", "Fancy", blnFancyPreview
+	Rhino.SaveSettings Rhino.InstallFolder & "Gelfling.ini", "DropSimulation", "StopOnEdge", blnStopOnEdge
+	Rhino.SaveSettings Rhino.InstallFolder & "Gelfling.ini", "DropSimulation", "SampleStepSize", SampleStepSize
+
+	Rhino.Print "Raindrop simulation finished"
+End Sub
+SimulateRainDropPaths
+
+Function SimulateDrop(Byval idObject, ByVal StartPt, Byval blnSmoothPath, Byval blnFancyPreview, Byval blnStopOnEdge, Byval SampleStepSize, Byval Tolerance)
+	SimulateDrop = Null
+	Dim BBox, S
+	Dim idPath, arrVertices()
+	Dim BrepCP
+	Dim curPt, lowPt, newPt
+	Dim idPreview, PreviewSize
+
+	BBox = Rhino.BoundingBox(idObject)
+	If IsNull(BBox) Then Exit Function
+
+	BrepCP = Rhino.BrepClosestPoint(idObject, StartPt)
+	curPt = BrepCP(0)
+	idPreview = "Nothing"
+	PreviewSize = FastDistance(BBox(0), BBox(6))/500
+
+	If blnFancyPreview Then Rhino.LockObject idObject
+
+	If Not IsNull(curPt) Then
+		ReDim arrVertices(0)
+		arrVertices(0) = curPt
+		S = 0
+		Do
+			lowPt = Array(curPt(0), curPt(1), curPt(2)-SampleStepSize)
+			BrepCP = Rhino.BRepClosestPoint(idObject, lowPt)
+			newPt = BrepCP(0)
+
+			If FastDistance(newPt, curPt) < Tolerance Then Exit Do
+			If newPt(2) > curPt(2) Then Exit Do
+			ReDim Preserve arrVertices(S)
+			arrVertices(S) = newPt
+			S = S+1
+
+			If blnStopOnEdge And BrepCP(2) <> 1342177280 Then Exit Do
+			If blnFancyPreview Then
+				Rhino.EnableRedraw False
+				Rhino.DeleteObject idPreview
+				idPreview = DrawFancyArrow(curPt, newPt, PreviewSize)
+				Rhino.EnableRedraw True
+			End If
+
+			curPt = newPt
+		Loop
+
+		Rhino.DeleteObject idPreview
+		Rhino.UnlockObject idObject
+		If blnSmoothPath Then
+			idPath = Rhino.AddCurve(arrVertices, 3)
+		Else
+			idPath = Rhino.AddPolyLine(arrVertices)
+		End If
+	Else
+		Rhino.Print "Drop could be projected to the surface... an error occured"
+		Exit Function
+	End If
+
+	SimulateDrop = idPath
+End Function
+
+Function FastDistance(Byval arr1, Byval arr2)
+	FastDistance = (arr1(0)-arr2(0))*(arr1(0)-arr2(0)) + (arr1(1)-arr2(1))*(arr1(1)-arr2(1)) + (arr1(2)-arr2(2))*(arr1(2)-arr2(2))
+	FastDistance = Sqr(FastDistance)
+End Function
+
+Function Bln2Str(Byval input)
+	If input Then
+		Bln2Str = "Yes"
+		Exit Function
+	Else
+		Bln2Str = "No"
+		Exit Function
+	End If
+End Function
+
+Function DrawFancyArrow(ByVal arrTail, Byval arrTip, Byval dblSize)
+	DrawFancyArrow = "Nothing"
+
+	Dim idMesh, Vertices(13), Faces(10)
+	Vertices(0) = Array(0,0,0)
+	Vertices(1) = Array(6 * dblSize, -5 * dblSize,0)
+	Vertices(2) = Array(6 * dblSize, -3 * dblSize,0)
+	Vertices(3) = Array(16 * dblSize, -3 * dblSize,0)
+	Vertices(4) = Array(16 * dblSize, +3 * dblSize,0)
+	Vertices(5) = Array(6 * dblSize, +3 * dblSize,0)
+	Vertices(6) = Array(6 * dblSize, +5 * dblSize,0)
+	Vertices(7) = Array(0,0,2*dblSize)
+	Vertices(8) = Array(6 * dblSize, -5 * dblSize, 2*dblSize)
+	Vertices(9) = Array(6 * dblSize, -3 * dblSize, 2*dblSize)
+	Vertices(10) = Array(16 * dblSize, -3 * dblSize, 2*dblSize)
+	Vertices(11) = Array(16 * dblSize, +3 * dblSize, 2*dblSize)
+	Vertices(12) = Array(6 * dblSize, +3 * dblSize, 2*dblSize)
+	Vertices(13) = Array(6 * dblSize, +5 * dblSize, 2*dblSize)
+	Faces(0) = Array(0,7,8,1)
+	Faces(1) = Array(1,8,9,2)
+	Faces(2) = Array(2,9,10,3)
+	Faces(3) = Array(3,10,11,4)
+	Faces(4) = Array(4,11,12,5)
+	Faces(5) = Array(5,12,13,6)
+	Faces(6) = Array(6,13,7,0)
+	Faces(7) = Array(7,13,8,8)
+	Faces(8) = Array(9,12,11,10)
+	Faces(9) = Array(0,1,6,6)
+	Faces(10) = Array(2,3,4,5)
+
+	Rhino.EnableRedraw False
+		idMesh = Rhino.AddMesh(Vertices, Faces)
+		idMesh = Rhino.OrientObject(idMesh, Array(Array(0,0,0), Array(1,0,0)), Array(arrTip, arrTail))
+	Rhino.EnableRedraw True
+	DrawFancyArrow = idMesh
+End Function
+
+

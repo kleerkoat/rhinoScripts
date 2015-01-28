@@ -1,0 +1,96 @@
+Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version Tuesday, November 02, 2010
+
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "RevWheel","_-Runscript (RevWheel)"
+
+Private OldSpokes, oldHalf
+
+If IsEmpty(oldhalf) then
+	OldHalf = "FullAngle"
+End If
+
+If IsEmpty(OldSpokes) then
+	OldSpokes = 5
+End If
+
+'Call RevWheel()
+
+Sub RevWheel()
+
+	Dim aCurves: aCurves = Rhino.GetObjects("Select curves to revolve",4,True,True)
+	If not IsArray(aCurves) then exit sub
+	
+	'	Dim AAx: AAx = Rhino.GetPoints(True, False, "Start Of Revolve Axis", "End Of Revolve Axis",2)
+	Dim aAx: aAx = array(array(0,0,1),array(0,0,0))
+	If not isArray(aAx) then exit sub
+	If Ubound(aAx) <> 1 then exit sub
+	
+	Dim intSpokes: intSpokes = Rhino.GetInteger("Number of spokes",OldSpokes,1)
+	If isNull(intSpokes) then exit sub
+	OldSpokes = intSpokes
+	Dim sHalf: sHalf = Rhino.GetString("Choose spoke option",OldHalf,array("FullAngle","HalfAngle"))
+	If isNull(sHalf) then exit sub
+	OldHalf = SHalf
+	
+	Dim blnHalf
+	If lcase(sHalf) = "fullangle" then 
+		blnHalf = False
+	elseif lcase(sHalf) = "halfangle" then 
+		blnHalf = True
+	else exit sub
+		
+	End If
+	
+	'	Dim AHalf: AHalf = Rhino.GetBoolean("Choose Spoke Option",Array("Spokes","FullAngle","HalfAngle"),Array(False))
+	'	If not isArray(aHalf) then exit sub
+	'	Dim blnHalf: blnHalf = aHalf(0)
+	
+	Dim dblAng: dblAng = 360/(2*intSpokes)
+	'If BlnHalf = True Then dblAng = 360/(2*intSpokes)
+	
+	Rhino.EnableRedraw(False)
+	
+	
+	Dim aSrfs: aSrfs = RevCurves(aCurves, aAx, dblAng, blnHalf)
+
+	If not isArray(aSrfs) then exit sub
+	Rhino.EnableRedraw(True)
+	
+	If Blnhalf = true then
+		
+		dim sFlip: sFlip = Rhino.GetString("Flip direction?","No",array("Yes", "No"))
+		
+		If lCase(sFlip) = "yes" then
+			Rhino.EnableRedraw(False)
+			Rhino.DeleteObjects aSrfs
+			aAx = array(array(0,0,0),array(0,0,1))	
+			aSrfs = RevCurves(aCurves, aAx, dblAng, blnHalf)
+		End If
+		
+	End if
+	
+	Rhino.EnableRedraw(True)
+	
+End Sub
+
+Function RevCurves(aCrvs, aAx, dblAng, blnHalf)
+	
+	dim sCrv, aSrfs, i
+	redim aSrfs(UBound(aCrvs))
+
+	For each sCrv in aCrvs
+		
+		if BlnHalf = True then
+			aSrfs(i) =	Rhino.AddRevSrf (sCrv,aAx,0,dblAng)	
+		else
+			aSrfs(i) =	Rhino.AddRevSrf (sCrv, aAx, -dblAng, dblAng)
+		End If
+		i = i + 1
+	Next
+	
+	RevCurves = aSrfs
+End Function

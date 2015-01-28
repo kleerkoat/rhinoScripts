@@ -1,0 +1,74 @@
+Option explicit
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "Clearance","_NoEcho _-Runscript (Clearance)"
+Sub Clearance
+
+	Dim strUnits: strUnits = Rhino.UnitSystemName(,False,True)
+	Dim Precision: Precision = Rhino.UnitDistanceDisplayPrecision 
+ 
+	Dim strObj: strObj = Rhino.GetObject("Select object to test", 8+16, True)
+	If IsNull(strObj) Then	Exit Sub
+      
+	Dim strTest: strTest = Rhino.GetObject("Select object to test for clearance", 8+16)
+	If IsNull(strTest) Then Exit Sub
+	
+	Dim aPt: aPt = Rhino.GetPointOnSurface(strTest, "Click near the closest point")
+	If Not isArray(aPt) Then Exit Sub
+	
+	Rhino.EnableRedraw(False)
+   
+	Dim arrIntersect: arrIntersect = Rhino.IntersectBreps(strTest, strObj)
+	If IsArray(arrIntersect) Then
+		Rhino.EnableRedraw(True)
+		Rhino.SelectObjects(arrIntersect)
+		MsgBox "Objects intersect." &vbNewLine &"Highlighting curves of intersection."
+		Exit Sub
+	End If
+	
+	Dim Clearance: Clearance = PingPong(apt,strTest,strObj)
+	
+	Rhino.EnableRedraw(True)
+	Dim str :str = "Estimated clearance at this location is " &round(Clearance,Precision) &" " &strUnits
+	MsgBox str
+	Rhino.Print str
+
+End Sub
+
+
+Function PingPong(aPt, Brep1, Brep2)
+	
+	Dim Temp, i, aTemp, sLine, aTempPt, atemp2
+	Dim max: max = 512
+	
+	Rhino.EnableRedraw(False)
+	
+	Do
+		Temp = Rhino.BrepClosestPoint (Brep1,aPt)
+		atemp2 = temp(0)
+		aTemp = Rhino.BrepClosestPoint(Brep2,aTemp2)
+		aPt = aTemp(0)
+		
+		i = i +1
+
+		If i = max Then
+			
+			Dim Line: Line = Rhino.AddLine (aPt, aTemp2)
+			Dim Pts(1)
+			Pts(0) = Rhino.AddPoint(Rhino.CurveStartPoint(Line))
+			Pts(1) = Rhino.AddPoint(Rhino.CurveEndPoint(Line))
+			Dim Grp: Grp = Rhino.AddGroup
+			Rhino.AddObjectsToGroup Pts,Grp
+			Rhino.AddObjectToGroup Line,Grp
+			Rhino.ObjectsByGroup Grp,True
+			
+		End If
+	
+	Loop Until i = max
+	
+	If Not isNull(Line) Then
+		Rhino.SelectObject Line
+		PingPong = Rhino.CurveLength (line)
+	End If
+
+End Function

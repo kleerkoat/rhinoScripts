@@ -1,0 +1,133 @@
+' ****************************** RhinoScript.org ******************************
+'
+'   Bookshelf Maker, version 1
+'
+'   by Mantuano Fabio, published Jun 02, 2011
+'
+'
+'   This code will help you to create bookshelf from a solid.
+'   
+'   -  create any type of solid
+'   - Draw a _Rectangle that contains the solid
+'   - insert  number of elements, their thickness and the Solid's height
+'   
+'   An old video of this script:
+'   http://www.youtube.com/watch?v=RIjmWuxxIkE
+'
+'
+'
+'
+'   This RhinoScript Tool has been downloaded from RhinoScript.org.
+'
+'   Rhino versions: Rhino 4 (at least service release 6)
+'
+'   LICENSE INFORMATION:
+'   This script is published under the GNU General Public License, version 3
+'   or any later version, and thus comes WITHOUT ANY WARRANTY. You can get
+'   the complete license text here: www.rhinoscript.org/gpl
+'
+' ****************************** RhinoScript.org ******************************
+
+
+
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' Bookshelf Maker 1.0
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' Script written by Fabio Mantuano - ddrpochi@gmail.com
+' Script version 2 June 2011
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' Metodi e modelli matematici per le Applicazioni :: a.a. 2010-2011
+' http://www.formulas.it/metodi/ :: Università degli Studi Roma Tre 
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+
+'Call BookshelfMakerV1()
+Sub  BookshelfMakerV1() 
+
+
+  SolidoTemp = Rhino.GetObjects("Select Solid",16)
+  RettangoloTemp = Rhino.GetObjects("Select Rectangle That Bounds Solid",4)
+
+   n      = Rhino.getinteger ("Vertical elements",10,2)
+   m      = Rhino.getinteger ("Horizontal elements",10,2)
+   hsolid = Rhino.getinteger ("Solid's height",10)
+   sp     = Rhino.getreal ("Thickness",0.2)     
+     
+  Solido = SolidoTemp(0) 
+  Rettangolo = RettangoloTemp(0)
+  
+  
+ SegmentiRettangolo = Rhino.ExplodeCurves (Rettangolo,True)
+  
+ segmento0 = SegmentiRettangolo(0)
+ segmento1 = SegmentiRettangolo(3)
+ 
+ 'Superfici di Sezione
+   Hestrusione = hsolid
+    Srf0 = Rhino.ExtrudeCurveStraight (segmento0,Array(0,0,0),Array(0,0,hestrusione))
+    Srf1 = Rhino.ExtrudeCurveStraight (segmento1,Array(0,0,0),Array(0,0,hestrusione))
+   
+   
+ 'divido i segmenti
+  
+    Punti0 = Rhino.DivideCurve (segmento0,n)
+    Punti1 = Rhino.DivideCurve (segmento1,m)
+   
+    Rhino.addpoints Punti0
+    Rhino.addpoints Punti1
+   
+    
+    ReDim Verticali(n)
+    ReDim Orizzontali(m)
+    
+    strCurveO = Rhino.AddLine(Array(0,0,0), Array(0,sp,0))
+    strCurveV = Rhino.AddLine(Array(0,0,0), Array(sp,0,0))
+ 
+  
+    For i = 0 To n   
+      Seztemp = Rhino.CopyObject (Srf1,Punti0(0),Array(Punti0(i)(0),Punti0(i)(1),Punti0(i)(2)-hsolid/20))                
+      Verticali(i) = Rhino.IntersectBreps  (Solido,Seztemp)  
+      
+        If  IsNull(Verticali(i)) Then        
+        Else    
+        Rhino.moveobjects Verticali(i),Array(0,0,0)   
+        
+        SurfTempV = Rhino.AddPlanarSrf (Verticali(i))
+     
+          For ii = 0 To UBound(SurfTempV)      
+          ElementoV =  Rhino.ExtrudeSurface  (SurfTempV(ii) ,strCurveV,True)
+          
+          Rhino.moveobject ElementoV,Array(-sp/2,0,hsolid)
+   
+          Next      
+        End If  
+      
+      Rhino.deleteobject Seztemp    
+    Next
+    
+    
+    For j = 0 To m   
+     Seztemp = Rhino.CopyObject (Srf0,Punti1(M),Array(Punti1(j)(0),Punti1(j)(1),Punti1(j)(2)-hsolid/20))
+     Orizzontali(j) = Rhino.IntersectBreps  (Solido,Seztemp)
+     
+      If  IsNull(Orizzontali(j)) Then        
+      Else    
+      Rhino.moveobjects Orizzontali(j),Array(0,0,0)
+    
+      SurfTempO =  Rhino.AddPlanarSrf (orizzontali(j))
+       
+        For jj = 0 To UBound(SurfTempO)      
+        ElementoO = Rhino.ExtrudeSurface  (SurfTempO(jj),strCurveO,True)
+        
+        Rhino.moveobject ElementoO,Array(0,-sp/2,hsolid)
+        
+        Next   
+      End If  
+          
+     Rhino.deleteobject Seztemp
+    Next
+     
+  Rhino.deleteobject  Srf0 
+  Rhino.deleteobject  Srf1 
+ 
+
+End Sub  

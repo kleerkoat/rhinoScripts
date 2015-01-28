@@ -1,0 +1,101 @@
+' ****************************** RhinoScript.org ******************************
+'
+'   offsetCurves, version 1
+'
+'   by moritz rumpf, published Nov 16, 2008
+'
+'
+'   offset funktion for planar curves. 
+'   it allowes you to offset several curves at once. plus: the new created curve will have the same number of control points as the original one. 
+'
+'
+'
+'
+'   This RhinoScript Tool has been downloaded from RhinoScript.org.
+'
+'   Rhino versions: Rhino 4
+'
+'   LICENSE INFORMATION:
+'   This script is published under the GNU General Public License, version 3
+'   or any later version, and thus comes WITHOUT ANY WARRANTY. You can get
+'   the complete license text here: www.rhinoscript.org/gpl
+'
+' ****************************** RhinoScript.org ******************************
+
+
+
+'offset funktion for planar curves. 
+'it allowes you to offset several curves at once.
+'the new created curve will have the same number of control points as the original one. 
+
+Option Explicit
+'Script written by <Max Wittich & Moritz Rumpf>
+'Script copyrighted by <insert company name>
+'Script version Montag, 4. August 2008 17:28:56
+
+Call getCurves()
+
+Sub getCurves()
+
+	Dim arrCrvs
+	
+	arrCrvs = rhino.getObjects("select curves", 4)
+	
+	Call getDistance(arrCrvs)
+	
+End Sub
+
+Sub getDistance(arrCrvs)
+	
+	Dim dblDistance 
+	dblDistance = Rhino.GetReal ("enter distance", 10)
+	
+	Call movePts(arrCrvs,dblDistance)
+	
+End Sub
+
+Function movePts(arrCrvs,dblDistance)
+	
+	Dim i,j
+	Dim arrControlPoints
+	Dim numCrvs : numCrvs = UBound(arrCrvs)
+	Dim numPts 
+	Dim arrNormal
+	Dim crvParam
+	Dim arrTangent
+	Dim arrVecDir
+	Dim crvPt
+	Dim vecAdded,vecRev,vecScale
+	
+	
+	For i = 0 To numCrvs
+		
+		arrControlPoints = Rhino.CurvePoints (arrCrvs(i))
+		
+		arrNormal = Rhino.CurveNormal (arrCrvs(i))
+		
+		numPts = UBound(arrControlPoints)
+		
+		ReDim vecAdded (numPts)
+	
+		For j = 0 To numPts
+				
+			crvParam = Rhino.CurveClosestPoint (arrCrvs(i), arrControlPoints(j)) 
+			crvPt = rhino.EvaluateCurve(arrCrvs(i),crvParam)
+		
+			arrTangent = Rhino.CurveTangent (arrCrvs(i), crvParam )
+			
+			arrVecDir = rhino.VectorCrossProduct(arrTangent,arrNormal)
+			'vecRev = rhino.VectorReverse(arrVecDir)
+			vecScale = rhino.VectorScale(arrVecDir,dblDistance)
+			
+			vecAdded(j) = rhino.VectorAdd(vecScale,arrControlPoints(j))
+								
+		Next
+		
+		rhino.addCurve(vecAdded)
+				
+	Next
+	
+	
+End Function

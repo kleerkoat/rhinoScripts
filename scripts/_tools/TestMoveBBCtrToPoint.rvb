@@ -1,0 +1,44 @@
+Option Explicit
+'Script by Mitch Heynick
+'Version Tuesday, 07 December, 2010
+
+'Call TestMoveBBCtrToPoint()
+Sub TestMoveBBCtrToPoint()
+	
+	Dim strObj,arrMoveToPt,arrCtrPt
+	
+	'get your object
+	strObj=Rhino.GetObject("Select object to move",,True)
+	'get out if the user doesn't select an object
+	If isNull(strObj) Then Exit Sub
+	
+	'get the point to move to:
+	arrMoveToPt=Rhino.GetPoint("Pick point to move to")
+	'get out if the user doesn't select or input a point
+	If not IsArray(arrMoveToPt) Then Exit Sub
+	
+	'now get the object's BB center:
+	'call the custom function with strObj as its input
+	arrCtrPt=BoundingBoxCenterPoint(strObj)	
+	'if the function returns a valid point, do the move
+	'if no valid point is returned, nothing will happen
+	If IsArray(arrCtrPt) Then
+		Call Rhino.MoveObject(strObj,arrCtrPt,arrMoveToPt)
+	End If
+	
+End Sub
+
+Function BoundingBoxCenterPoint(objs)
+	' returns the center point of bounding box
+	' objs can be a string or an array of objects
+	'in case of failure the function will return Null
+	BoundingBoxCenterPoint=Null
+	Dim arrBB,arrPt
+	arrBB=Rhino.BoundingBox(objs)
+	If IsArray(arrBB) Then
+		arrPt=Rhino.PointDivide(Rhino.PointAdd(arrBB(0),arrBB(6)),2)
+		'if we get this far, set the output of the function to the point
+		BoundingBoxCenterPoint=arrPt
+	End If
+End Function
+

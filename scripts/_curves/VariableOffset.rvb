@@ -1,0 +1,83 @@
+Option Explicit
+'Script written by Pascal
+' RMA
+'Script version Thursday, November 03, 2011
+
+'Rhino.AddStartUpScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "OffsetVariable", "_NoEcho _-Runscript (OffsetVariable)"
+
+'Call VariableOffset()
+Sub VariableOffset()
+	
+	Dim sCrv: sCrv = Rhino.GetObject("Select curve to offset.", 4, True, True)
+	If isNull(sCrv) Then Exit Sub
+	
+	Rhino.Command "Pipe _Cap=_None "
+	If Rhino.LastCommandResult <> 0 Then Exit Sub
+	
+	Dim alast: aLast = rhino.LastCreatedObjects()
+	Dim sObj, plane
+	
+	
+	Rhino.EnableRedraw False
+	For Each sObj In aLast
+		
+		If Rhino.IsCurvePlanar(sCrv) Then plane = Rhino.CurvePlane(sCrv)
+		GetPipeSeam sObj
+		
+		
+	Next
+	 	
+	Rhino.EnableRedraw True
+	
+End Sub
+
+Sub getPlanarIso(sObj, plane)
+	
+	Dim aBB: aBB = rhino.BoundingBox(sObj, plane)
+	Dim dist: Dist = Rhino.Distance(aBB(0), aBB(6))
+	
+	Dim CutPlane: 
+	
+End Sub
+
+Sub GetPipeSeam(sObj)
+	
+	Dim sSrf
+
+	If Rhino.IsSurface(sObj) Then
+			
+		Rhino.ExtractisoCurve sObj, array(Rhino.SurfaceDomain(sObj, 0)(0), Rhino.SurfaceDomain(sObj, 1)(0)), 0
+		Rhino.ExtractisoCurve sObj, midparam(sObj), 0
+		Rhino.DeleteObject sObj
+			
+	Else
+		
+		Dim aObj
+		aObj = Rhino.ExplodePolysurfaces(sObj, True)
+		If isArray(aObj) Then
+			For Each sSrf In aObj
+				GetPipeSeam(sSrf)
+			Next
+		End If
+		
+	End If
+	
+End Sub
+
+Function MidParam(sSrf)
+	'find the midlle parameter pair of a surface
+	Dim uDom,VDom
+	
+	UDom = Rhino.SurfaceDomain(sSrf, 0)
+	VDom = Rhino.SurfaceDomain(sSrf, 1)
+	
+	Dim Umid, VMid
+	
+	UMid = UDom(0) + (0.25 * (UDom(1) - Udom(0)))
+	
+	VMid = VDom(0) + (0.25 * (VDom(1) - Vdom(0)))
+	
+	MidParam = array(UMid, Vmid)
+	
+End Function

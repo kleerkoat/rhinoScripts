@@ -1,0 +1,37 @@
+Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version Monday, April 14, 2008 10:23:04 AM
+
+'Call CopyToPt()
+Sub CopyToPt()
+
+	Dim arrObj, strObj
+	Dim arrPts, strPt
+	Dim arrCooPt
+	Dim arrStart
+	Dim arrResult
+
+	arrObj = Rhino.GetObjects ("Select objects to copy", ,True, True)
+	If IsNull (arrObj) Then Exit Sub
+
+	arrPts = Rhino.GetObjects ("Select points to copy to",1 ,True, True)
+	If IsNull (arrPts) Then Exit Sub
+
+	arrStart = Rhino.GetPoint ("Select point to copy from")
+	If IsNull (arrStart) Then Exit Sub
+
+	Rhino.EnableRedraw vbFalse
+
+	For Each strPt In arrPts
+		arrCooPt = Rhino.PointCoordinates (strPt)
+		'Rhino.print Rhino.Pt2Str (arrCooPt)
+		If arrCooPt(0)<>arrStart(0) Or arrCooPt(1)<>arrStart(1) Or arrCooPt(2)<>arrStart(2) Then
+			arrResult = Rhino.CopyObjects (arrObj, arrStart, arrCooPt)
+			Rhino.SelectObjects (arrResult)
+		End If
+	Next
+
+	Rhino.EnableRedraw vbTrue
+
+End Sub

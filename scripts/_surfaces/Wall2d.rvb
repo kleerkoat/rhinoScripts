@@ -1,0 +1,67 @@
+Option Explicit
+
+'Script written by Pascal
+
+'Script version Tuesday, July 15, 2008
+Private dblOldOffset
+If IsEmpty(dblOldOffset) Then
+	dblOldOffset = 1.0
+End If
+'Call Wall2d()
+Sub Wall2d()
+	
+	Dim dblOffset: dblOffset = Rhino.GetReal("Wall thickness",dblOldOffset)
+	If Not isNumeric(dblOffset) Then Exit Sub
+	dblOldOffset = dblOffset
+	
+	Rhino.Command"_Polyline"
+	
+	If Rhino.LastCommandresult = 0 Then
+		Dim aPolyline:aPolyline = Rhino.LastCreatedObjects
+		Dim sPolyline: sPolyline = aPolyline(0)
+	Else
+		Exit Sub
+	End If
+	
+	Rhino.Enableredraw(False)
+	
+	Dim CrntPlane: crntPlane = Rhino.ViewCplane(Rhino.CurrentView)
+	Rhino.SelectObject sPolyline
+	
+	If Rhino.IsCurvePlanar(sPolyline) Then
+		
+		Dim Plane: plane = Rhino.CurvePlane(sPolyline)
+		Rhino.ViewCPlane Rhino.CurrentView, Plane
+		Rhino.Command "_Offset _BothSides " & dblOffset/2 &" " & Rhino.Pt2Str (array(dblOffset,dblOffset,0),,True)',False
+		If Rhino.LastCommandresult = 0 Then
+			Dim aOffsets:aOffsets = Rhino.LastCreatedObjects
+		
+		End If
+	
+		Rhino.ViewCPlane Rhino.CurrentView,crntPlane
+	Else 
+		
+		MsgBox "The polyline must be planar. Nothing done. Try projecting Osnaps to force a planar polyline."
+		Rhino.Enableredraw
+		Exit Sub
+		
+	End If
+
+	If uBound(aOffsets) = 1 Then
+    If Not Rhino.IsCurveClosed(sPolyline) Then 
+	  	Dim line1: line1 = Rhino.AddLine(Rhino.CurveStartPoint(aOffsets(0)),Rhino.CurveStartPoint(aOffsets(1)))
+			Dim line2: line2 = Rhino.AddLine(Rhino.CurveEndPoint(aOffsets(0)),Rhino.CurveEndPoint(aOffsets(1)))
+			Rhino.JoinCurves array(Line1, aOffsets(0), Line2, aOffsets(1)),True
+		End If
+		
+	Else
+		
+		'msgBox Ubound(aOffsets)
+	End If
+	
+	Rhino.deleteobject sPolyline
+	Rhino.Enableredraw
+End Sub
+
+'Rhino.AddStartUpScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "Wall2d", "_NoEcho _-RunScript (Wall2d)"

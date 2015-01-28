@@ -1,0 +1,156 @@
+Option Explicit
+'Script by Mitch Heynick
+'Script version 27 January, 2010
+
+'Rhinoscript version of the Douglas-Peucker algorithm for simplifying polylines
+'This version supports both open and closed polylines
+
+'Important - polyline segments smaller than file tolerance will cause errors.
+'Clean up curves to be fitted with RemoveShortCrvSegments script first.
+
+Dim dblUserPrevTol
+If IsEmpty(dblUserPrevTol) Then dblUserPrevTol=0.1
+
+'Call DPRefitPolylines()
+
+Sub DPRefitPolylines
+	
+	Dim arrPL,dblFitTol,sTime
+	Dim dblAbsTol : dblAbsTol=Rhino.UnitAbsoluteTolerance
+	
+	arrPL=Rhino.GetObjects("Select polylines to refit",4,,True)
+	If Not IsArray(arrPL) Then Exit Sub	
+			
+	dblFitTol=Rhino.GetReal("Fitting Tolerance?",dblUserPrevTol,dblAbsTol)
+	If IsNull(dblFitTol) Then Exit Sub
+	dblUserPrevTol=dblFitTol
+	
+	sTime=Timer
+	Call Rhino.Prompt("Fitting curves...")
+	Call Rhino.EnableRedraw(False)
+	
+	Dim arrCPL(),arrOPL(),strPL,arrSplitCPL
+	Dim m,n : m=-1 : n=-1
+	
+	For each strPL in arrPL
+		If Rhino.IsPolyline(strPL) Then
+			If Rhino.IsCurveClosed(strPL) Then
+				arrSplitCPL=SplitClosedPL(strPL)
+				n=n+2
+				Redim Preserve arrCPL (n)
+				arrCPL(n-1)=arrSplitCPL(0)
+				arrCPL(n)=arrSplitCPL(1)
+			Else
+				m=m+1
+				Redim Preserve arrOPL (m)
+				arrOPL(m)=strPL				
+			End If			
+		End If		
+	Next	
+	
+	Dim strNewPL,lngColor,arrNewPL(),i,count : count=0
+	
+	If m>-1 Then 'open curves
+		For each strPL in arrOPL							
+			i=-1
+			lngColor=Rhino.ObjectColor(strPL)
+			Call DPSplitPL(strPL,dblFitTol,arrNewPL,i)			
+			If IsArray(arrNewPL) and Not IsEmpty(arrNewPL) Then
+				strNewPL=Rhino.JoinCurves(arrNewPL,True) 'still a problem here?
+				If Not IsNull(strNewPL) Then Call Rhino.ObjectColor(strNewPL,lngColor)
+			End If
+			count=count+1
+			Call Rhino.Print(count&"/"&(Ubound(arrPL)+1))
+		Next
+	End If
+
+	If n>-1 Then 'closed curves
+		Dim arrPLHalves,arrHalf1,arrHalf2
+		
+		For n=0 to UBound(arrCPL) step 2						
+			i=-1
+			lngColor=Rhino.ObjectColor(arrCPL(n))
+			Call DPSplitPL(arrCPL(n),dblFitTol,arrNewPL,i)			
+			If IsArray(arrNewPL) and Not IsEmpty(arrNewPL) Then
+				arrHalf1=Rhino.JoinCurves(arrNewPL,True)
+			End If
+			
+			i=-1
+			Call DPSplitPL(arrCPL(n+1),dblFitTol,arrNewPL,i)
+			If IsArray(arrNewPL) and Not IsEmpty(arrNewPL) Then
+				arrHalf2=Rhino.JoinCurves(arrNewPL,True)
+			End If
+			
+			If IsArray(arrHalf1) and IsArray(arrHalf2) Then
+				arrPLHalves=Rhino.JoinArrays(arrHalf1,arrHalf2)
+				strNewPL=Rhino.JoinCurves(arrPLHalves,True)
+				If Not IsNull(strNewPL) Then Call Rhino.ObjectColor(strNewPL,lngColor)
+			End If
+			
+			count=count+1
+			Call Rhino.Print(count&"/"&(Ubound(arrPL)+1))
+		Next
+	End If	
+	
+	Call Rhino.EnableRedraw(True)
+	Call Rhino.Print("Finished curves processing after "&Round(Timer-sTime)&" seconds")
+End Sub
+
+Sub DPSplitPL(strPL,dblFitTol,arrNewPL,i)
+	
+	'this is the actual polyline fitting algorithm
+	Dim arrTLine,arrVerts,arrVPt,dblDist,dblMaxDist,arrMaxPt
+	Dim strCrv,arrSplit,k
+	dblMaxDist=0
+	
+	arrTLine=Array(Rhino.CurveStartPoint(strPL),Rhino.CurveEndPoint(strPL))
+	arrVerts=Rhino.PolylineVertices(strPL)
+	If IsArray(arrVerts) and Ubound(arrVerts)>1 Then
+		For k=1 to UBound(arrVerts)-1
+			dblDist=Rhino.LineMinDistanceTo(arrTLine,arrVerts(k))
+			If dblDist>dblMaxDist Then 
+				dblMaxDist=DblDist
+				arrMaxPt=arrVerts(k)
+			End If
+		Next
+	End If
+	
+	If dblMaxDist>dblFitTol Then		
+		arrSplit=Rhino.SplitCurve(strPL,Rhino.CurveClosestPoint(strPL,arrMaxPt),True)
+		For Each strCrv in arrSplit 'recursive loop
+			Call DPSplitPL(strCrv,dblFitTol,arrNewPL,i)
+		Next
+	Else			
+		Call Rhino.DeleteObject(strPL)
+		i=i+1
+		Redim Preserve arrNewPL(i)		
+		arrNewPL(i)=Rhino.AddLine(arrTLine(0),arrTLine(1))		
+	End If
+End Sub
+
+Function SplitClosedPL(strPL)
+	
+	'splits closed polylines at vertex nearest midpoint
+	SplitClosedPL=Null
+	Dim arrMPt,arrPLV,intIndex,arrSParams(1),arrSplit	
+	
+	arrMPt=Rhino.CurveMidPoint(strPL)
+	arrPLV=Rhino.PolylineVertices(strPL)
+	intIndex=Rhino.PointArrayClosestPoint(arrPLV,arrMPt)
+			
+	arrSParams(0)=Rhino.CurveDomain(strPL)(0)
+	arrSParams(1)=Rhino.CurveClosestPoint(strPL,arrPLV(intIndex))
+	
+	arrSplit=Rhino.SplitCurve(strPL,arrSParams,False)
+			
+	If IsArray(arrSplit) then
+		If Ubound(arrSplit)=1 Then
+			Call Rhino.DeleteObject(strPL)
+			SplitClosedPL=arrSplit
+			
+		Else
+			Call Rhino.DeleteObjects(arrSplit)
+			Call Rhino.AddTextDot("!!",arrMPt)
+		End If			
+	End If	
+End Function

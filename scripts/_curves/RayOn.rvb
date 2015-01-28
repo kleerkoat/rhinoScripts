@@ -1,0 +1,37 @@
+Option Explicit
+'Script  by Mitch Heynick
+'Version Saturday, 14 April, 2012
+'Creates a series of "rays" from picked start point/direction
+'Rhino V4 or V5
+
+Private initRayLength
+If IsEmpty(initRayLength) then initRayLength=100.0
+'Change the startup value of initRayLength ^^^^^^^ to what you like
+
+'Call RayOn()
+Sub RayOn()	
+	Dim len,pts,msg1,msg2,vec,endPt
+	msg1="Pick start point of ray"
+	msg2="Pick point in direction of ray"
+	
+	len=Rhino.GetReal("Ray length?",initRayLength,0)
+	If not IsNumeric(len) Then Exit Sub
+	If len=0 Then Exit Sub		
+	
+	Do
+		pts=Rhino.GetPoints(True,,msg1,msg2,2)
+		If not IsArray(pts) Then Exit Do
+		If Ubound(pts)<>1 Then Exit Do
+		vec=Rhino.VectorCreate(pts(1),pts(0))
+		If not Rhino.IsVectorTiny(vec) Then
+			vec=Rhino.VectorUnitize(vec)
+			vec=Rhino.VectorScale(vec,len)
+			endPt=Rhino.PointAdd(pts(0),vec)
+			Call Rhino.AddLine(pts(0),endPt)
+		Else
+			Call Rhino.Print("Unable to create ray")		
+		End If
+		msg1="Pick start point of next ray or Enter to terminate the command"	
+	Loop
+	initRayLength=len
+End Sub

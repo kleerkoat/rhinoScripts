@@ -1,0 +1,11 @@
+Hi Ryan- ok, try this script out... go ahead and make the fillets with FilletEdge, ExtractSrf the fillets, and run the attached InvertFillet script on each. It's pretty dumb right now, but should be good enough to test  and see if it gets you anything you like- Hard corners between fillets will need to be trimmed back after inverting, for instance and I also notice that it does not like single surface fillets that wrap around to a closed loop- split these in two with an isocurve, Shrink=Yes...
+
+To use the script, extract and save the .rvb file, then drag and drop it over an open V4 window to add the following alias:
+
+InvertFillet
+
+
+This can be used as a 'command' by typing or by adding it to a button.
+I'll make it work on multiple surfaces...
+
+The intersection troubles you are running into here are the *next big thing* to work on, according to the developer. What happens is the seam on the pipe, or a fully multiple knot in the pipe falls exactly or very close to the surface you a retrimming and that is just not working correctly.

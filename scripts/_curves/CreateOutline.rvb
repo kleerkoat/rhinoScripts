@@ -1,0 +1,27 @@
+Option Explicit
+'Script written by Pascal
+'RMA
+'Script version Friday, December7, 2007
+
+
+Sub CreateOutline()
+	
+	
+	Dim aCrvs: aCrvs = Rhino.GetObjects("Select curves",4,True,True)
+	If Not isArray(aCrvs) Then Exit Sub
+	
+	Dim aBB: aBB = Rhino.BoundingBox(aCrvs,Rhino.CurrentView, False)
+	Dim aPt:apt = aBB(0)
+	Dim aPt2: apt2 = array(abb(0)(0)-10, abb(0)(1)-10, abb(0)(2))
+	Dim Plane: PLane = Rhino.ViewCPlane
+	apt = Rhino.XformCPlaneToWorld(aPt2, Plane)
+	Rhino.EnableRedraw(False)
+	Rhino.SelectObjects aCrvs
+	Rhino.Command "_CurveBoolean _DeleteInput=_All " &Rhino.Pt2Str(aPt,,True) &"_Enter", False
+	Rhino.EnableRedraw(True)
+	
+	
+End Sub
+
+'Rhino.AddAlias "CreateOutline", "_noEcho _-Runscript CreateOutline"
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile

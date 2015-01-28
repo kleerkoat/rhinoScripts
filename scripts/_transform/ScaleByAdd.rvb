@@ -1,0 +1,127 @@
+Option Explicit
+'Script written by Pascal
+'Script version Friday, January 22, 2010
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "ScaleByAdd","noEcho _-Runscript (ScaleByAdd)"
+
+Private OldAdd, OldType
+If isEmpty(oldAdd) then
+	OldAdd = 1.0
+End If
+If isEmpty(oldType) then
+	OldType  = "3D"
+End If
+
+'Call ScaleByAdd()
+Sub ScaleByAdd()
+	
+	Dim sType: sType = Rhino.GetString("Scale dimensions",OldType,array("1D","2D","3D"))
+	If isNull(sType) then exit sub
+	
+	OldType=sType
+	
+	
+	Dim aObj: aObj = Rhino.GetObjects("Select objects to scale",,,true)
+	If not isArray(aObj) then exit sub
+	
+	Dim aDir: aDir  = Rhino.GetPoints(True,False,"Set scale base point","Set direction point",2)
+	If not isArray(aDir) then  exit sub
+	If Ubound(aDir)<>1 then exit sub
+	
+	Dim dblAdd: dblAdd = Rhino.GetReal("Dimension to add",OldAdd)
+	If not isNumeric(dblAdd) then exit sub
+	OldAdd = dblAdd
+
+	Rhino.EnableRedraw(False)
+	
+	Dim vecDir: VecDir = Rhino.VectorCreate(aDir(1), aDir(0))
+	Dim Plane: Plane = Rhino.PlaneFromNormal(aDir(0), VecDir)
+	'	DrawPlaneFrame Plane, 10
+	
+	Dim aBB: aBB = Rhino.BoundingBox(aObj,Plane)
+	'Dim Plane1: Plane1 = Rhino.PlaneFromPoints(aBB(0),aBB(1),aBB(3))
+	Dim Plane1: Plane1 = Rhino.PlaneFromNormal(aBB(0),Rhino.VectorCreate(aBB(4),aBB(0)))
+	
+	'Dim Plane2: Plane2 = Rhino.PlaneFromPoints(aBB(4),aBB(5),aBB(7))
+	Dim Plane2: Plane2 = Rhino.PlaneFromNormal(aBB(4),Rhino.VectorCreate(aBB(0),aBB(4)))
+	
+	Dim testVec1: testVec1 = Rhino.VectorCreate(Rhino.PlaneClosestPoint(Plane1,adir(0)),aDir(0))
+	Dim testVec2: testVec2 = Rhino.VectorCreate(Rhino.PlaneClosestPoint(Plane2,adir(0)),aDir(0))
+	
+	Dim testVec, VecAdd
+	
+	If Rhino.IsVectorparallelto(VecDir,testvec1) = 1 then
+		testvec = Testvec1
+		VecAdd = Rhino.VectorScale (Rhino.VectorUnitize(Testvec1),dblAdd)
+	Else
+		testVec =  testVec2
+		VecAdd = Rhino.VectorScale (Rhino.VectorUnitize(Testvec2),dblAdd)
+	End If
+	
+	Dim aTarg: aTarg = Rhino.PointAdd(adir(0),Rhino.VectorAdd(testvec,vecAdd))
+	Dim sBase: sBase  = "W" & Rhino.Pt2Str(aDir(0),6,true)
+	Dim sRef: sRef = "W" & Rhino.Pt2Str( Rhino.PointAdd(aDir(0),TestVec),6,true)
+	Dim sTarg: sTarg = "W" & Rhino.Pt2Str(aTarg,6,true)
+	
+	Rhino.UnselectAllObjects
+	Rhino.SelectObjects aObj
+	
+	'	Rhino.addPoints array(aDir(0), Rhino.PointAdd(aDir(0),TestVec),atarg)'TEST
+	
+	If UCase(sType)="3D" Then
+		Rhino.Command"_Scale " & sbase &sRef & starg, False
+	elseIf UCase(sType)="2D" then
+		Rhino.Command"_Scale2D " & sbase &sRef & starg, False
+	Else
+		Rhino.Command"_Scale1D " & sbase &sRef & starg, False
+	End if
+		
+	
+	Rhino.EnableRedraw(True)
+	
+End Sub
+
+
+'DrawPlaneFrame Rhino.CurvePlane(Rhino.GetObject(,4,true)),10
+
+Sub DrawPlaneFrame (aPlane, dblScale)
+	
+	Rhino.EnableRedraw(False)
+	
+	Dim pt0: Pt0 =aPlane(0)
+	dim aLines(5)
+	
+	Dim vec1: vec1 = Rhino.VectorScale(aPlane(1),dblScale)
+	Dim pt1: Pt1 = Rhino.PointAdd (Pt0,vec1)
+	Dim Pt4: Pt4 = Rhino.PointAdd (Pt0,Rhino.VectorReverse(Vec1))
+
+	Dim vec2: vec2 = Rhino.VectorScale(aPlane(2),dblScale)
+	Dim pt2: Pt2 = Rhino.PointAdd (Pt0,Vec2)	
+	Dim Pt5: Pt5 = Rhino.PointAdd (Pt0,Rhino.VectorReverse(Vec2))
+	Dim vec3: vec3 = Rhino.VectorScale(aPlane(3),dblScale)
+	Dim pt3: Pt3 = Rhino.PointAdd (Pt0,Vec3)	
+	Dim Pt6: Pt6 = Rhino.PointAdd (Pt0,Rhino.VectorReverse(Vec3))
+	
+	aLines(0) = Rhino.AddLine (Pt0,Pt1)
+	aLines(1) = Rhino.AddLine (Pt0,pt2)
+	aLines(2) =	Rhino.AddLine (Pt0,Pt3)
+	aLines(3) = Rhino.AddLine (Pt0,Pt4)
+	aLines(4) = Rhino.AddLine (Pt0,Pt5)
+	aLines(5) = Rhino.AddLine (Pt0,Pt6)
+	
+	Rhino.ObjectColor array(alines(0),alines(3)), vbred
+	Rhino.ObjectColor array(alines(1),alines(4)), vbgreen
+	rhino.ObjectColor array(alines(2),alines(5)), vbBlue
+	
+	dim i
+	For i = 0 to 2
+		Rhino.CurveArrows aLines(i),2
+	next
+			
+	Dim sgrp: sGrp = Rhino.AddGroup
+	
+	Rhino.AddObjectsToGroup aLines,sGrp
+	Rhino.EnableRedraw(true)
+	
+End Sub

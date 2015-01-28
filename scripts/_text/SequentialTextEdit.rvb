@@ -1,0 +1,98 @@
+'Script written and copyrighted by Gelfling '04 aka David Rutten
+'December 7th 2004 revision
+'Modified by Olivier Suire to make it a text or annotation dot editor
+Option Explicit
+
+Sub SequentialTextEdit()
+	Dim prefix, Increment, intValue, suffix, limList(8)
+	Dim blnRename, idObject, objFilter, fixLength
+	Dim strResult, arrOptions(7), i, frzObjects(), F
+	Dim intType
+
+	Rhino.UnselectAllObjects
+	Prefix = ""
+	Suffix = ""
+	Increment = 1
+	fixLength = 2
+	intValue = 1
+	F = 0
+
+	Do
+		arrOptions(0) = "Prefix"
+		arrOptions(1) = "First_" & intValue
+		arrOptions(2) = "Step_" & Increment
+                arrOptions(3) = "Suffix"
+		arrOptions(4) = "FixedLength_" & fixLength
+		arrOptions(5) = "Unlock"
+		arrOptions(6) = "Start"
+		arrOptions(7) = "Quit"
+
+		strResult = Rhino.GetString("Sequential naming [" & Prefix & intValue & Suffix &" (+" & Increment & ")]", "Start", arrOptions)
+
+		If IsNull(strResult) Then strResult = "Quit"
+		Select Case UCase(Left(strResult, 3))
+		Case "PRE"
+			strResult = Rhino.GetString("Specify a new prefix text. Use 0 to disable ", Prefix)
+			If Not IsNull(strResult) Then Prefix = strResult Else
+                        If Prefix = "0"  Then Prefix = ""
+		Case "FIR"
+			strResult = Rhino.GetInteger("Specify a new starting value...", intValue)
+			If Not IsNull(strResult) Then intValue = strResult
+		Case "STE"
+        	strResult = Rhino.GetInteger("Specify a new increment value...", Increment)
+			If Not IsNull(strResult) Then Increment = strResult
+		Case "SUF"
+			strResult = Rhino.GetString("Specify a new suffix text. Use 0 to disable ", Suffix)
+			If Not IsNull(strResult) Then Suffix = strResult Else
+                        If Suffix = "0"  Then Suffix = ""
+		Case "FIX"
+			strResult = Rhino.GetInteger("Specify a fixed length for the incremental numbers. Use 0 to disable fixing.", fixLength, 0, 10)
+			If Not IsNull(strResult) Then fixLength = strResult
+		Case "STA"
+        	Do
+        		idObject = Rhino.GetObject("Select an object to display <" & _
+											CStr(Prefix & FixStringLength(intValue, "0", fixLength,  vbTrue) & Suffix) & "> Press Esc to return to options", _
+											0, vbFalse, vbTrue)
+				If IsNull(idObject) Then Exit Do
+				intType = Rhino.ObjectType(idObject)
+				If Not (intType = 8192 or intType = 512) then Exit Do
+				If Rhino.IsTextDot(idObject) Then Rhino.TextDotText idObject, CStr(Prefix & FixStringLength(intValue, "0", fixLength,  vbTrue) & Suffix) Else Rhino.TextObjectText idObject, CStr(Prefix & FixStringLength(intValue, "0", fixLength,  vbTrue) & Suffix)
+
+                                        intValue = intValue+Increment
+					ReDim Preserve frzObjects(F)
+					frzObjects(F) = idObject
+					Rhino.LockObject idObject
+					F = F+1
+
+               Loop
+
+        Case "UNL"
+        	If F <> 0 Then Rhino.UnlockObjects frzObjects
+        	Erase frzObjects
+        	F = 0
+        Case "QUI"
+                If F <> 0 Then Rhino.UnlockObjects frzObjects
+                Exit Do
+                End Select
+
+	Loop
+	Rhino.Print "Object texts edited"
+End Sub
+'SequentialTextEdit
+
+Function FixStringLength(strIn, charAdd, intLength, blnAddInFront)
+	FixStringLength = strIn
+	If intLength = 0 Then Exit Function
+
+	Dim Suffix2, Result
+	Suffix2 = String(intLength, charAdd)
+	If blnAddInFront Then
+		Result = Suffix2 & strIn
+		Result = Right(Result, intLength)
+	Else
+    	Result = strIn & Suffix2
+		Result = Left(Result, intLength)
+	End If
+	FixStringLength = Result
+End Function
+

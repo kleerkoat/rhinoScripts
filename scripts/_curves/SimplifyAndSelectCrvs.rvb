@@ -1,0 +1,27 @@
+Option Explicit
+'Script by Mitch Heynick
+'Version Sunday, 12 December, 2010
+
+'Call SimplifyAndSelectCrvs()
+Sub SimplifyAndSelectCrvs()
+	
+	Dim arrCrvs,strCrv,n : n=0
+	arrCrvs=Rhino.GetObjects("Select curves to check/simplify",4,,True)
+	If Not IsArray(arrCrvs) Then Exit Sub
+	
+	Call Rhino.EnableRedraw(False)
+	Call Rhino.UnselectAllObjects
+	For each strCrv in ArrCrvs
+		If Rhino.SimplifyCurve(strCrv)Then
+			n=n+1
+			Call Rhino.SelectObject(strCrv)
+		End If		
+	Next
+	If n>0 Then 
+		Call Rhino.Print(n&" curves simplified")
+	Else
+		Call Rhino.Print("No curves simplified")
+	End If
+	Call Rhino.EnableRedraw(True)
+End Sub
+

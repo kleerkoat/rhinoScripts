@@ -1,0 +1,21 @@
+﻿Option Explicit
+'Script written by Damien Alomar
+
+Call Main()
+Sub Main()
+
+	Dim objs, objLayers, i
+	
+	objs = Rhino.GetObjects ("Select objects to select other layer objects", , ,True)
+	If IsNull(objs) Then Exit Sub
+	
+	Rhino.EnableRedraw False
+	
+	For i=0 To ubound(objs)
+		Rhino.ObjectsByLayer Rhino.ObjectLayer(objs(i)), True
+	Next
+	
+	Rhino.EnableRedraw True	
+	
+End Sub
+

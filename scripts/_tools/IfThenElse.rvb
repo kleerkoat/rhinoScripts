@@ -1,0 +1,30 @@
+Option Explicit
+'Script written by davide del giudice
+'Script copyrighted by www.co-de-it.com
+'Script version lunedì 17 ottobre 2011 16.52.36
+'Call IfThenElse()
+Sub IfThenElse()
+
+Dim arrpointsA,arrpointsB,i,arrA,arrB
+arrpointsA=rhino.GetObjects ("select points A",1)
+arrpointsB=rhino.GetObjects("select points B",1)
+
+
+
+For i=0 To Ubound (arrpointsA)
+
+
+arrA= Rhino.PointCoordinates (arrpointsA(i))
+arrB= Rhino.PointCoordinates (arrpointsB(i))
+
+Dim distance:distance= rhino.distance (arrA,arrB)
+If rhino.Distance( arrA, arrB)<4 Then
+Dim sphere1:sphere1=rhino.addsphere (arrB,1)
+Call rhino.ObjectColor (sphere1, rgb(50,125,50))
+Else
+Dim sphere2:sphere2= rhino.AddSphere (arrB,1.5)
+Call rhino.ObjectColor (sphere2, rgb(150,200,150))
+End If
+
+Next
+End Sub

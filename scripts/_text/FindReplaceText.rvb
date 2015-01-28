@@ -1,0 +1,71 @@
+Option Explicit
+'Script written by <David Ray>
+'Script copyrighted by <David Ray> ©
+'Script version Thursday, July 19, 2007 8:43:34 AM
+'FindReplaceText
+Sub FindReplaceText()
+	Dim StrFindTxt,ArrObj,StrObj,StrReplcTxt,ArrPrev(0),ArrRealTxt,ArrMethod(1),ArrMethodTxt,StrLstSrch,StrSettingINI,StrMatch
+	StrSettingINI=Rhino.InstallFolder & "FindReplaceText.ini"
+	ArrMethodTxt=Array("Method_WholeWord","MatchCase_Yes","MatchCase_No","Method_PartOfWord")
+	ArrMethod(0)=cint(Rhino.GetSettings(StrSettingINI,"Settings","Method"))
+	ArrMethod(1)=cint(Rhino.GetSettings(StrSettingINI,"Settings","MatchCase"))
+	StrLstSrch=Rhino.GetSettings(StrSettingINI,"Settings","LastSearch")
+	Do
+		StrFindTxt=Rhino.GetString("Find Text",StrLstSrch,Array(ArrMethodTxt(ArrMethod(0)),ArrMethodTxt(ArrMethod(1))))
+		If IsNull(StrFindTxt) Then 	
+			Exit Sub
+		ElseIf StrFindTxt = ArrMethodTxt(0) Then
+			ArrMethod(0)=3
+			Rhino.SaveSettings StrSettingINI,"Settings","Method",ArrMethod(0)
+		ElseIf StrFindTxt = ArrMethodTxt(3) Then
+			ArrMethod(0)=0
+			Rhino.SaveSettings StrSettingINI,"Settings","Method",ArrMethod(0)
+		ElseIf StrFindTxt = ArrMethodTxt(1) Then
+			ArrMethod(1)=2
+			Rhino.SaveSettings StrSettingINI,"Settings","MatchCase",ArrMethod(1)
+		ElseIf StrFindTxt = ArrMethodTxt(2) Then
+			ArrMethod(1)=1
+			Rhino.SaveSettings StrSettingINI,"Settings","MatchCase",ArrMethod(1)
+		ElseIf StrFindTxt<>StrLstSrch Then
+			Rhino.SaveSettings StrSettingINI,"Settings","LastSearch",StrFindTxt
+			Exit Do
+		Else
+			Exit Do
+		End If
+	Loop
+	ArrObj=Rhino.AllObjects
+	ArrPrev(0)=""
+	For Each StrObj In ArrObj	
+		rhino.UnselectAllObjects
+		If rhino.IsText(StrObj)Then
+			StrMatch =False	 
+			Select Case	ArrMethod(0)+ ArrMethod(1)
+				Case 1
+					If rhino.TextObjectText(StrObj)=StrFindTxt Then	StrMatch =True
+				Case 2
+					If UCase(rhino.TextObjectText(StrObj))=UCase(StrFindTxt) Then	StrMatch =True
+				Case 4
+					If instr(rhino.TextObjectText(StrObj),StrFindTxt) <>0 Then StrMatch =True
+				Case 5
+					If instr(UCase(rhino.TextObjectText(StrObj)),UCase(StrFindTxt)) <>0 Then StrMatch =True
+			End Select
+			If StrMatch =True Then
+				rhino.SelectObject StrObj
+				rhino.zoomselected
+				StrReplcTxt=Rhino.GetString("Replace With","Find Next",ArrPrev)
+				If IsNull(StrReplcTxt) Then
+					Exit Sub
+				ElseIf StrReplcTxt <> "Find Next" Then
+					If 	StrReplcTxt=ArrPrev(0)Then
+						rhino.TextObjectText StrObj,ArrRealTxt(0)
+					Else
+						ArrRealTxt=Array(StrReplcTxt,replace(StrReplcTxt,chr(32),"_"))
+						ArrPrev(0)=ArrRealTxt(1)
+						rhino.TextObjectText StrObj,ArrRealTxt(0)
+					End If
+				End If
+			End If
+		End If 	
+	Next
+	Rhino.UnselectAllObjects
+End Sub

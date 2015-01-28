@@ -1,0 +1,151 @@
+Option Explicit
+'Script written by Pascal
+'Script version Friday, June 05, 2009 
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "DXFInByLayer", "_NoEcho _-Runscript (DXFInByLayer)"
+
+Public OldFolder
+
+If isEmpty(OldFolder) Then
+	
+	If Not isNull(Rhino.WorkingFolder) Then
+		OldFolder = Rhino.WorkingFolder
+	Else
+		OldFolder = ""
+	End If
+	
+	
+End If
+
+'Call DXFInByLayer()
+Sub DXFInByLayer()
+
+	Dim sFolder: sFolder = Rhino.BrowseForFolder(OldFolder,"Locate files to import","Layerized import")
+	If isNull(sFolder) Then Exit Sub
+	
+	OldFolder= SFolder
+	
+	Dim sExt: sExt = ".DXF"
+	
+	Dim aFiles: aFiles = getFileList(sFolder,sExt)
+	
+	If Not isArray(aFiles) Then Exit Sub
+	Dim sFile, adxf(), n, s, Filename, i
+	
+	
+	'///////////////////////////////////
+	'///////////////////////////////////
+	Dim aStartnames(1)
+	
+	aStartnames(0) = "Contour_1"
+	aStartnames(1) = "Measure_Contour_1"
+	
+	'///////////////////////////////////
+	'///////////////////////////////////
+	
+	
+	Dim Bound: Bound = Ubound(aStartnames)
+	Dim aLabels()
+	
+	For i = 0 To bound
+		ReDim Preserve aLabels(i)
+		aLabels(i) = "Layer " & i+1
+	Next
+	
+	
+	Dim aLayerNames:aLayerNames = Rhino.PropertyListBox(aLabels,aStartnames,"Expected layer names", "Import dxf to layers")
+	If Not IsArray(aLayerNames) Then Exit Sub
+	
+	Rhino.EnableRedraw(False)
+	Dim sGrp, NewLayer, str, oldnew
+	For i = 0 To uBound(aFiles)
+		
+		
+		If lCase(right(aFiles(i),3)) = "dxf" Then
+			FileName= getBaseFilename(aFiles(i))
+			str = ReplaceDashes(Filename)
+			if not Rhino.IsGroup(str) then 
+				sGrp = Rhino.addGroup (str)
+			Else
+				sGrp = str
+			End If
+				
+				
+			
+			Rhino.Command "_-Import " & chr(34) &aFiles(i)  &chr(34), False
+			
+			For n = 0 To UBound(aLayerNames)
+				NewLayer = Filename & " " & aLayerNames(n)
+				
+				
+				Dim aTempList: aTempList = Rhino.LayerNames
+				
+				If Rhino.IsLayer(aLayerNames(n)) Then
+					
+					If Not Rhino.isLayer (NewLayer) Then
+						Rhino.RenameLayer aLayerNames(n),Newlayer
+						If n > 0 Then Rhino.ParentLayer Newlayer, OldNew
+					End If
+					
+				End If
+				
+				If Not isnull(rhino.Objectsbylayer(NewLayer)) Then Rhino.AddObjectsToGroup rhino.Objectsbylayer(NewLayer),sGrp
+				OldNew = NewLayer
+			Next
+			
+		End If
+		OldNew = Null
+	Next
+	
+	Rhino.EnableRedraw(True)
+	
+End Sub
+
+Function ReplaceDashes(Str)
+
+	ReplaceDashes =	replace (LTrim(str),chr(45),chr(95))
+
+End Function
+
+
+Function GetBaseFileName(ByVal sFile)
+
+	Dim intFile,lenFile
+	intFile = InstrRev(sFile,"\")
+	lenFile = len(sFile)
+	sFile = Right (sfile, lenFile-intFile)
+	intFile = instr(sFile,".")
+	lenFile = len(sFile)
+	GetBaseFilename = Left(sfile,intFile-1)
+	
+
+End Function
+
+
+Function GetFileList(sDir,sExt)
+	
+	Dim fso, f, fl, fc, s
+	Set fso = CreateObject("Scripting.FileSystemObject")
+	Set f = fso.GetFolder(sDir)
+	Set fc = f.Files
+	Dim aResult(), n, X
+	n = 0
+	
+	For Each fl In fc
+		'	X = CStr(fl)
+		If lcase(right(fl,4)) = lcase(sExt) Then
+			X = True
+			
+			ReDim Preserve aResult(n)
+
+			aresult(n) =fl
+			n = n + 1
+		End If
+	Next
+	
+	GetFileList = aResult
+	
+	Set fso = Nothing
+
+End Function

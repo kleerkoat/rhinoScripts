@@ -1,0 +1,36 @@
+Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version Wednesday, September 29, 2010 6:46:58 PM
+
+'Call straightenLine()
+Sub straightenLine()
+	' make a line segment that is the same length as an arbitrary curve.
+	' line has same start and tangent as curve does at start.
+	Dim strObject, arrDomain
+	Dim startPt, endPt, tangVec
+	Dim fframe
+
+	strObject = Rhino.GetObject("Select a curve")
+
+	If Rhino.IsCurve(strObject) Then
+
+		' get curve domain, it might not be [0,1] (e.g. if you
+		' reverse, reparameterize, or trim it):
+		arrDomain = Rhino.CurveDomain(strObject)
+
+		fframe = Rhino.CurveEvaluate(strObject, arrDomain(0), 1)
+		startPt = fframe(0)
+
+		' shortcut: normalize tangent vector and scale to length of curve simultaneously:
+		tangVec = Rhino.VectorScale(fframe(1), _
+			Rhino.CurveLength(strObject) / Rhino.VectorLength(fframe(1)))
+		
+		' add to start point to get line end point at correct distance away &
+		' in direction of curve tangent:
+		endPt = Rhino.PointAdd(startPt, tangVec)
+		
+		Rhino.AddLine startPt, endPt
+
+	End If
+End Sub

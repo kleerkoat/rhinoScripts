@@ -1,0 +1,27 @@
+Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version Thursday, November 03, 2011 4:24:22 PM
+
+Sub VariableOffsetCrv()
+
+	Dim Obid, ObPrev
+
+	Rhino.UnselectAllObjects
+
+	ObPrev=Rhino.FirstObject
+
+	Rhino.command("_Pipe _Pause Cap=No _Pause _Pause")
+
+	Obid=Rhino.FirstObject
+
+	If Obid = ObPrev or isNull(Obid) Then Exit Sub
+
+	Rhino.command("_ExtractIsocurve _SelLast _Pause")
+
+	Rhino.UnselectAllObjects
+
+	Rhino.DeleteObject(Obid)
+
+End Sub
+

@@ -1,0 +1,52 @@
+'--------------------------------------------------------------
+'Command   :  excb (Extend Curve Both)
+'Date      :  2011/01/25
+'Version   :  2.5
+'Organization   :  Rhino+
+'--------------------------------------------------------------
+
+Sub ExtendCrvBothEnds
+
+
+Dim arrObjects, dblLength
+Dim arrTypes(2), strType ,intType
+
+arrObjects = Rhino.GetObjects("Select curve to extend",4,True,True)
+
+dblLength = 5
+
+dblLength = Rhino.GetReal("Length to extend", dblLength)
+
+If Not IsNumeric(dblLength) Then Exit Sub
+
+arrTypes(0) = "Line"
+arrTypes(1) = "Arc"
+arrTypes(2) = "Smooth"
+
+strType = Rhino.GetString("Extend type",arrTypes(2),arrTypes)
+
+Select Case strType
+Case "Line" realType = 0
+Case "Arc" realType = 1
+Case "Smooth" realType = 2
+End Select
+
+For Each strCurve In arrObjects
+
+If IsNull(strType) Then Exit Sub
+
+If Not IsNull(strCurve) Then
+
+If IsNumeric(dblLength) Then
+Rhino.ExtendCurveLength strCurve,realType , 2, dblLength
+End If
+
+End If
+
+Next
+
+Rhino.SelectObjects arrObjects
+
+End Sub
+
+'ExtendCrvBothEnds'

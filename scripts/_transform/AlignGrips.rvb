@@ -1,0 +1,197 @@
+Option Explicit
+'Script written by Pascal
+
+'Script version Saturday, July 05, 2008
+Private sOldMode1, sOldMode2
+
+If isEmpty(sOldMode1) Then
+	sOldMode1 ="Plane"
+End If
+
+If isEmpty(sOldMode2) Then
+	sOldMode2 ="Direction"
+End If
+
+
+Sub AlignGrips()
+	
+	Dim aCV : aCV = Rhino.getObjectGrips("Select grips.",True,True)
+	
+	If Not isArray(aCV)  Then Exit Sub
+	dim vecX, vecZ, Plane
+	
+	Dim aPts: aPts = Rhino.GetPoints(True,,"Set target line, first point","Set target line, second point",2)
+	If Not IsArray(aPts) Then Exit Sub
+	
+	Dim sLine: sLine = Rhino.AddLine(aPts(0), aPts(1))
+	
+	Dim aModes: aModes = array("Direction", "ClosestPoints")
+	Dim SMode: sMode = Rhino.GetString("Move grips in plane or by closest points?",sOldMode1,aModes)
+	If isNull(sMode) then exit sub
+	Dim aresult: aresult =  Filter(aModes, sMode) 
+	sMode = aresult(0)
+	If isnull(sMode) Then Exit Sub
+	sOldMode1 = sMode
+	
+	
+	Dim CrntPlane: CrntPlane = Rhino.ViewCplane(Rhino.CurrentView)
+	
+
+	
+	Dim temp:temp = aPts(1)
+
+	vecz = Rhino.VectorCreate(apts(1), aPts(0))
+	'vecZ = Rhino.VectorScale(vecZ, 100)
+	
+	Rhino.EnableRedraw(False)
+	
+	if lcase(sMode) = "closestpoints" then
+		aPts(1) = Rhino.PointAdd(apts(0),vecZ)
+		apts(0) = Rhino.PointAdd(temp, Rhino.VectorReverse(vecZ))
+
+		Plane = Rhino.PlaneFromNormal (Apts(0),vecZ)
+		Dim GetLoc,Result, CV, sObj
+		
+		For Each CV In aCV
+			GetLoc = 	Rhino.ObjectGripLocation (CV(0), CV(1))
+			Plane(0) = getLoc
+			result = Rhino.LinePlaneIntersection(aPts,plane)
+			if isArray(result) then	Rhino.ObjectGripLocation CV(0), CV(1),Result
+		Next
+	
+	Else
+		Rhino.EnableRedraw(true)
+		dim aLine: aline = aPts
+		Dim ADir: aDir = Rhino.GetPoints(True,,"Set projection direction first point","Set projection direction second point",2)
+		If Not IsArray(Apts) Then Exit Sub
+		
+		VecX = Rhino.VectorCreate(aDir(1), aDir(0))
+		VecZ = Rhino.ViewCPlane(Rhino.CurrentView)(3)
+		Plane = Rhino.PlaneFromFrame(Rhino.XformCPlaneToWorld(array(0,0,0),Rhino.ViewCPlane),vecX,vecZ)
+		dim test
+		
+		Rhino.EnableRedraw(False)
+		For Each CV In aCV
+			
+			Plane(0) = Rhino.ObjectGripLocation (CV(0), CV(1))
+			Test = Rhino.LinePlaneIntersection(aLine,Plane)
+			If isArray(test) then
+				
+				Rhino.ObjectGripLocation CV(0), CV(1),Test
+				
+			End if
+		
+		Next
+	End if
+	
+		
+	Rhino.DeleteObject sLine
+	Rhino.EnableRedraw(true)
+	
+End Sub
+
+Rhino.AddAlias "AlignGripsCrv", "_NoEcho _-Runscript AlignGripsCrv"
+Rhino.AddAlias "AlignGrips", "_NoEcho _-Runscript AlignGrips"
+Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+
+Sub AlignGripsCrv()
+	
+	Dim aCV : aCV = Rhino.GetObjectGrips("Select grips",True,True)
+	If Not isArray(aCV) Then Exit Sub
+	
+	
+	Dim sCrv: sCrv = Rhino.GetObject("Select target curve",4)
+	If IsNull(sCrv) Then Exit Sub
+	Dim aModes: aModes = array("Direction", "ClosestPoints")
+	Dim SMode: sMode = Rhino.GetString("Move grips in plane or by closest points?",sOldMode2,aModes)
+	If isNull(sMode) then exit sub
+	Dim aresult: aresult =  Filter(aModes, sMode) 
+	sMode = aresult(0)
+	If isnull(sMode) Then Exit Sub
+	sOldMode2 = sMode
+	
+	Dim GetLoc,Result, CV, Test, Param, PlaneSrf
+	
+	If lcase(sMode) = "direction" Then
+	
+		Dim Apts: Apts = Rhino.GetPoints(True,,"First direction point","Second direction point",2)
+		If Not IsArray(Apts) Then Exit Sub
+		
+		Dim VecX : VecX = Rhino.VectorCreate(apts(1), aPts(0))
+		Dim VecZ: VecZ = Rhino.ViewCPlane(Rhino.CurrentView)(3)
+	
+		Dim Plane: Plane = Rhino.PlaneFromFrame(Rhino.XformCPlaneToWorld(array(0,0,0),Rhino.ViewCPlane),vecX,vecZ)
+	
+		Dim aBB: aBB = Rhino.BoundingBox(Rhino.AllObjects,Rhino.CurrentView)
+		Dim Len: Len = Rhino.Distance(aBB(0), aBB(6))
+	
+		PlaneSrf = Rhino.AddPlaneSurface(Plane,len,len)
+	
+		Dim aCen:aCen = Rhino.EvaluateSurface(PlaneSrf,array(len/2,len/2))
+	
+		Rhino.EnableRedraw(False)
+	
+		For Each CV In aCV
+		
+			GetLoc = 	Rhino.ObjectGripLocation (CV(0), CV(1))
+			Rhino.MoveObject PlaneSrf, aCen,GetLoc
+			Test = Rhino.CurveSurfaceIntersection(sCrv,PlaneSrf)
+			If isArray(test) then
+				Result = Test(0,1)
+				Rhino.ObjectGripLocation CV(0), CV(1),Result
+				aCen = GetLoc
+			End if
+			
+		
+		Next
+		
+	Else
+		Rhino.EnableRedraw(False)
+		
+		For Each CV In aCV
+			GetLoc = Rhino.ObjectGripLocation (CV(0), CV(1))
+			Param = Rhino.CurveClosestPoint(sCrv,GetLoc)
+			result = Rhino.EvaluateCurve(sCrv,param)
+			if isArray(result) then	Rhino.ObjectGripLocation CV(0), CV(1),Result
+		Next	
+		
+	End If
+	
+	If Not isEmpty(planeSrf) Then
+		Rhino.DeleteObject PlaneSrf
+	End If
+	
+	Rhino.EnableRedraw(true)
+	
+End Sub
+
+
+Function AveragePoints(arrPts)
+	'Finds the average location of an array
+	'of points.
+
+	Dim X, Y, Z
+	Dim i
+	
+	X = 0
+	Y = 0
+	Z = 0
+
+	For i=0 To UBound (arrPts)
+			
+		'add all the X values
+		X = X+arrPts(i)(0)
+	
+		'add all th Y values
+		Y = Y+arrPts(i)(1)			
+	
+		'add all the Z values
+		Z = Z+arrpts(i)(2)
+	Next
+	
+	'Divide by the number of points to
+	'get the average  for each
+	'create the output array from the 3 averages
+	AveragePoints  =array(X/(UBound(arrPts)+1), Y/(UBound(arrPts)+1), Z/(UBound(arrPts)+1))
+
+End Function

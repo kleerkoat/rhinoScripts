@@ -1,0 +1,88 @@
+' ****************************** RhinoScript.org ******************************
+'
+'   ByLayer command, version 1
+'
+'   by Damon Sidel, published Dec 08, 2009
+'
+'
+'   A quick script command to help work by layer, with three options:
+'   1. Hide all objects on layer of selected object.
+'   2. Isolate all objects on layer of selected object.
+'   3. Make current the layer of the selected object.
+'
+'
+'
+'
+'   This RhinoScript Tool has been downloaded from RhinoScript.org.
+'
+'   Rhino versions: Rhino 4
+'
+'   LICENSE INFORMATION:
+'   This script is published under the GNU General Public License, version 3
+'   or any later version, and thus comes WITHOUT ANY WARRANTY. You can get
+'   the complete license text here: www.rhinoscript.org/gpl
+'
+' ****************************** RhinoScript.org ******************************
+
+
+
+Option Explicit
+'Script written by Damon Sidel
+'Script copyrighted by Damon Sidel
+'Script version Friday, December 04, 2009 4:30:17 PM
+
+'Call ByLayer()
+Sub ByLayer()
+
+	Dim strObj : strObj = Rhino.GetObject("Select an object",,True)
+	If IsNull(strObj) Then Exit Sub
+	
+	Dim strLayer : strLayer = Rhino.ObjectLayer(strObj)
+	If IsNull(strLayer) Then Exit Sub
+
+	Dim arrOpts(2)
+	arrOpts(0) = "Hide"
+	arrOpts(1) = "Isolate"
+	arrOpts(2) = "MakeCurrent"
+
+	Dim strOpt : strOpt = Rhino.GetString("Choose an option:", "MakeCurrent", arrOpts)
+
+	Select Case strOpt
+		Case "Hide"
+			Call HideObjectLayer(strLayer)
+		Case "Isolate"
+			Call IsolateObjectLayer(strLayer)
+		Case "MakeCurrent"
+			Call MakeCurrentObjectLayer(strLayer)
+	End Select
+ 
+	
+End Sub
+
+Function HideObjectLayer(strLayer)
+
+	Dim arrObjs : arrObjs = Rhino.ObjectsByLayer(strLayer)
+	Call Rhino.HideObjects(arrObjs)
+	
+End Function
+
+Function IsolateObjectLayer(strLayer)
+
+	Call Rhino.CurrentLayer(strLayer)
+
+	Call Rhino.UnselectAllObjects() 'first make sure nothing is selected
+	
+	Dim arrObjs : arrObjs = Rhino.ObjectsByLayer(strLayer)
+	Call Rhino.SelectObjects(arrObjs)
+	Call Rhino.Command("'_Invert")
+	
+	Dim arrObjsInv : arrObjsInv = Rhino.SelectedObjects()
+	Call Rhino.HideObjects(arrObjsInv)
+			
+End Function
+
+Function MakeCurrentObjectLayer(strLayer)
+
+	Call Rhino.CurrentLayer(strLayer)
+	
+End Function

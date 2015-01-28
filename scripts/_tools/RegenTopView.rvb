@@ -1,0 +1,11 @@
+﻿Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version Tuesday, January 31, 2012 11:09:55 AM
+
+Call Main()
+Sub Main()
+	Rhino.EnableRedraw False
+	Rhino.ZoomExtents "Top",True
+	Rhino.EnableRedraw True
+End Sub

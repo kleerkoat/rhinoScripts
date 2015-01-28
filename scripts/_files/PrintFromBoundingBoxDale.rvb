@@ -1,0 +1,24 @@
+Option Explicit
+'Call PrintFromBoundingBoxDale()
+Sub PrintFromBoundingBoxDale()
+
+   Dim arrPts, arrObjs, strCmd
+
+   arrObjs = Rhino.GetObjects("Select objects to print")
+   If Not IsArray(arrObjs) Then Exit Sub
+
+   arrPts = Rhino.BoundingBox(arrObjs)
+   If Not IsArray(arrPts) Then Exit Sub
+
+   strCmd = "_-Print _Setup _View _ViewportArea=_Window "
+   strCmd = strCmd & Rhino.Pt2Str(arrPts(0),, True)
+   strCmd = strCmd & Rhino.Pt2Str(arrPts(2),, True)
+   strCmd = strCmd & "_EnterEnd"
+
+   ' If you print this string the command line, you can then
+   ' copy and paste it into the MacroEditor to test...
+   ' Call Rhino.Print(strCmd)
+
+   Call Rhino.Command(strCmd, False)
+
+End Sub 

@@ -1,0 +1,49 @@
+﻿Option Explicit
+'Script written by <huhooya>
+'Script version 2010年10月20日 0:47:36
+'Call recursivebox
+Sub RecursiveBox()
+	Dim arrbox,nub,sbox
+	arrbox = rhino.GetBox
+	nub =rhino.GetInteger("input a generation then wait for a while(normally less than 2)")
+	Rhino.EnableRedraw False
+	sbox=rhino.AddBox(arrbox)
+	Call boxarray(arrbox,nub,sbox)
+	Rhino.EnableRedraw True
+End Sub
+Function movepoints(ByVal arrpoints, ByVal x, ByVal y, ByVal z)
+	Dim i,pt()
+	For i = 0 To Ubound(arrpoints)
+		ReDim Preserve pt(i)
+		pt(i)= rhino.PointAdd(arrpoints(i),array(x,y,z))
+	Next
+	movepoints = pt
+End Function
+
+Sub boxarray(ByVal arrbox, ByVal generation, ByVal Sbox)
+	If generation < 0 Then Exit Sub
+	rhino.DeleteObject Sbox
+	Dim scapt(7),vec,sp(7)
+	Dim z
+	For z = 0 To 7
+		sp(z)=rhino.PointScale(arrbox(z),1/3)
+		vec=rhino.vectorcreate(arrbox(0),sp(0))
+		scapt(z)=rhino.PointAdd(sp(z),vec)
+	Next
+	Dim aX,aY,aZ
+	aX=(1/3)*rhino.Distance(arrbox(0),arrbox(1))
+	aY=(1/3)*rhino.Distance(arrbox(0),arrbox(3))
+	aZ=(1/3)*rhino.Distance(arrbox(0),arrbox(4))
+	Dim i,j,k,pt,Mbox
+	For i=0 To 2
+		For j=0 To 2
+			For k = 0 To 2
+				If Not (i*i+j*j=2) And Not (i*i+k*k=2) And Not (k*k+j*j=2)Then
+					pt = movepoints(scapt,i*aX,j*aY,k*aZ)
+					Mbox = rhino.AddBox(pt)
+					boxarray pt,generation-1,Mbox
+				End If
+			Next
+		Next
+	Next
+End Sub

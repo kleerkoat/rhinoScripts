@@ -1,0 +1,106 @@
+Option Explicit
+'Script by Mitch Heynick
+'Version Sunday, 11 April, 2010
+
+Private dblOldPS
+If IsEmpty(dblOldPS)Then dblOldPS=5
+
+Private oldDel
+If IsEmpty(oldDel)Then oldDel="No"
+
+'Call RebuildCrvByLength()
+Sub RebuildCrvByLength()
+	
+	Dim arrMsgs,dblPtSpace,arrCrvs,strDel
+	
+	arrMsgs=Localize()
+	
+	arrCrvs=Rhino.GetObjects(arrMsgs(0),4,,True)
+	If not IsArray(arrCrvs) Then Exit Sub
+			
+	dblPtSpace=Rhino.GetReal(arrMsgs(1),dblOldPS,0)
+	If IsNull(dblPtSpace) Then Exit Sub
+	dblOldPS=dblPtSpace	
+	
+	If oldDel="Yes" Then	
+		strDel=Rhino.GetString(arrMsgs(2),arrMsgs(4),Array(arrMsgs(3)))
+	Else
+		strDel=Rhino.GetString(arrMsgs(2),arrMsgs(3),Array(arrMsgs(4)))
+	End If	
+	If IsNull(strDel) or (strDel<>arrMsgs(3) and strDel<>arrMsgs(4)) Then Exit Sub
+	
+	If strDel=arrMsgs(3) Then
+		strDel="No"
+	Else
+		strDel="Yes"
+	End If	
+	oldDel=strDel
+	
+	Dim strCrv,dblCrvLen,intVCount,strVCount,strComm,strNewCrv,m
+	Dim sTime,count
+		
+	Call Rhino.UnselectAllObjects
+	Call Rhino.EnableRedraw(False)
+	sTime=timer
+	count=0	
+	If not Rhino.IsLayer(arrMsgs(7)) and strDel="No" Then 
+		Call Rhino.AddLayer(arrMsgs(7),RGB(0,0,255))
+	End If
+	
+	For each strCrv in arrCrvs
+		Call Rhino.SelectObject(strCrv)
+		
+		dblCrvLen=Rhino.CurveLength(strCrv)
+		intVCount=Int(dblCrvLen/dblPtspace)
+		
+		'special case for small point counts
+		m=15 '(adjust as necessary)
+		If intVCount<=m then
+			strVCount=Cstr(m)
+		Else
+			strVCount=Cstr(intVCount)	
+		End If
+	
+		strComm="_RebuildCrvNonUniform _RequestedTolerance=0.1 _MaxPointCount="
+		strComm=strComm&strVCount&" _Quarters=_No _DeleteInput=_"&strDel&" _Enter" 
+		Call Rhino.Command(strComm,False)
+		strNewCrv=Rhino.LastCreatedObjects
+		If strDel="No" Then
+			Call Rhino.ObjectLayer(strNewCrv,arrMsgs(7))
+		End If		
+		Call Rhino.UnselectAllObjects
+		count=count+1
+		Call Rhino.Print(count&"/"&(Ubound(arrCrvs)+1))
+	Next
+	
+	Call Rhino.EnableRedraw(True)
+	Call Rhino.Print(arrMsgs(5)&Round(Timer-sTime)&arrMsgs(6))
+End Sub
+
+Function Localize()
+	Dim intLCID,arrMsgs
+	Dim str1,str2,str3,str4,str5,str6,str7,str8
+
+	intLCID=Rhino.LocaleID
+	If intLCID=1036 Then
+		str1="Sélectionner les courbes"
+		str2="Espacement **approximative** des points de contrôle le long de la courbe?"
+		str3="Effacer originaux?"
+		str4="Non"
+		str5="Oui"
+		str6="Calculs terminés après "
+		str7=" secondes"
+		str8="Courbes Réconstruites"
+	Else
+		str1="Select curves to process"
+		str2="**Approximate** control point spacing along curve?"
+		str3="Delete input?"
+		str4="No"
+		str5="Yes"
+		str6="Finished processing curves after "
+		str7=" seconds"
+		str8="Rebuilt Curves"
+	End If
+	Localize=Array(str1,str2,str3,str4,str5,str6,str7,str8)
+	
+End Function

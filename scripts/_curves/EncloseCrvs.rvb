@@ -1,0 +1,75 @@
+Option Explicit
+' Script written by Guilherme C. Webster, Jan 2005, for Rhinoceros 3D 3.0.
+' Rhinoscript February 11, 2005
+' Updated in June 2005, with the on-line collaboration of Emilio Morello on the Rhino NewsGroup
+' Designed to enclose open planar curves inside a closed planar curve boundary.
+'Call EncloseCrvs()
+Sub EncloseCrvs()
+
+Dim arrCrvs, strCrv
+Dim strBound
+Dim strSrf, arrInt
+
+arrCrvs = Rhino.GetObjects ("Select planar curves to restrict", 4, True, True)
+        If IsNull (arrCrvs) Then
+        Exit Sub
+        Else
+            For each strCrv in arrCrvs
+                If Not Rhino.IsCurvePlanar (strCrv) Then
+                Exit Sub
+                End If
+            Next
+        End If
+
+strBound = Rhino.GetObject ("Select Boundary", 4)
+          If IsNull (strBound) Then
+          Exit Sub
+          Else
+                  If Not Rhino.IsCurvePlanar (strBound) or Not Rhino.IsCurveClosed (strBound) Then
+                  Rhino.print "Please select a planar closed curve."
+                  Exit Sub
+                  End If
+          End If
+
+Rhino.print "Intersecting curves, please wait..."
+
+Rhino.EnableReDraw(vbFalse)
+
+Rhino.SelectObject (strBound)
+Rhino.command "PlanarSrf", False
+strSrf = Rhino.LastCreatedObjects
+
+           Rhino.UnselectAllObjects
+           Rhino.SelectObject strBound
+           Rhino.Command "Cplane Object", False
+           
+           For each strCrv in arrCrvs
+               arrInt = Rhino.CurveBrepIntersect (strCrv, strSrf(0))
+                      If IsNull (arrInt) Then
+                      Rhino.DeleteObjects (strSrf)
+                      Rhino.Command "Cplane Previous", False
+                      Rhino.EnableReDraw(vbTrue)
+                      Rhino.print "Command failed."
+                      Exit Sub
+                      End If
+                      If Not Rhino.IsCurveInPlane (strCrv) Then
+                      Rhino.Print "Curves are not coplanar to the boundary. Unable to proceed."
+                      Rhino.DeleteObjects (strSrf)
+                      Rhino.Command "Cplane Previous", False
+                      Rhino.EnableReDraw(vbTrue)
+                      Exit Sub
+                      End If
+           Next
+
+           Rhino.Command "Cplane Previous", False
+           Rhino.DeleteObjects (arrCrvs)
+           Rhino.DeleteObjects (strSrf)
+
+Rhino.command "SelNone", False
+Rhino.command "SelLast", False
+Rhino.command "Join enter", False
+Rhino.command "Group enter", False
+
+Rhino.EnableReDraw(vbTrue)
+
+End Sub

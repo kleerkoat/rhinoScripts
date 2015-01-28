@@ -1,0 +1,414 @@
+Option Explicit
+
+'--------------------------------------------------------------------------------
+'      Global Defaults - To Be Handled By INI File at a Later Date
+'--------------------------------------------------------------------------------
+
+'Defaults
+Dim ProgramName: ProgramName = "NC-CurveS"
+Dim NCMode: NCMode = "Cut"
+Dim dblMinTolerance: dblMinTolerance = .00001
+Dim dblMaxTolerance: dblMaxTolerance = 10
+Dim dblTolerance: dblTolerance = .01
+Dim IntPrecision: IntPrecision = 4
+Dim OutPutBlocks: OutPutBlocks = True
+Dim intMaxRPM: intMaxRPM = 50000	
+Dim intMaxFEED: intMaxFEED = 40000
+Dim intMaxTOOLS: intMaxTOOLS = 99 	
+Dim m_BlockNumber, m_BlockStart, m_BlockMax, m_BlockInc, strEmptyBlock, strBlockPrefix
+strBlockPrefix = "N"
+m_BlockNumber = 5
+m_BlockStart = 5
+m_BlockMax = 999999
+m_BlockInc = 5
+
+'Call NC-CurveS()
+
+Sub NCCurveS()
+	
+	
+	Dim arrNCCurveS : arrNCCurveS = Rhino.GetObjects("Select the NC-Curve(S)...", 4, True, True)
+	If IsNull(arrNCCurveS) Then Exit Sub 'User pressed Escape instead of picking a Curve
+	
+	Dim iCounter, strNCPoints(), arrNCPoints(), arrShowPts()
+	ReDim strNCPoints(uBound(arrNCCurveS))
+	ReDim arrNCPoints(uBound(arrNCCurveS))
+	ReDim arrShowPts(uBound(arrNCCurveS))  
+
+	
+	Call Rhino.EnableRedraw(False)
+	For iCounter = 0 To uBound(arrNCCurveS)
+		strNCPoints(iCounter) = Rhino.ConvertCurveToPolyline (arrNCCurveS(iCounter), 0, dblTolerance , False)	
+		arrNCPoints(iCounter) = Rhino.PolylineVertices (strNCPoints(iCounter))
+		Rhino.DeleteObject(strNCPoints(iCounter))
+		arrShowPts(iCounter) = Rhino.AddPoints(arrNCPoints(iCounter))
+	Next
+	Call Rhino.EnableRedraw(True)
+
+	Dim iToleranceOK: iToleranceOK = vbNo
+	
+	While (iToleranceOK <> vbYes)
+		iToleranceOK = Rhino.MessageBox("Use the current NC-CurveS Tolerance as shown?", vbYesNo, ProgramName)
+			
+		If (iToleranceOK = vbNo) Then
+			' Leave the displayed points up while the users decides the new tolerance.
+			dblTolerance = Rhino.GetReal("Enter the New NC-CurveS Tolerance (" & dblMinTolerance & "-" & dblMaxTolerance &")", dblTolerance, dblMinTolerance, dblMaxTolerance)
+			' User has made his choice, get rid of the Polyline and the associated points
+			
+			Call Rhino.EnableRedraw(False)
+			For iCounter = 0 To uBound(arrNCCurveS)
+				Rhino.DeleteObject(strNCPoints(iCounter))
+				Rhino.DeleteObjects(arrShowPts(iCounter)) 
+
+				If IsNull(dblTolerance) Then Exit Sub 'User did not specify a valid tolerance
+				' Lets throw it back up and see what the User thinks this time... 
+				strNCPoints(iCounter) = Rhino.ConvertCurveToPolyline (arrNCCurveS(iCounter), 0, dblTolerance , False)	
+				arrNCPoints(iCounter) = Rhino.PolylineVertices (strNCPoints(iCounter))
+				Rhino.DeleteObject(strNCPoints(iCounter))
+				arrShowPts(iCounter) = Rhino.AddPoints(arrNCPoints(iCounter))
+			Next
+			Call Rhino.EnableRedraw(True)
+		
+		End If
+	Wend
+
+	Call Rhino.EnableRedraw(False)
+	For iCounter = 0 To uBound(arrNCCurveS)
+		Rhino.DeleteObject(strNCPoints(iCounter))
+		Rhino.DeleteObjects(arrShowPts(iCounter)) 
+	Next
+	Call Rhino.EnableRedraw(True)
+	
+	
+	'--------------------------------------------------------------------------------
+	'                   Declaration of Speeds-n-Feeds
+	'--------------------------------------------------------------------------------
+	'Dim intToolNo: intToolNo = 19
+	Dim intToolNo: intToolNo = 3
+
+	Dim dblSafePlane: dblSafePlane = 100.0
+	Dim dblApproachHt: dblApproachHt = 2.5
+	Dim dblRetractHt: dblRetractHt = 2.5
+	Dim dblEngageHt: dblEngageHt = .5
+	Dim dblDisengageHt: dblDisengageHt = .5
+
+	Dim intCutFeed: intCutFeed = 230
+	Dim intApproachFeed: intApproachFeed = 762
+	Dim intRetractFeed: intRetractFeed = 762
+	Dim intPositionFeed: intPositionFeed = 5000
+	Dim intEngageFeed: intEngageFeed = 127
+	Dim intDisengageFeed: intDisengageFeed = 762
+	Dim intSpindleSpeed: intSpindleSpeed = 3701
+	Dim dblParkTableX: dblParkTableX = 0
+	Dim dblParkTableY: dblParkTableY = 0
+	Dim dblZVal
+	
+	'--------------------------------------------------------------------------------
+	'                   Allow User Modification of all parameters
+	'--------------------------------------------------------------------------------
+	'                   Get the Menu Selections prepared
+	'--------------------------------------------------------------------------------
+
+	Dim bResult, arrOptions(8)
+	arrOptions(0) = "BlockOptions"
+	arrOptions(1) = "ToolNo" 
+	arrOptions(2) = "CutFeed"  
+	arrOptions(3) = "SpindleSpeed"
+	arrOptions(4) = "RetractPlaneHt" 
+	arrOptions(5) = "Precision"
+	arrOptions(6) = "MovementFeeds"
+	arrOptions(7) = "PositionalHeights"
+	arrOptions(8) = "Accept"
+	
+	Dim arrBlockOptions(4)
+	arrBlockOptions(0) = "OutputBlocks"
+	arrBlockOptions(1) = "StartingBlock"
+	arrBlockOptions(2) = "IncrementBy"
+	arrBlockOptions(3) = "MaxBlockNo"
+	arrBlockOptions(4) = "Accept"
+		
+	Dim arrMOVoptions(4)
+	arrMOVoptions(0) = "ApproachFeed"
+	arrMOVoptions(1) = "EngageFeed"
+	arrMOVoptions(2) = "RetractFeed"
+	arrMOVoptions(3) = "DisengageFeed"
+	arrMOVoptions(4) = "Accept"
+	
+	Dim arrPOSoptions(4)
+	arrPOSoptions(0) = "ApproachHt"
+	arrPOSoptions(1) = "EngageHt"
+	arrPOSoptions(2) = "RetractHt"
+	arrPOSoptions(3) = "DisengageHt"
+	arrPOSoptions(4) = "Accept"
+
+	'--------------------------------------------------------------------------------
+	'                  Loop Until All Parmeters Are Acceptable
+	'--------------------------------------------------------------------------------
+	
+	Dim LocalBlock
+	
+	Do
+	Call Rhino.Print("  BlockOptions" & "  ToolNo=" & intToolNo & "  CutFeed=" & intCutFeed & "  SpindleSpeed=" & intSpindleSpeed & _
+		"  RetractPlaneHt=" & dblSafePlane & "  Precision=" & IntPrecision & "  ( SubMenus = MovementFeeds & PositionalHeights )"	)
+
+	bResult = Rhino.GetString(ProgramName & " Settings", "Accept", arrOptions)
+	If Not IsNull(bResult) Then	
+		
+	Select Case UCase(Left(bResult, 3))
+		Case "BLO"
+		Do 
+			Call Rhino.Print("  OutputBlocks=" & OutPutBlocks & "  StartingBlock=" & m_BlockStart & "  IncrementBy=" & m_BlockInc & "  MaxBlockNo=" & m_BlockMax)
+			bResult = Rhino.GetString("MovementFeeds", "Accept", arrBlockOptions)
+			Select Case UCase(Left(bResult, 3))
+			Case "STA"
+				m_BlockStart = Rhino.GetInteger ("StartingBlock", m_BlockStart , 1 , m_BlockMax)
+			Case "INC"
+				m_BlockInc = Rhino.GetInteger ("IncrementBy", m_BlockInc , 1 , m_BlockMax)
+			Case "MAX"
+				m_BlockMax = Rhino.GetInteger ("MaxBlockNo", m_BlockMax , 1 )
+			Case "OUT"
+				LocalBlock = Rhino.GetBoolean ("(Yes/No)", Array("OutputBlocks", "No", "Yes"), Array(True))
+				OutPutBlocks = LocalBlock(0)
+			Case "ACC"
+				Exit Do 
+			End Select
+		Loop
+		Case "TOO"
+		intToolNo = Rhino.GetInteger ("ToolNo", intToolNo , 1 , intMaxTOOLS)
+		Case "CUT"
+		intCutFeed = Rhino.GetInteger ("CutFeed", intCutFeed , 1 , intMaxFEED)
+		Case "PRE"
+		IntPrecision = Rhino.GetInteger ("DecimalPoints", IntPrecision , 1 , 10)
+		Case "MOV"
+		Do 
+			Call Rhino.Print("  ApproachFeed=" & intApproachFeed & "  EngageFeed=" & intEngageFeed & "  RetractFeed=" & intRetractFeed & "  DisengageFeed=" & intDisengageFeed)
+			bResult = Rhino.GetString("MovementFeeds", "Accept", arrMOVoptions)
+			Select Case UCase(Left(bResult, 3))
+			Case "APP"
+				intApproachFeed = Rhino.GetInteger ("ApproachFeed", intApproachFeed , 1 , intMaxFEED)
+			Case "ENG"
+				intEngageFeed = Rhino.GetInteger ("EngageFeed", intEngageFeed , 1 , intMaxFEED)
+			Case "RET"
+				intRetractFeed = Rhino.GetInteger ("RetractFeed", intRetractFeed , 1 , intMaxFEED)
+			Case "DIS"
+				intDisengageFeed = Rhino.GetInteger ("DisengageFeed", intDisengageFeed , 1 , intMaxFEED)
+			Case "ACC"
+				Exit Do 
+			End Select
+		Loop
+		Case "SPI"
+		intSpindleSpeed = Rhino.GetInteger ("SpindleSpeed", intSpindleSpeed , 1 , intMaxRPM)
+		Case "RET"
+		dblSafePlane = Rhino.GetReal ("RetractPlane", dblSafePlane , .1 , 500)
+		Case "POS"
+		Do
+			Call Rhino.Print("  ApproachHt=" & dblApproachHt & "  EngageHt=" & dblEngageHt & "  RetractHt=" & dblRetractHt & "  DisengageHt=" & dblDisengageHt)
+			bResult = Rhino.GetString("MovementHeights", "Accept", arrPOSoptions)
+			Select Case UCase(Left(bResult, 3))
+			Case "APP"
+				dblApproachHt = Rhino.GetReal ("ApproachHt", dblApproachHt , .1 , 500)
+			Case "ENG"
+				dblEngageHt = Rhino.GetReal ("EngageHt", dblEngageHt , .1 , 500)
+			Case "RET"
+				dblRetractHt = Rhino.GetReal ("RetractHt", dblRetractHt , .1 , 500)
+			Case "DIS"
+				dblDisengageHt = Rhino.GetReal ("DisengageHt", dblDisengageHt , .1 , 500)
+			Case "ACC"
+				Exit Do 
+			End Select
+		Loop
+		Case "ACC"
+			Exit Do 
+	End Select
+
+Else
+	Exit Do
+End If
+Loop	
+	
+	
+	'--------------------------------------------------------------------------------
+	'                User is Satisfied with the Parameters
+	'--------------------------------------------------------------------------------
+	'                   Get the File........
+	'--------------------------------------------------------------------------------
+
+	Dim  FileSystem, strFilename, NCFile, iNCContour 
+	Dim  xNCPoint, strGCodePoint, strFileOutput          
+
+	strFilename = Rhino.SaveFileName("Output File for " & ProgramName, _
+		"TAP Files (*.tap)|*.tap|NC Files (*.nc)|*.nc|Text Files (*.txt)|*.txt|.I Files (*.i)|*.i|All Files (*.*)|*.*||")
+	
+	If Not IsNull(strFilename) Then
+		Set FileSystem = CreateObject("Scripting.FileSystemObject")
+		On Error Resume Next
+		' Get a new text file
+		Set NCFile = FileSystem.CreateTextFile(strFileName, True)
+		If Err Then
+			MsgBox Err.Description
+			Exit Sub
+		End If
+	End If
+	'--------------------------------------------------------------------------------
+	'                   Output File/Machine HEADER
+	'        (All to be handled by INI file routines at a later date)
+	'--------------------------------------------------------------------------------
+
+	Call NCFile.WriteLine (BlockNo() & " ( PROGRAM BY " & ProgramName & " )")
+	Call NCFile.WriteLine (BlockNo() & " T" & intToolNo & " M6")
+	Call NCFile.WriteLine (BlockNo() & FormatSPEED(intSpindleSpeed) & " M3")
+	'Call NCFile.WriteLine (BlockNo() & " G21")
+	Call NCFile.WriteLine (BlockNo() & " G0 G43 H" & intToolNo & " Z" & FormatREAL(dblSafePlane) & " M8") ' Change whenever the Tool is variable... & strH
+ 
+	'--------------------------------------------------------------------------------
+	'                   Process/Output the Point Data
+	'	The outer For/Next Loop steps through the Array of Curves
+	'	The inner For/Next Loop digitizes and Outputs the PointData
+	'--------------------------------------------------------------------------------
+	'	Between (Fore and Aft) the INNER and OUTER Loops, 
+	'	Place the Approach(Fore Section)/Retract(Aft Section) Data
+	'--------------------------------------------------------------------------------
+
+	For iNCContour = 0 To  ubound(arrNCPoints)  ' OUTER LOOP
+		'--------------------------------------------------------------------------------
+		'  First we must properly ADDRESS and ENGAGE the part, then once we are on our way
+		'  We will LOOP (For/Next) the the remainder of points in the array
+		'--------------------------------------------------------------------------------
+	
+		' SPECIAL CONDITION: Point "1"(0) = The first point, used only for Positional and Engaging purposes
+		xNCPoint=0		
+			' Position @ last known Z value (Safe/Retract), over the X-Y Coord
+		Call NCFile.WriteLine (BlockNo() & " X" & FormatREAL(arrNCPoints(iNCContour)(xNCPoint)(0)) _
+		& " Y" & FormatREAL(arrNCPoints(iNCContour)(xNCPoint)(1)))
+				
+			' Decend in Z to the Approach Height
+		'dblZVal = arrNCPoints(iNCContour)(0)(2) + dblApproachHt
+		Call NCFile.WriteLine (BlockNo() & " Z" & FormatREAL(dblApproachHt))
+				
+			' Decend in Z to the Engage Height at the Approach Feed
+		dblZVal = arrNCPoints(iNCContour)(xNCPoint)(2) + dblEngageHt
+		Call NCFile.WriteLine (BlockNo() & " G1 Z" & FormatREAL(dblZval) & FormatFEED(intApproachFeed))
+				
+			' ***ENGAGE THE PART*** at the Engage Feed Rate
+		Call NCFile.WriteLine (BlockNo() & " Z" & FormatREAL(arrNCPoints(iNCContour)(xNCPoint)(2)) & FormatFEED(intEngageFeed))
+
+		'  SPECIAL CONDITION: Point "2"(1) = The SECOND point, but the FIRST point to actually CUT
+		xNCPoint=1
+		If ( Round(arrNCPoints(iNCContour)(xNCPoint)(0),intPrecision) <> Round(arrNCPoints(iNCContour)(xNCPoint-1)(0),intPrecision) ) Then
+			strFileOutput = BlockNo() & " X" & FormatREAL(arrNCPoints(iNCContour)(xNCPoint)(0))
+			Else
+				strFileOutput = BlockNo() 
+			End If
+							
+		If ( Round(arrNCPoints(iNCContour)(xNCPoint)(1),intPrecision) <> Round(arrNCPoints(iNCContour)(xNCPoint-1)(1),intPrecision) ) Then
+			strFileOutput = strFileOutput & " Y" & FormatREAL(arrNCPoints(iNCContour)(xNCPoint)(1) )
+			End If
+							
+		If ( Round(arrNCPoints(iNCContour)(xNCPoint)(2),intPrecision) <> Round(arrNCPoints(iNCContour)(xNCPoint-1)(2),intPrecision) ) Then
+			strFileOutput = strFileOutput & " Z" & FormatREAL(arrNCPoints(iNCContour)(xNCPoint)(2) )
+			End If
+								
+			Call NCFile.WriteLine(strFileOutput & FormatFEED(intCutFeed))
+			strFileOutput = ""
+		'--------------------------------------------------------------------------------
+		'  Time to process the remainder of points in the current Curve/Array (Starting at the 3rd point (2))
+		'--------------------------------------------------------------------------------
+
+		For xNCPoint = 2 To ubound(arrNCPoints(iNCContour))  ' INNER LOOP
+				
+			If ( Round(arrNCPoints(iNCContour)(xNCPoint)(0),intPrecision) <> Round(arrNCPoints(iNCContour)(xNCPoint-1)(0),intPrecision) ) Then
+				strFileOutput = BlockNo() & " X" & FormatREAL(arrNCPoints(iNCContour)(xNCPoint)(0))
+			Else
+				strFileOutput = BlockNo()
+				strEmptyBlock = strFileOutput 
+			End If
+		
+			If ( Round(arrNCPoints(iNCContour)(xNCPoint)(1),intPrecision) <> Round(arrNCPoints(iNCContour)(xNCPoint-1)(1),intPrecision) ) Then
+				strFileOutput = strFileOutput & " Y" & FormatREAL(arrNCPoints(iNCContour)(xNCPoint)(1))
+			End If
+		
+			If ( Round(arrNCPoints(iNCContour)(xNCPoint)(2),intPrecision) <> Round(arrNCPoints(iNCContour)(xNCPoint-1)(2),intPrecision) ) Then
+				strFileOutput = strFileOutput & " Z" & FormatREAL(arrNCPoints(iNCContour)(xNCPoint)(2))
+			End If
+				
+			If ( strFileOutput <> strEmptyBlock ) Then
+			Call NCFile.WriteLine(strFileOutput)
+			End If
+			strFileOutput = ""
+			
+		Next  ' INNER LOOP
+
+		'--------------------------------------------------------------------------------
+		'  Time to DISENGAGE, and RETRACT from the part, a lot more straightforward that the engagement!
+		'--------------------------------------------------------------------------------
+		dblZVal = arrNCPoints(iNCContour)(ubound(arrNCPoints(iNCContour)))(2) + dblDisengageHt
+		Call NCFile.WriteLine (BlockNo() & " Z" & FormatREAL(dblZval) & FormatFEED(intDisengageFeed))
+		'dblZVal = arrNCPoints(iNCContour)(ubound(arrNCPoints(iNCContour)))(2) + dblRetractHt
+		Call NCFile.WriteLine (BlockNo() & " G0 Z" & FormatREAL(dblRetractHt))
+		
+		' DONE with that Curve/Array..... NEXT!!!! On to the next task (another Curve/Array, or Finish Up!)
+		
+	Next  ' OUTER LOOP
+    
+	'--------------------------------------------------------------------------------
+	'                   Output File/Machine FOOTER
+	'        (All to be handled by INI file routines at a later date)
+	'--------------------------------------------------------------------------------
+     
+	Call NCFile.WriteLine(BlockNo() & " G0 Z" & FormatREAL(dblSafePlane))
+	Call NCFile.WriteLine(BlockNo() & " Z250.")
+	Call NCFile.WriteLine(BlockNo() & " M9")
+	Call NCFile.WriteLine(BlockNo() & " G0 G40 G90 G80 M5")
+	
+	'--------------------------------------------------------------------------------
+	'                   CLOSE-UP - File Complete
+	'--------------------------------------------------------------------------------
+		
+	Call NCFile.Close()
+	Set NCFile = Nothing
+
+End Sub
+
+
+Function BlockNo()
+	m_BlockNumber = m_BlockNumber + m_BlockInc
+	If ((m_BlockNumber + m_BlockInc) > m_BlockMax) Then m_BlockNumber = m_BlockStart
+	If ((m_BlockNumber + m_BlockInc) < m_BlockStart) Then m_BlockNumber = m_BlockStart
+	
+	If (OutPutBlocks = True) Then
+		BlockNo = strBlockPrefix & m_BlockNumber
+	Else
+		BlockNo = ""
+	End If
+		
+End Function
+
+Function FormatREAL(ByVal FormatValue)
+	
+	Dim CNCValue:	CNCValue = Round(FormatValue,IntPrecision)
+	
+	If (CNCValue = Int(CNCValue)) Then
+		FormatREAL = CStr(CNCValue) & "."
+	Else
+		FormatREAL = CStr(CNCValue)
+	End If
+	
+End Function
+
+Function FormatFEED(ByVal FormatValue)
+	
+		FormatFEED = " F" & CStr(Int(FormatValue))
+	
+End Function
+
+Function FormatSPEED(ByVal FormatValue)
+	
+		FormatSPEED = " S" & CStr(Int(FormatValue))
+	
+End Function
+
+Function FormatINT(ByVal FormatValue)
+	
+		FormatINT = CStr(Int(FormatValue))
+	
+End Function

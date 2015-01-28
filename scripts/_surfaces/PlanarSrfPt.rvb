@@ -1,0 +1,66 @@
+Option Explicit
+'Script written by Pascal
+
+'Script date Friday, September 04, 2009 
+Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+Rhino.AddAlias "PlanarSrfPt", "_NoEcho _-Runscript (PlanarSrfPt)"
+
+
+'//////////////////////////////////
+'Makes a polygonal planar surface with vertices
+'at user picked points locations.
+'//////////////////////////////////
+
+'PlanarSrfPt()
+
+Sub PlanarSrfPt()
+  
+	dim arrPt:arrPt = Rhino.GetPoints(true,,"First point for planar surface",_
+		"Next point for planar surface. Press Enter when done")
+	If not IsArray(arrPt) Then exit sub
+	
+	Rhino.EnableRedraw(false)
+		
+	If UBound(arrPt)<=1 Then exit sub 'make sure there are three points at least
+		
+	dim Bound:	Bound = Ubound(arrPt)
+		
+	redim preserve arrpt(Bound+1)
+	arrPt(Bound+1) = arrPt(0)
+	
+	'add the first point to the end of the array
+	'to close the polyline:
+		
+	Dim plane: Plane = Rhino.PlaneFitFromPoints(array(arrPt(0), arrPt(1), ArrPt(2)))
+	Dim Tol: Tol = Rhino.UnitAbsoluteTolerance
+	dim test, i, X, aOff(), n
+	X = False
+	n = 0
+	
+	For i = 3 to Ubound(arrPt)
+		test = Rhino.PlaneClosestPoint(plane,arrPt(i))
+		if  Rhino.Distance(arrpt(i), test)  > tol then
+			
+			redim preserve aOff(n)
+			aOff(n) = Rhino.AddPoint(arrpt(i))
+			n = n + 1
+			arrPt(i) = test
+	
+			X = true
+		End If
+	Next
+		
+	Dim strCrv:	strCrv = Rhino.addPolyline (arrPt)
+	dim strSrf: strSrf = Rhino.AddPlanarSrf (array(strCrv))
+		
+	Rhino.DeleteObject strCrv
+	Rhino.EnableRedraw(true)
+	
+	If X = true then 
+		dim sGrp: sGrp = Rhino.addGroup
+		Rhino.AddObjectsToGroup aOff, sGrp
+		Rhino.SelectObjects aOff
+		MsgBox "The points were not coplanar." &vbNewLine &"The selected points were projected to the plane of the first three points"
+	End If
+			
+End Sub

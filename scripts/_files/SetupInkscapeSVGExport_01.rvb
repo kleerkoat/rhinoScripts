@@ -1,0 +1,283 @@
+Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version Thursday, May 12, 2011 20:03:45
+
+Call SetupInkscapeSVGtoPDF()
+Sub  SetupInkscapeSVGtoPDF()
+	
+	Dim strRVBPath
+	strRVBPath = Rhino.OpenFileName("Select ExportInkscapeSVG script file for setup", "ExportInkscapeSVG xx .rvb* |ExportInkscapeSVG*")
+	If (IsNull(strRVBPath)) Then
+		Rhino.MessageBox ("Scriptfile not found, exiting setup, nothing changed")
+		Exit Sub
+	End If
+	
+	
+	
+	
+	
+	
+	Dim blnDisableDisclaimer, blnOfferInkscapePDF, blnAddAlias
+		
+	blnDisableDisclaimer = False
+	blnOfferInkscapePDF = False
+	blnAddAlias = False
+	
+	If NoDisclaimer()=6 Then
+		blnDisableDisclaimer = True
+	End If
+
+	If OfferInkscapePDF() = 6 Then
+		blnOfferInkscapePDF = True
+	End If
+	
+	If MakeAlias() = 6 Then 
+		blnAddAlias = True
+	End If
+	
+	
+
+	If FinalCheck(blnDisableDisclaimer,blnOfferInkscapePDF,blnAddAlias) <> 6 Then
+		Rhino.MessageBox ("Exiting setup, nothing changed")
+		Exit Sub
+	End If
+	
+	
+	
+	'get Inkscape executable
+	Dim strInkscapeEXE
+	If blnOfferInkscapePDF Then
+		strInkscapeEXE = Rhino.OpenFileName ("Get Inkscape executable" , "Inkscape executable (.exe)| inkscape*.exe")
+		'	strInkscapeEXE = "c:/Dummy/inkscape.exe"
+		If (IsNull(strInkscapeEXE)) Then
+			Rhino.MessageBox ("No valid Inkscape executable found, exiting setup, nothing changed")
+			Exit Sub
+		End If
+	End If
+	
+
+	
+	Dim markerEXE,markerWarning,markerPDF,markerAlias
+	
+	markerWarning = "'SETUP MARKER: Show Disclaimer"
+	markerPDF     = "'SETUP MARKER: Offer InkscapePDF"
+	markerEXE     = "'SETUP MARKER: Inkscape Executable"
+	markerAlias   = "'SETUP MARKER: run via Alias"
+	
+	Dim strRVB,Line,strLine
+	
+	
+	
+	
+	Dim Fso,RVB
+	Set Fso = CreateObject("Scripting.FileSystemObject")
+	Set RVB = fso.OpenTextFile(strRVBPath, 1)
+	
+	Do While Not RVB.AtEndOfStream
+		
+		Line = RVB.ReadLine()
+		
+		strLine = Line
+		
+			
+		If right(strLine,len(markerWarning)) = markerWarning Then
+			If blnDisableDisclaimer Then
+				strLine = Replace(strLine,"True","False")
+			Else
+				strLine = Replace(strLine,"False","True")
+			End If
+		End If
+				
+		
+		If (right(strLine,len(markerPDF)) = markerPDF) Then
+			If blnOfferInkscapePDF Then
+				strLine = Replace(strLine,"False","True")
+			Else
+				strLine = Replace(strLine,"True","False")
+			End If
+		End If
+				
+		If  (right(strLine,len(markerEXE)) = markerEXE) Then
+			If blnOfferInkscapePDF Then
+				strLine = "   "&Chr(34)&strInkscapeEXE&Chr(34)& markerEXE
+			Else
+				strLine = "   "&Chr(34)&"path-to-inkscape-executable"&Chr(34)&"  "& markerEXE
+			End If
+		End If
+						
+		
+		strRVB = strRVB&strLine&vbCrLf
+	Loop
+					
+					
+					
+					
+					
+	'Close file
+	Call RVB.Close
+	
+	'Open file in writing mode
+	Set RVB = fso.OpenTextFile(strRVBPath, 2)
+	Call RVB.Write(strRVB)
+	Call RVB.Close()	
+	
+	'clean up
+	Set Fso=Nothing
+	Set RVB=Nothing
+
+	
+	Call AddAlias(blnAddAlias,strRVBPath)
+	
+	Call Goodbye()
+	
+	
+	
+End Sub
+
+
+
+
+Sub AddAlias(blnAdd,strRVBPath)
+		
+	Call Rhino.DeleteAlias("SVGexport")
+	
+	If blnAdd Then
+		Call Rhino.AddAlias ("SVGexport", "!_NoEcho _-LoadScript "&Chr(34)&strRVBPath&Chr(34))
+	End If
+
+	
+End Sub
+
+
+Function Goodbye()
+	
+	Dim strTXT
+	strTXT = strTXT& "SVG export script Setup is complete"&Chr(13)
+	strTXT = strTXT& Chr(13)
+	strTXT = strTXT& "You need to RESTART Rhino fo all changes to take effect"& Chr(13)
+	strTXT = strTXT& Chr(13)
+	strTXT = strTXT& "Run this setup script again to change settings"&Chr(13)
+
+ 
+	Call Rhino.MessageBox (strTXT,0,"Setup complete")
+	
+	
+	
+End Function
+
+
+
+
+Function NoDisclaimer()
+   
+
+	Dim strTXT
+	strTXT = strTXT& "Disable warning at the beginning of export script?"&Chr(13)
+	strTXT = strTXT& Chr(13)
+	strTXT = strTXT& "The 'ExportInkscapeSVG' script will (attempt to) export geometry to an SVG file"&Chr(13)
+	strTXT = strTXT& Chr(13)
+	strTXT = strTXT& "The script is presented 'as is' and usage is at your own risk"&Chr(13)
+	strTXT = strTXT& Chr(13)
+	strTXT = strTXT& "I took care not to edit existing geometry in any way nor leave geometry behind"&Chr(13)
+	strTxt = strTXT& "However there is no 100% guarantee this script is flawless."&Chr(13)
+	strTXT = strTXT& "So, if the file is of importance to you, make sure to create a copy of it"&Chr(13)
+	strTXT = strTXT& "and run the script on that copy, discarding it afterwards"&Chr(13)
+	strTXT = strTXT& Chr(13)
+	strTxt = strTXT& "Do you want to DISABLE the WARNING at the beginning of the script?"&Chr(13)
+ 
+	NoDisclaimer = Rhino.MessageBox (strTXT,4,"Disable warning?")
+    
+		
+End Function
+
+
+
+
+
+Function OfferInkscapePDF()
+    
+
+	Dim strTXT
+	strTXT = strTXT& "The SVG export script can automate the conversion from SVG to PDF via Inkscape"&Chr(13)
+	strTXT = strTXT& "By default the option is not offered. You can enable it here and setup a link"&Chr(13)
+	strTXT = strTXT& "in the script to the Inkscape executable "&Chr(13)
+	strTXT = strTXT& "Note that the automated conversion is optional,"&Chr(13)
+	strTXT = strTXT& "you will always be able to only export to SVG. "
+	strTXT = strTXT& Chr(13)
+	strTXT = strTXT& "So you will need to have Inkscape available at your machine"&Chr(13)
+	strTXT = strTXT& Chr(13)
+	strTXT = strTXT& "Go to www.inkscape.org for the latest version"&Chr(13)
+	strTXT = strTXT& "Note that at the download section there is not only a Windows installer version,"&Chr(13)
+	strTXT = strTXT& "but also a Portable version; that can be run without the need of an installation,"&Chr(13)
+	strTXT = strTXT& "it's an automated archive extraction at a location of your choice."&Chr(13)
+	strTXT = strTXT& Chr(13)
+	strTxt = strTXT& "Do you have Inkscape at your computer and would you like to"&Chr(13)
+	strTxt = strTXT& "ENABLE the option for automated SVG to PDF via Inkscape?"&Chr(13)
+
+ 
+	OfferInkscapePDF = Rhino.MessageBox (strTXT,4,"SVG to PDF via inkscape?")
+    
+		
+End Function
+
+
+Function MakeAlias()
+	
+	Dim strTXT
+	strTXT = strTXT& "Do you want to create a command alias for the export script?"&Chr(13)
+	strTXT = strTXT& Chr(13)
+	strTXT = strTXT& "In Rhino the command 'SVGexport' will run the script from it's current location "&Chr(13)
+	strTXT = strTXT& Chr(13)
+	strTXT = strTXT& "Do you want to ADD the ALIAS 'SVGexport'?"&Chr(13)
+ 
+	MakeAlias = Rhino.MessageBox (strTXT,4,"Create command alias?")
+    
+		
+End Function
+
+
+
+
+
+Function FinalCheck(blnDisableDisclaimer, blnOfferInkscapePDF,blnAddAlias)
+    
+	Dim strA,strB,strC
+	
+	If blnDisableDisclaimer Then
+		strA = "Disable "
+	Else
+		strA = "Enable "
+	End If
+	
+	If blnOfferInkscapePDF Then
+		strB = "Enable "
+	Else
+		strB = "Disable "
+	End If
+	
+		
+	If blnAddAlias Then
+		strC = "Create "
+	Else
+		strC = "Not create or delete "
+	End If
+	
+	
+	
+
+	Dim strTXT
+	strTXT = strTXT& "You have choosen to : "&Chr(13)
+	strTXT = strTXT& Chr(13)
+	strTXT = strTXT& "- "&strA & "the warning at the beginning of the SVG export script"&Chr(13)
+	strTXT = strTXT& Chr(13)
+	strTXT = strTXT& "- "&strB & "the option to automate SVG to PDF via inkscape"&Chr(13)
+	strTXT = strTXT& Chr(13)
+	strTXT = strTXT& "- "&strC & "the command alias 'SVGexport' to rhino for running this script"&Chr(13)
+	strTXT = strTXT& Chr(13)
+	strTXT = strTXT& "Do you want to proceed?"&Chr(13)
+ 
+	FinalCheck = Rhino.MessageBox (strTXT,4,"Proceed?")
+    
+		
+End Function

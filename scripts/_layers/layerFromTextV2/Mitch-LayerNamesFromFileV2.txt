@@ -1,0 +1,12 @@
+Mitch-LayerNamesFromFileV2
+OK, here is the first installment...  There are two scripts attached with lots of comments inside.  See if you manage to follow - if not, yell.
+
+The difference between the two is a bit subtle.  The first just adds two sublayers as you asked - it is a light modification of the original script.
+
+The second attempts to generalize a bit by creating a subroutine that will add as many sublayers as you specify suffixes for to each parent layer.  You are not limited to two.  Those suffixes are currently hardcoded into the script (I put in 5 as an example), but you could also ask the user, etc.
+
+One could go further and read in a set of suffixes from a second file, create an automatic sublayer numbering routine, etc...  infinite variations are possible.
+
+Both of the above use the vbScript FSO object.  I will concoct one more that uses the new ReadTextFile method in Rhinoscript.
+
+--Mitch 

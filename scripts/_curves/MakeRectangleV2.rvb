@@ -1,0 +1,52 @@
+﻿Option Explicit
+Sub MakeRectangle
+
+	Dim arrFillets(2), dblFilletsDisp, dblWidth, dblLength
+	arrFillets(0) = 0.25
+	arrFillets(1) = 0.5
+	arrFillets(2) = 0.75
+	
+	dblLength = Rhino.GetReal("Length of rectangle",1)
+	If IsNull (dblLength) Then Exit Sub
+		 
+	dblWidth = Rhino.GetReal("Width of rectangle",1)
+	If IsNull (dblWidth) Then Exit Sub
+	
+	dblFilletsDisp = Rhino.GetReal("Corner radii", arrFillets(2))
+	If IsNull (dblFilletsDisp) Then Exit Sub
+	
+	'	Dim strLayer
+	'	strLayer = Rhino.CurrentLayer
+	'	strLayer = Rhino.GetString("Layer to set current", strLayer)
+	'	If Not IsNull(strLayer) Then
+	'		Rhino.CurrentLayer strLayer
+	'	End If
+	'	Dim arrNames(2), strName
+	'	arrNames(0) = "RedLayer"
+	'	arrNames(1) = "GreenLayer"
+	'	arrNames(2) = "BlueLayer"
+	'	strName = Rhino.GetString("New layer name", , arrNames)
+	'	If Not IsNull(strColor) Then
+	'		Rhino.AddLayer strName
+	'	End If
+	'If you make these changes, should work I think.
+	'
+'	You need To assign numbers (doubles) To your array, Not a string.
+'
+'		arrFillets(0) = 0.25
+'	arrFillets(1) = 0.5
+'	arrFillets(2) = 0.75
+'
+'
+'	Then assuming they are the min, Default, And max values,
+'
+'		dblFilletsDisp = Rhino.GetReal("Corner radii", arrFillets(1), arrFillets(0), arrFillets(2))
+'
+'	Does this help? 
+	
+	Rhino.Command "Rectangle Rounded Pause " &dblLength &" " &dblWidth &" " &dblFilletsDisp &""
+	Rhino.Command "_SelLast"
+	Rhino.Command "_CrvSeam"
+	
+End Sub
+MakeRectangle

@@ -1,0 +1,128 @@
+' ****************************** RhinoScript.org ******************************
+'
+'   3D cellular automata (static), version 1
+'
+'   by joy mondal, published Sep 30, 2011
+'
+'   
+'   This script fills up a grid using CA rule-set. the rule-set, size of grid & spacing of grid can be modified. 
+'
+'
+'
+'
+'   This RhinoScript Application has been downloaded from RhinoScript.org.
+'
+'   Rhino versions: Rhino 4 (at least service release 8)
+'
+'   LICENSE INFORMATION:
+'   This script is published under the GNU General Public License, version 3
+'   or any later version, and thus comes WITHOUT ANY WARRANTY. You can get
+'   the complete license text here: www.rhinoscript.org/gpl
+'
+' ****************************** RhinoScript.org ******************************
+
+
+
+Option Explicit
+'Script written by Joy Mondal
+'5th year, Bachelor of Architecture, Jadavpur University
+'Contact: joy_thefuture@yahoo.co.in
+'Script version Friday, September 16, 2011 9:30:09 AM
+													
+Dim x,y,z,dx,dy,dz,ax,ay,az											
+ax=15	'no of grids in x-axis
+ay=5	'no of grids in y-axis
+az=3	'no of grids in z-axis
+dx=5	'size of grids in x-axis
+dy=5	'size of grids in y-axis
+dz=3	'size of grids in z-axis
+
+'Call 3DCellularAutomataStatic()
+Sub 3DCellularAutomataStatic()
+	Dim arrgrid
+	ReDim arrgrid(ax,ay,az)
+	'to create the initial grid
+	arrgrid=initialise(arrgrid)
+	'to count neighbours & apply ruleset
+	arrgrid=ca(arrgrid)
+	'to draw the boxes
+	Call draw(arrgrid)
+End Sub
+
+Function initialise(arrini)
+	'this function randomly fills up the grid
+	For x=0 To ax-1											
+		For y=0 To ay-1
+			For z=0 To az-1
+				arrini(x,y,z)=round(rnd)
+			Next
+		Next
+	Next
+	initialise=arrini
+End Function
+
+Function ca(arrca)
+	'this function counts the neighbours & applies the rule set
+	Dim count
+	For x=1 To ax-2												
+		For y=1 To ay-2
+			For z=1 To az-2
+				'counting neighbours
+				count=0
+				If arrca(x-1,y,z) Then count=count+1
+				If arrca(x+1,y,z) Then count=count+1
+				If arrca(x,y-1,z) Then count=count+1
+				If arrca(x,y+1,z) Then count=count+1
+				If arrca(x,y,z-1) Then count=count+1
+				If arrca(x,y,z+1) Then count=count+1
+				If arrca(x,y,z) Then 
+					'survival ruleset
+					Select Case count								
+						Case 0 arrca(x,y,z)=0
+						Case 1 arrca(x,y,z)=0
+						Case 2 arrca(x,y,z)=1
+						Case 3 arrca(x,y,z)=1
+						Case 4 arrca(x,y,z)=0
+						Case 5 arrca(x,y,z)=0
+						Case 6 arrca(x,y,z)=0
+				End Select
+				else 
+					'birth ruleset
+					Select Case count								
+						Case 0 arrca(x,y,z)=0
+						Case 1 arrca(x,y,z)=0
+						Case 2 arrca(x,y,z)=0
+						Case 3 arrca(x,y,z)=1
+						Case 4 arrca(x,y,z)=0
+						Case 5 arrca(x,y,z)=0
+						Case 6 arrca(x,y,z)=0
+						
+					End Select
+				End If	
+			Next
+		Next
+	Next
+	ca=arrca					
+End Function
+
+Function draw(arrdr)
+	'this function draws the boxes
+	Dim arrp(7)
+	For x=0 To ax-1											
+		For y=0 To ay-1
+			For z=0 To az-1
+				If arrdr(x,y,z) Then
+					arrp(0)=array(x*dx,y*dy,z*dz)
+					arrp(1)=array(x*dx,(y+1)*dy,z*dz)
+					arrp(2)=array((x+1)*dx,(y+1)*dy,z*dz)
+					arrp(3)=array((x+1)*dx,y*dy,z*dz)
+					arrp(4)=array(x*dx,y*dy,(z+1)*dz)
+					arrp(5)=array(x*dx,(y+1)*dy,(z+1)*dz)
+					arrp(6)=array((x+1)*dx,(y+1)*dy,(z+1)*dz)
+					arrp(7)=array((x+1)*dx,y*dy,(z+1)*dz)
+					rhino.addbox(arrp)
+				End If
+			Next
+		Next
+	Next
+End Function

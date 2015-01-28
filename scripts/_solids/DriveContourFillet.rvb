@@ -1,0 +1,177 @@
+<div class="moz-text-flowed" style="font-family: -moz-fixed">﻿Option Explicit
+Dim ProgramName: ProgramName = "DriveContourFillet"
+
+'Call DriveContourFillet()
+Sub DriveContourFillet()
+	Dim X: X=CInt("0")
+	Dim Y: Y=CInt("1")
+	Dim Z: Z=CInt("2")
+	Dim arrResult, bFlip
+	Dim strFirstSurface, strSecondSurface
+	Dim arrFirstSurfacePt, arrSecondSurfacePt
+	Dim dirFirstSurface, dirSecondSurface
+	Dim arrFirstSurfaces, arrSecondSurfaces
+	Dim strDriveCo
+	Dim dblDomain, dblParam
+	Dim arrDriveCo, arrRadiusLaw, arrBaseCurve
+	Dim dblDivisions
+	Dim iCounter
+	Dim arrRadiusValues
+	Dim arrCurve1, arrCurve2
+	Dim strCurve1, strCurve2
+	Dim blnMatch, strLastCurve1, strLastCurve2
+	Dim arrFillets()
+
+	arrResult = Rhino.GetObjectEx("Select First Surface at Approximate
+StartPoint", 24)
+	If Not IsNull(arrResult) Then
+		strFirstSurface = arrResult(0)
+		arrFirstSurfacePt = arrResult(3)
+		dirFirstSurface = SurfaceFlipper(strFirstSurface, arrFirstSurfacePt)
+	Else
+		Exit Sub
+	End If
+	'arrFirstSurfaces = Rhino.GetObjects("Select Remaining, Continuous First
+Surfaces", 24)
+
+	arrResult = Rhino.GetObjectEx("Select Second Surface at Approximate
+StartPoint", 24)
+	If Not IsNull(arrResult) Then
+		strSecondSurface = arrResult(0)
+		arrSecondSurfacePt = arrResult(3)
+		dirSecondSurface = SurfaceFlipper(strSecondSurface, arrSecondSurfacePt)
+	Else
+		Exit Sub
+	End If
+	'arrSecondSurfaces = Rhino.GetObjects("Select Remaining, Continuous Second
+Surfaces", 24)
+
+	arrDriveCo = Rhino.GetObjectEx("Select DriveContour Near Start", 4, False,
+True)
+	If IsNull(arrDriveCo) Then Exit Sub  'User pressed Escape instead of
+picking a Curve
+	dblDomain = Rhino.CurveDomain(arrDriveCo(0))
+	If (Rhino.CurveClosestPoint(arrDriveCo(0), arrDriveCo(3)) >
+((dblDomain(0)+dblDomain(1))/2)) Then Rhino.ReverseCurve(arrDriveCo(0))
+
+	arrRadiusLaw = Rhino.GetObjectEx("Select RadiusLaw Near Start", 4, False,
+True)
+	If IsNull(arrRadiusLaw) Then Exit Sub  'User pressed Escape instead of
+picking a Curve
+	dblDomain = Rhino.CurveDomain(arrRadiusLaw(0))
+
+	If (Rhino.CurveClosestPoint(arrRadiusLaw(0), arrRadiusLaw(3)) >
+((dblDomain(0)+dblDomain(1))/2)) Then Rhino.ReverseCurve(arrRadiusLaw(0))
+
+	Call Rhino.EnableRedraw(False)
+
+	dblDivisions =
+Int(Rhino.CurveLength(arrDriveCo(0))/Rhino.UnitAbsoluteTolerance())
+	Dim prmcontour: prmcontour = Rhino.DivideCurveLength (arrDriveCo(0), .1,
+False, False)
+	Dim arrStartPoint, arrEndPoint
+	arrStartPoint = Rhino.CurveStartPoint(arrRadiusLaw(0))
+	arrEndPoint = Rhino.CurveEndPoint(arrRadiusLaw(0))
+	arrRadiusValues = Rhino.CurveContourPoints
+(arrRadiusLaw(0),Array(arrStartPoint(X),0,0), Array(arrEndPoint(X),0,0),
+Rhino.Distance(Array(arrStartPoint(X),0,0),Array(arrEndPoint(X),0,0))/(uBoun
+d(prmcontour)+1))
+
+
+
+	For iCounter = 0 To ubound(prmcontour)
+		arrCurve1 = Rhino.AddSrfSectionCrvs (strFirstSurface, Rhino.CurvePerpFrame
+(arrDriveCo(0), prmcontour(iCounter)))
+		arrCurve2 = Rhino.AddSrfSectionCrvs (strSecondSurface,
+Rhino.CurvePerpFrame (arrDriveCo(0), prmcontour(iCounter)))
+		strCurve1 = Rhino.JoinCurves(arrCurve1)
+		strCurve2 = Rhino.JoinCurves(arrCurve2)
+		Rhino.DeleteObjects(arrCurve1)
+		Rhino.DeleteObjects(arrCurve2)
+
+		If iCounter = 0 Then
+			blnMatch = Rhino.CurveDirectionsMatch (Rhino.Addline(arrFirstSurfacePt,
+Rhino.PointAdd(arrFirstSurfacePt,dirFirstSurface)), strCurve2(0))
+			If blnMatch Then Rhino.ReverseCurve (strCurve2(0))
+			strLastCurve2 = Rhino.CopyObject (strCurve2(0))
+			blnMatch = Rhino.CurveDirectionsMatch (Rhino.Addline(arrSecondSurfacePt,
+Rhino.PointAdd(arrSecondSurfacePt,dirSecondSurface)), strCurve1(0))
+			If blnMatch Then Rhino.ReverseCurve (strCurve1(0))
+			strLastCurve1 = Rhino.CopyObject (strCurve1(0))
+			ReDim Preserve arrFillets(iCounter)
+
+			arrFillets(iCounter) = Rhino.AddFilletCurve (strCurve1(0),
+strCurve2(0),arrRadiusValues(iCounter)(Y))
+		Else
+			blnMatch = Rhino.CurveDirectionsMatch (strLastCurve2, strCurve2(0))
+			If Not blnMatch Then Rhino.ReverseCurve (strCurve2(0))
+			Call Rhino.DeleteObject(strLastCurve2)
+			strLastCurve2 = Rhino.CopyObject (strCurve2(0))
+			blnMatch = Rhino.CurveDirectionsMatch (strLastCurve1, strCurve1(0))
+			If Not blnMatch Then Rhino.ReverseCurve (strCurve1(0))
+			Call Rhino.DeleteObject(strLastCurve1)
+			strLastCurve1 = Rhino.CopyObject (strCurve1(0))
+			ReDim Preserve arrFillets(iCounter)
+			arrFillets(iCounter) = Rhino.AddFilletCurve (strCurve1(0),
+strCurve2(0),arrRadiusValues(iCounter)(Y))
+		End If
+
+
+
+'		Call Rhino.AddFilletCurve (strCurve1(0),
+strCurve2(0),arrRadiusValues(iCounter)(1))
+		Call Rhino.DeleteObject(strCurve1(0))
+		Call Rhino.DeleteObject(strCurve2(0))
+
+	Next
+	Call Rhino.DeleteObject(strLastCurve1)
+	Call Rhino.DeleteObject(strLastCurve2)
+	Call Rhino.AddLoftSrf(arrFillets)
+	Call Rhino.DeleteObjects(arrFillets)
+
+
+	Call Rhino.EnableRedraw(True)
+
+
+End Sub
+
+Function SurfaceFlipper(ByRef strSurface, ByVal arrSurfacePt)
+	Dim prmSurfacePt, arrNormal, strNormal, strNormalArrow, strChoice, blnFlip,
+shit
+	prmSurfacePt = Rhino.SurfaceClosestPoint (strSurface, arrSurfacePt)
+	arrNormal = Rhino.SurfaceNormal (strSurface, prmSurfacePt)
+	strNormal = Rhino.Addline(arrSurfacePt,
+Rhino.PointAdd(arrSurfacePt,arrNormal))
+	Call Rhino.CurveArrows(strNormal , 2)
+	Do
+		'Call Rhino.Print("  Select Side to Fillet " )
+		strChoice = Rhino.GetString(ProgramName & " Select Side to Fillet - ",
+"Accept", Array("Flip", "Accept"))
+		If Not IsNull(strChoice) Then
+			Select Case UCase(Left(strChoice, 3))
+				Case "FLI"
+					'If blnFlip Then blnFlip = False Else blnFlip = True
+					'Call Rhino.DeleteObject(strNormalArrow)
+					Call Rhino.DeleteObject(strNormal)
+					blnFlip = Rhino.FlipSurface(strSurface,True)
+					If (blnFlip = True) Then
+						Call Rhino.FlipSurface(strSurface, False)
+					End If
+					prmSurfacePt = Rhino.SurfaceClosestPoint (strSurface, arrSurfacePt)
+					arrNormal = Rhino.SurfaceNormal (strSurface, prmSurfacePt)
+					strNormal = Rhino.Addline(arrSurfacePt,
+Rhino.PointAdd(arrSurfacePt,arrNormal))
+					Call Rhino.CurveArrows(strNormal , 2)
+				Case "ACC"
+					Exit Do
+			End Select
+		Else
+			Exit Do
+		End If
+	Loop
+	SurfaceFlipper = arrNormal
+	Call Rhino.DeleteObject(strNormal)
+
+
+End Function
+</div>

@@ -1,0 +1,67 @@
+Option Explicit
+'Script written by Pascal
+'Script version Friday, June 19, 2009 
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "QuickNamer", "_NoEcho _-Runscript (QuickNamer)"
+
+Private oldHt
+
+If isEmpty(oldHt) Then
+	oldHt = 1
+End If
+
+'Call QuickNamer()
+Sub QuickNamer()
+	Dim aObj : aObj = Rhino.GetObjects("Select objects to name.",,,True)
+	If Not isArray(aObj) Then Exit Sub
+	Dim dblHt: dblHt = Rhino.GetReal("Text height?",oldHt)
+	If Not isNumeric(dblHt) Then Exit Sub
+	
+	OldHt = dblHt
+	Dim sObj, aBB
+	
+	Rhino.EnableRedraw(False)
+	For Each sObj In aObj
+		
+		If Not isNull(Rhino.ObjectName(sObj)) Then
+			aBB = Rhino.BoundingBox(sObj)
+			Rhino.AddText  Rhino.ObjectName(sObj),AveragePoints(aBB),dblHt
+		End If
+			
+		
+	Next
+	
+		
+	Rhino.EnableRedraw(True)
+End Sub
+
+Function AveragePoints(arrPts)
+	'Finds the average location of an array
+	'of points.
+
+	Dim X, Y, Z
+	Dim i
+	
+	X = 0
+	Y = 0
+	Z = 0
+
+	For i=0 To UBound (arrPts)
+			
+		'add all the X values
+		X = X+arrPts(i)(0)
+	
+		'add all th Y values
+		Y = Y+arrPts(i)(1)			
+	
+		'add all the Z values
+		Z = Z+arrpts(i)(2)
+	Next
+	
+	'Divide by the number of points to
+	'get the average  for each
+	'create the output array from the 3 averages
+	AveragePoints  =array(X/(UBound(arrPts)+1), Y/(UBound(arrPts)+1), Z/(UBound(arrPts)+1))
+
+End Function

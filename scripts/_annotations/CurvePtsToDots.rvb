@@ -1,0 +1,22 @@
+﻿Option Explicit
+'Script written by Roland M 3dsynergyNospam@aol.com
+' copied from newsgroup and made into this script
+'Script version Tuesday, October 28, 2008 12:37:58 PM
+
+Call CurvePtsToDots()
+Sub CurvePtsToDots()
+	Dim strObject, arrPoint
+	' Get the curve object
+	strObject = Rhino.GetObject("Select curve")
+	If IsNull(strObject) Then Exit Sub
+	' Add the first annotation
+	arrPoint = Rhino.CurveStartPoint(strObject)
+	Rhino.AddPoint arrPoint
+	Rhino.AddTextDot Rhino.Pt2Str(arrPoint, 3), arrPoint
+	' Add the second annotation if necessary
+	If Not Rhino.IsCurveClosed(strObject) Then
+		arrPoint = Rhino.CurveEndPoint(strObject)
+		Rhino.AddPoint arrPoint
+		Rhino.AddTextDot Rhino.Pt2Str(arrPoint, 3), arrPoint
+	End If
+End Sub

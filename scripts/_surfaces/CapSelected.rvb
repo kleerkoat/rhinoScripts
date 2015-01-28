@@ -1,0 +1,69 @@
+Option Explicit
+'Script written by Pascal
+'Script version Wednesday, April 01, 2009 
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "CapSelected", "_NoEcho _-Runscript (CapSelected)"
+
+Sub CapSelected()
+	
+	Dim sObj: sObj = Rhino.GetObject("Select object to cap",8+16,True)
+	If isNull(sObj) Then Exit Sub
+	
+	Dim aBorder: aBorder = Rhino.DuplicateSurfaceBorder(sobj)
+	
+	If Not isArray(aBorder) Then 
+		MsgBox "No open edges found"
+		Exit Sub
+	End If
+	
+	Dim sCrv, tempSrf, aSrf(), n
+	n = 0
+	
+	Do
+		sCrv= Rhino.GetObject("Select edge to cap",4,,True,aBorder)
+		If isNull(sCrv) Then Exit Do
+		
+		If Rhino.IsCurveClosed(sCrv) Then
+			If Rhino.IsCurvePlanar(sCrv) Then
+				tempSrf = Rhino.AddPlanarSrf(array(sCrv))(0)
+				If Not isNull(tempSrf) Then
+					ReDim Preserve aSrf(n)
+					aSrf(n) = tempSrf
+					Rhino.DeleteObject sCrv
+					n = n + 1
+				End If
+			End If
+		End If
+		Rhino.UnselectAllObjects
+		
+	Loop Until isNull(sCrv)
+	
+	Rhino.DeleteObjects(aBorder)
+	
+	Rhino.EnableRedraw(False)
+	Dim X
+	
+	If isUpperBound(aSrf) Then
+		Rhino.SelectObject sobj
+		Rhino.SelectObjects aSrf
+		Rhino.Command "_Join", False
+		If Rhino.LastCommandResult = 0 Then X = True
+	Else
+		Rhino.Print "Unable to cap any of these holes. The hole edges must form closed planar loops."
+	End If
+	
+	Dim sCap
+	If n = 1 Then 
+		sCap = " cap."
+	Else  sCap = " caps."
+	End If
+	
+	
+	If X = True Then
+		Rhino.Print "Added " & n & sCap
+	End If
+	
+	Rhino.EnableRedraw(True)
+	
+End Sub

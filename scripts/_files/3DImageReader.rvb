@@ -1,0 +1,358 @@
+﻿Option Explicit
+    'Script written by <David Mans>
+    'adapted from work by Che Wei Wang
+    'www.cwwang.com
+    'Script copyrighted by <NeoArchaic Studio>
+    'Script version Tuesday, March 18, 2008 7:40:18 AM
+'Call 3DImageReader()
+Sub 3DImageReader()
+	Dim rows, cols, tol, height,unit
+	Dim arrItems, arrValues, arrResults
+	arrItems = array("columns","rows","tolerance","maximum_height","unit_width")
+	arrValues = array(10,10,0,10,10)
+	arrResults = Rhino.PropertyListBox (arrItems, arrValues ,,"Image Parameters")
+	cols = CDbl(arrResults(0))
+	rows = CDbl(arrResults(1))
+	If CDbl(arrResults(2)) > 1 Then
+		tol = 1
+	Else
+		tol = CDbl(arrResults(2))
+	End If
+	height = CDbl(arrResults(3))
+	unit = CDbl(arrResults(4))
+	Dim arrImg, arrExist, strInput
+	arrImg = arrImageSample(cols,rows)
+	' image outputs (0)red(1)green(2)blue(3)alpha(4)hue(5)saturation(6)luminance
+	strInput = Rhino.GetString("Select Image Reading Method","Normalized_Pannel",array("Banding","Segments","Cylinders","Horizontal_Plates","Faceted","Normalized_Pannel","Surface","PointCloud"))
+	If isNull(strInput) Then Exit Sub
+	Call Rhino.EnableRedraw(False)
+	If CStr(strInput) = "Banding" Then
+		arrExist = banding(arrImg(6),tol,height,unit)
+	End If
+	If CStr(strInput) = "Segments" Then
+		arrExist = segments(arrImg(6),tol,height,unit)
+	End If
+	If CStr(strInput) = "Cylinders" Then
+		arrExist = cylinders(arrImg(6),tol,height,unit)
+	End If
+	If CStr(strInput) = "Horizontal_Plates" Then
+		arrExist = plates(arrImg(6),tol,height,unit)
+	End If
+	If CStr(strInput) = "Faceted" Then
+		arrExist = loftPannels(arrImg(6),tol,height,unit)
+	End If
+	If CStr(strInput) = "Normalized_Pannel" Then
+		arrExist = uniformPannels(arrImg(6),tol,height,unit)
+	End If
+	If CStr(strInput) = "Surface" Then
+		arrExist = surface(arrImg(6),height,unit)
+	End If
+	If CStr(strInput) = "PointCloud" Then
+		arrExist = cloud(arrImg(0),arrImg(1),arrImg(2),arrImg(6),height,unit)
+	End If
+	Call Rhino.EnableRedraw(True)
+End Sub
+Function arrImageSample(cols, rows)
+	arrImageSample = Null
+	'Instantiate the RhPicture Object
+	Dim RhPicture : Set RhPicture = Rhino.GetPlugInObject("RhPicture")
+	If IsNull(RhPicture) Then Exit Function
+	'Load an arbitrary image
+	If Not RhPicture.LoadImage() Then
+		Call Rhino.Print("Image not loaded")
+		Exit Function
+	End If
+	'Get the width and height
+	Dim w : w = RhPicture.Width()
+	Dim h : h = RhPicture.Height()
+	If IsNull(w) Or IsNull(h) Then
+		Call Rhino.Print("No valid image data")
+		Exit Function
+	End If
+	Dim x, y, i,j
+	Dim r, g, b, a, hu, s, u
+	ReDim r(rows), g(rows), b(rows), a(rows), hu(rows), s(rows), u(rows)
+	Dim rValSet, gValSet, bValSet, aValSet, hValSet, sValSet, uValSet
+	ReDim rValSet(cols), gValSet(cols), bValSet(cols), aValSet(cols), hValSet(cols), sValSet(cols), uValSet(cols)
+	'Sample Image returning all values between zero and one
+	For i = 0 To cols Step 1
+		For j = 0 To rows Step 1
+			x = int(w/cols)*i
+			y = int(h/rows)*j
+			If x>w Then
+				x = w
+			End If
+			If y>h Then
+				y = h
+			End If
+			r(j) = RhPicture.Red(x,y)/255
+			g(j) = RhPicture.Green(x,y)/255
+			b(j) = RhPicture.Blue(x,y)/255
+			a(j) = RhPicture.Alpha(x,y)/255
+			hu(j) = RhPicture.Hue(x,y)/360
+			s(j) = RhPicture.Saturation(x,y)
+			u(j) = RhPicture.Luminance(x,y)
+		Next
+		rValSet(i) = r
+		gValSet(i) = g
+		bValSet(i) = b
+		aValSet(i) = a
+		hValSet(i) = hu
+		sValSet(i) = s
+		uValSet(i) = u
+	Next
+	Set RhPicture = Nothing
+	' image outputs (0)red(1)green(2)blue(3)alpha(4)hue(5)saturation(6)luminance
+	arrImageSample = array(rValSet,gValSet,bValSet,aValSet,hValSet,sValSet,uValSet)
+End Function
+Function plates(arrInput,min,max,spacing)
+	plates = Null
+	Dim i,j,r,cols,rows
+	cols = uBound(arrInput)
+	rows = uBound(arrInput(0))
+	Dim mvPlane,plate()
+	r = 0
+	ReDim plate(r)
+	For i = 0 To cols-1 Step 1
+		For j = 0 To rows Step 1
+			If arrInput(i)(j) > min Then
+				mvPlane = Rhino.MovePlane(Rhino.WorldXYPlane(),array(spacing*i,spacing*j,max*arrInput(i)(j)))
+				ReDim Preserve plate(r)
+				plate(r) = Rhino.AddPlaneSurface(mvPlane, spacing, spacing)
+				r =r+1
+			End If
+		Next
+	Next
+	plates = plate
+End Function
+Function cylinders(arrInput,min,max,spacing)
+	cylinders = Null
+	Dim i,j,r,cols,rows
+	cols = uBound(arrInput)
+	rows = uBound(arrInput(0))
+	Dim mvPlane,plate()
+	r = 0
+	ReDim plate(r)
+	For i = 0 To cols-1 Step 1
+		For j = 0 To rows Step 1
+			If arrInput(i)(j) > min Then
+				mvPlane = Rhino.MovePlane(Rhino.WorldXYPlane(),array(spacing*i,spacing*j,0))
+				ReDim Preserve plate(r)
+				plate(r) = Rhino.AddCylinder(mvPlane(0), array(mvPlane(0)(0),mvPlane(0)(1),mvPlane(0)(2)+max*arrInput(i)(j)), spacing*.5)
+				r =r+1
+			End If
+		Next
+	Next
+	cylinders = plate
+End Function
+Function banding(arrInput,min,max,spacing)
+	banding = Null
+	Dim i,j,r,cols,rows
+	cols = uBound(arrInput)
+	rows = uBound(arrInput(0))
+	Dim mvPlane, pSet(),band()
+	ReDim band(cols)
+	For i = 0 To cols-1 Step 1
+		r = 0
+		ReDim pSet(r)
+		For j = 0 To rows Step 1
+			If arrInput(i)(j) > min Then
+				mvPlane = Rhino.MovePlane(Rhino.WorldXYPlane(),array(spacing*i,spacing*j,max*arrInput(i)(j)))
+				ReDim Preserve pSet(r)
+				pSet(r) = mvPlane(0)
+				r =r+1
+			End If
+		Next
+		band(i) = Rhino.AddInterpCurve(pSet)
+	Next
+	banding = band
+End Function
+Function surface(arrInput,max,spacing)
+	surface = Null
+	Dim i,j,r,cols,rows
+	cols = uBound(arrInput)
+	rows = uBound(arrInput(0))
+	Dim mvPlane, pSet()
+	r = 0
+	ReDim pSet(r)
+	For i = 0 To cols-1 Step 1
+		For j = 0 To rows-1 Step 1
+			mvPlane = Rhino.MovePlane(Rhino.WorldXYPlane(),array(spacing*i,spacing*j,max*arrInput(i)(j)))
+			ReDim Preserve pSet(r)
+			pSet(r) = mvPlane(0)
+			r =r+1
+		Next
+	Next
+	Call Rhino.AddSrfPtGrid(array(cols,rows),pSet,array(3,3))
+	surface = array()
+End Function
+Function segments(arrInput,min,max,spacing)
+	segments = Null
+	Dim i,j,k,r,s,cols,rows
+	cols = uBound(arrInput)
+	rows = uBound(arrInput(0))
+	Dim mvPlane, pSet(),band()
+	Dim trFa(),arrTrFa()
+	ReDim band(cols),trFa(rows),arrTrFa(cols)
+	For i = 0 To cols-1 Step 1
+		r=0
+		For j = 0 To rows Step 1
+			If arrInput(i)(j) > min Then
+				trFa(j) = True
+				ReDim pSet(r)
+				pSet(r) = array(i*spacing,j*spacing,max*arrInput(i)(j))
+				r=r+1
+			Else
+				trFa(j) = False
+			End If
+		Next
+		arrTrFa(i) = trFa
+	Next
+	Dim ptGroup(),ptSet(),arrPts(),crvVal(),crvBln
+	ReDim arrPts(cols),crvVal(cols)
+	For i = 0 To cols-1 Step 1
+		r = 0
+		s = 0
+		If arrTrFa(i)(0) = True And arrTrFa(i)(1) = True Then
+			ReDim Preserve ptGroup(r)
+			ptGroup(r) = array(i*spacing,0*spacing,max*arrInput(i)(0))
+			r=r+1
+		End If
+		For j = 1 To rows-1 Step 1
+			If arrTrFa(i)(j) = True And arrTrFa(i)(j+1) = True And arrTrFa(i)(j-1) = False Then
+				ReDim Preserve ptGroup(r)
+				ptGroup(r) = array(i*spacing,j*spacing,max*arrInput(i)(j))
+				r=r+1
+			End If
+			If arrTrFa(i)(j) = True And arrTrFa(i)(j-1) = True Then
+				ReDim Preserve ptGroup(r)
+				ptGroup(r) = array(i*spacing,j*spacing,max*arrInput(i)(j))
+				r = r+1
+			End If
+			If arrTrFa(i)(j) = True And arrTrFa(i)(j+1) = False Then
+				r = 0
+				ReDim Preserve ptSet(s)
+				ptSet(s) = ptGroup
+				s = s+1
+			End If
+			If s = 0 Then
+				crvBln = False
+			Else
+				crvBln = True
+			End If
+		Next
+		arrPts(i) = ptSet
+		crvVal(i) = crvBln
+	Next
+	Dim cntA,bandSet()
+	s=0
+	For i = 0 To cols-1 Step 1
+		r=0
+		If crvVal(i) = True Then
+			cntA = uBound(arrPts(i))
+			For j = 0 To cntA Step 1
+				ReDim band(r)
+				band(r) = Rhino.AddCurve(arrPts(i)(j))
+				r = r+1
+			Next
+			ReDim bandSet(s)
+			bandSet(s) = band
+			s = s+1
+		End If
+	Next
+	segments = bandSet
+End Function
+Function uniformPannels(arrInput,min,max,spacing)
+	uniformPannels = Null
+	Dim i,j,k,r,s,cols,rows
+	cols = uBound(arrInput)
+	rows = uBound(arrInput(0))
+	Dim pSet()
+	Dim trFa(),arrTrFa()
+	ReDim band(cols),trFa(rows),arrTrFa(cols)
+	For i = 0 To cols-1 Step 1
+		r=0
+		For j = 0 To rows Step 1
+			If arrInput(i)(j) > min Then
+				trFa(j) = True
+				ReDim pSet(r)
+				pSet(r) = array(i*spacing,j*spacing,max*arrInput(i)(j))
+				r=r+1
+			Else
+				trFa(j) = False
+			End If
+		Next
+		arrTrFa(i) = trFa
+	Next
+	Dim tempSrf,srfPlane()
+	tempSrf = Rhino.AddSrfPt(array(array(-spacing*.5,-spacing*.5,0),array(-spacing*.5,spacing*.5,0),array(spacing*.5,spacing*.5,0),array(spacing*.5,-spacing*.5,0)))
+	r = 0
+	For i = 1 To cols-1 Step 1
+		For j = 1 To rows-1 Step 1
+			If arrTrFa(i-1)(j) = True And arrTrFa(i)(j) = True And arrTrFa(i)(j-1) = True Then
+				ReDim Preserve srfPlane(r)
+				srfPlane(r)= Rhino.OrientObject (tempSrf, array(array(0,0,0),array(1,0,0),array(0,1,0)), array(array(i*spacing,j*spacing,max*arrInput(i)(j)), array((i-1)*spacing,j*spacing,max*arrInput(i-1)(j)), array(i*spacing,(j-1)*spacing,max*arrInput(i)(j-1))), 1)
+				r = r+1
+			End If
+		Next
+	Next
+	Call Rhino.DeleteObject(tempSrf)
+	uniformPannels = srfPlane
+End Function
+Function loftPannels(arrInput,min,max,spacing)
+	loftPannels = Null
+	Dim i,j,k,r,s,cols,rows
+	cols = uBound(arrInput)
+	rows = uBound(arrInput(0))
+	Dim pSet()
+	Dim trFa(),arrTrFa()
+	ReDim band(cols),trFa(rows),arrTrFa(cols)
+	For i = 0 To cols-1 Step 1
+		r=0
+		For j = 0 To rows Step 1
+			If arrInput(i)(j) > min Then
+				trFa(j) = True
+				ReDim pSet(r)
+				pSet(r) = array(i*spacing,j*spacing,max*arrInput(i)(j))
+				r=r+1
+			Else
+				trFa(j) = False
+			End If
+		Next
+		arrTrFa(i) = trFa
+	Next
+	Dim srfOutput()
+	r = 0
+	For i = 1 To cols-1 Step 1
+		For j = 1 To rows-1 Step 1
+			If arrTrFa(i-1)(j) = True And arrTrFa(i-1)(j-1) = True And arrTrFa(i)(j) = True And arrTrFa(i)(j-1) = True Then
+				ReDim Preserve srfOutput(r)
+				srfOutput(r) = Rhino.AddSrfPt(array(array((i-1)*spacing,j*spacing,max*arrInput(i-1)(j)),array((i-1)*spacing,(j-1)*spacing,max*arrInput(i-1)(j-1)),array(i*spacing,(j-1)*spacing,max*arrInput(i)(j-1)),array(i*spacing,j*spacing,max*arrInput(i)(j))))
+				r=r+1
+			End If
+		Next
+	Next
+	loftPannels = srfOutput
+End Function
+Function cloud(arrInputX,arrInputY,arrInputZ,arrInputR,spacing,rad)
+	cloud = Null
+	Dim i,j,r,cols,rows
+	cols = uBound(arrInputX)
+	rows = uBound(arrInputX(0))
+	Dim mvPlane, arrbln, pSet()
+	arrbln = Rhino.GetBoolean("Type of Data Representation",array("Representation","points","spheres"),array(False))
+	r = 0
+	For i = 0 To cols-1 Step 1
+		For j = 0 To rows-1 Step 1
+			ReDim Preserve pSet(r)
+			pSet(r)    = array(arrInputX(i)(j)*spacing,arrInputY(i)(j)*spacing,arrInputZ(i)(j)*spacing)
+			If arrbln(0) = True Then
+				Call Rhino.addsphere(pSet(r),arrInputR(i)(j)*rad)
+			Else
+				Call Rhino.AddPoint(pSet(r))
+			End If
+			r =r+1
+		Next
+	Next
+	cloud = pSet
+End Function

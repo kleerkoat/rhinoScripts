@@ -1,0 +1,76 @@
+'--------------------------------------------------------------
+'Command   :  mdca (DisplayColorMatchALL)
+'Date      :  2011/03/12
+'Version   :  1.0
+'Organization   :  Rhino+
+'--------------------------------------------------------------
+
+Sub DisplayColorMatchALL
+
+Dim arrObjects, strObject, arrLayers, strLayer,rhinoPlus,objPlugIn
+'--------------------------------------------------layer state
+     On Error Resume Next
+
+      Set objPlugIn = Rhino.GetPluginObject("Rhino Bonus Tools")
+    
+     If Err Then
+
+     MsgBox Err.Description
+
+     End If
+
+     Call objPlugIn.SaveLayerState("Rhino-plus")
+'--------------------------------------------------layer state
+
+'-------------------------------------- memory show objects  
+Rhino.command "_NoEcho _-Layer _On * _Enter"
+Rhino.command "_NoEcho _SelAll"
+arrObjects2 = Rhino.SelectedObjects
+Rhino.command "_NoEcho _Show"
+Rhino.command "_NoEcho _SelNone"
+'-------------------------------------- memory show objects    
+   
+arrLayers= Rhino.LayerNames
+If IsArray(arrLayers) Then
+  
+      For Each strLayer In arrLayers
+   
+        arrObjects = Rhino.ObjectsByLayer(strLayer, True)
+
+       If IsArray(arrObjects) Then
+          For Each strObject In arrObjects
+          Rhino.command "_NoEcho _SelNone"
+          Rhino.SelectObject strObject
+
+          If (Rhino.objectColor(strObject)=Rhino.LayerColor ( strLayer)) Then
+
+          Rhino.ObjectColor strObject , Rhino.LayerColor ( strLayer)
+          If IsNull( Rhino.HideObject (strObject)) Then Exit Sub
+          Else
+          
+          Rhino.HideObject (strObject)
+      
+          End If
+ 
+       Next
+
+       End If
+    
+  Rhino.command "_NoEcho _SelNone"
+
+Next
+
+End If
+
+Call objPlugIn.RestoreLayerState("Rhino-plus", 0)
+Call objPlugIn.DeleteLayerState("Rhino-plus")
+
+Rhino.ShowObjects arrObjects2 
+
+Rhino.MessageBox "Work completed.Objects without the color were changed. Others have not changed.",,"Rhino+  DisplayColorMatchALL"
+
+ 
+  
+End Sub
+
+DisplayColorMatchALL

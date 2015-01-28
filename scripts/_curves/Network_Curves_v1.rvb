@@ -1,0 +1,117 @@
+' ****************************** RhinoScript.org ******************************
+'
+'   Network Curves, version 1
+'
+'   by SIAN YEW LIAN, published Apr 15, 2008
+'
+'
+'   The script connects 2 curves through a new network of curves.
+'   Number of new network curves to be determined by user.
+'   Code was edited from an example on WWW
+'   
+'
+'
+'
+'
+'   This RhinoScript Tool has been downloaded from RhinoScript.org.
+'
+'   Rhino versions: Rhino 4
+'
+'   LICENSE INFORMATION:
+'   This script is published under the GNU General Public License, version 3
+'   or any later version, and thus comes WITHOUT ANY WARRANTY. You can get
+'   the complete license text here: www.rhinoscript.org/gpl
+'
+' ****************************** RhinoScript.org ******************************
+
+
+
+'Edited by GroovySian!!!
+'making the connecting curves
+function makeCurves()
+	'curves will be created from 4 points
+	'you are welcome to add more points for creating different
+	'types of curves, but the minimum should be 4
+	
+	Dim crvOnePt1, crvOnePt2, crvOnePt3, crvOnePt4 'Define the variables for each point of curve one
+	Dim crvTwoPt1, crvTwoPt2, crvTwoPt3, crvTwoPt4 'Define the variables for each point of curve two
+	Dim crvOne, crvTwo 'Define variables for curves
+	
+	
+	'Use the built curves to build bridge
+	Call makeBridge(crvOne, crvTwo)
+End Function
+
+
+
+
+
+' connecting the 2 curves
+
+	
+Function makebridge (crv1, crv2)
+
+	dim i
+	dim Uval1, uval2
+	dim paramsOne, paramsTwo, paramsThree
+	dim point1, point2
+	Dim line
+	X=Rhino.GetInteger("How many divisions do u want between ya curves?",10) ' queries for number of points
+	If IsNull(X) Then Exit Function
+	ReDim matrix(X,X)
+
+
+	crv1=Rhino.getObject("What's your first groovy Curve?", 4) 'select the first curve
+	If IsNull(crv1) Then Exit Function
+	crv2=Rhino.getObject("C'mon, gimme your next Curve!", 4) 'select the second curve
+	If IsNull(crv2) Then Exit Function
+	a=X
+	paramsOne=Rhino.curveDomain(crv1)
+	paramsTwo=Rhino.curveDomain(crv2)
+	'params (0) = Umin
+	'params (1) = Umax
+
+	'divide the curves into 10 segments and assign points to an array
+	For i=0 To a
+		Uval1=((paramsOne(1)-paramsOne(0))/a)*(i)
+		point1=Rhino.Evaluatecurve(crv1,Uval1)
+		Uval2=((paramsTwo(1)-paramsTwo(0))/a)*(i)
+		point2=Rhino.Evaluatecurve(crv2,Uval2)
+	
+	line=Rhino.AddLine (point1,point2)
+	paramsThree=Rhino.curveDomain(line)
+	Rhino.Sleep (100)
+	
+		For j=0 To a
+			Uval1=((paramsThree(1)-paramsThree(0))/a)*(j)
+		point1=Rhino.Evaluatecurve(line,Uval1)
+	
+	matrix (i,j)=point1
+	call Rhino.Addpoint(point1)
+	next
+	
+	'call Rhino.AddLine(matrix 1,1),(matrix 2,1)
+
+  next
+  
+	'draws a curve from each point on the first line to the coresponding point
+	'along each of the other 9 lines
+
+	For i=0 To a
+		ReDim crvpointsarr (a) 'creates a temporary array to fill with points from the "master" array
+	
+		For j=0 To a
+		crvpointsarr (j)=matrix (j,i) 'reverses the values from the master to create perpendicular lines
+		
+		'Rhino.Print Rhino.pt2Str (crvpointsarr (j)) ''tests for values in the array
+		next
+	
+	Rhino.AddInterpCurve crvpointsarr ' draws splines along the points in the array
+	Rhino.Sleep (750)
+	next
+
+end function
+
+
+
+makeCurves

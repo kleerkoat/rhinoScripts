@@ -1,0 +1,115 @@
+'AnimatedWaterTest v02 
+'Script written by Jørgen Holo 
+'Thanks to willemderks.com for the Logistics Maps 
+
+'Call AnimatedWaterTest()
+Sub AnimatedWaterTest()
+	
+	strV="v02"
+	dblFrames=100 'the number of frames to calculate
+	iEnd=100 'Width
+	iiEnd=300 'Length
+	dblMeshSize = iEnd*iiEnd
+	
+	strView = Rhino.CurrentView
+	If Rhino.IsViewPerspective (strView)=False Then Rhino.print "Error: Please use a perspective view":Exit Sub
+	
+	dblMessage=Rhino.MessageBox ("This Work-In-Progress test will alter some settings in the document!"&VbNewLine&_
+		"So please use a new document for the test"&VbNewLine&VbNewLine&_
+		"Click OK to start.",1 , "WARNING! This is unstable stuff!")
+	If dblMessage=2 Then Rhino.Print "Test canceled":Exit Sub
+
+	'------------------- Let the games begin	
+	
+	Rhino.UnitAbsoluteTolerance 0.001
+
+	Rhino.enableRedraw False
+	Rhino.ShowGrid strView, False
+	Rhino.ShowGridAxes strView , False
+	Rhino.ViewCameraTarget strView, array(250,-150,150), array(50,100,0)
+	Rhino.ViewCameraLens strView ,50
+	Rhino.ViewDisplayMode strView ,2
+
+	time1=timer
+	
+	nrVertices=(iEnd+1)*(iiEnd+1)-1
+	
+	Rhino.Prompt"Calculating the array of Faces for a "&iEnd*iiEnd&" poly mesh"
+	
+	nrFaceVertices=(iEnd)*(iiEnd)-1
+	Dim arrFaceVertices
+	ReDim arrFaceVertices(nrFaceVertices)
+	n=0
+	
+	For ii = 0 To iiEnd-1
+		For i = 0 To iEnd-1
+			arrFaceVertices(n)=array(i+ii*(iEnd+1),i+1+ii*(iEnd+1),i+iEnd+2+ii*(iEnd+1),i+iEnd+1+ii*(iEnd+1))			'arrFaceVertices(n)=array(i,i+1,ii,ii+1)
+			n=n+1
+		Next
+	Next
+	
+	strLight=Rhino.AddPointLight (array(0,50,70))
+
+
+	
+	Dim arrVertices
+	ReDim arrVertices(nrVertices)
+	
+	'recalculating the vertices and replace the mesh to create the effect of an animation
+	Time2=timer
+	
+	C=3.9 'constant for the formula
+
+	For q=1 To dblFrames
+
+		n=0
+		m=q/10
+		x=0.5
+	
+		For ii = 0 To iiEnd
+			a = Rhino.CosH(sin(m)*4)
+			For i = 0 To iEnd		
+				x= c*x*(1-x) 
+				arrVertices(n)=array(i,ii,x+a)			
+				n=n+1
+			Next
+			
+			m=m+0.02
+		Next
+		
+		strMesh=Rhino.AddMesh (arrVertices, arrFaceVertices)
+		intIndex = Rhino.AddMaterialToObject (strMesh)
+		Rhino.MaterialShine intIndex , 220
+		Rhino.MaterialColor intIndex, RGB(q*255/dblFrames, 255-(q*255/dblFrames), 255-(q*255/dblFrames))
+		Rhino.RotateView strView, 1, 0.3
+
+		Rhino.enableRedraw True
+		Rhino.enableRedraw False
+		Rhino.deleteobject strMesh
+		dblFPS=round(q/(timer-time2),1)
+		Rhino.prompt "Frame "&q&" of "&dblFrames&". "&dblMeshSize&" polygon mesh. Average calculations per second: "&dblFPS
+	Next
+	
+	Rhino.deleteobject strLight
+	
+	timeEnd=round(timer-time1,2)
+	
+	strExe=Rhino.ExeVersion
+	strExeSr=Rhino.ExeServiceRelease
+	If isnull(strExe) Then 
+		strRhinoV ="Old Rhino"
+	Else
+		strRhinoV="Rhino v"&strExe&" sr"&strExeSr
+	End If
+	
+	'Rhino.deleteobject strMesh
+	Rhino.TextOut "HoloMark2 - Work in Progress - Wave test "&strV&" :"&VbNewLine&_
+		"Tested on "&strRhinoV&VbnewLine&_
+		"Test took "&timeEnd&" seconds."&VbNewLine&_
+		"Meshes had "&dblMeshSize&" polygons."&VbNewLine&_
+		"Number of calculations: "&dblFrames&VbNewLine&_
+		"Average calculations per second: "&dblFPS&VbNewLine&VbNewLine&_
+		"Total score: "&round(60000/timeEnd,0), "WIP Test Score"
+	Rhino.enableRedraw True
+	
+End Sub

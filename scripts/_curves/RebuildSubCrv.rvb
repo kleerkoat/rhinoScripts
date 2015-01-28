@@ -1,0 +1,236 @@
+Option Explicit
+'Script written by Pascal
+
+'Script version Friday, April 29, 2011 
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile()
+'Rhino.AddAlias "RebuildSubCrv", "_NoEcho _-Runscript (RebuildSubCrv)"
+
+Private OldsDeg, oldsCount, OldGraph
+
+If isEmpty(oldsDeg) then
+	oldSDeg = "3"
+End If
+
+If isEmpty(oldsCount) then
+	oldsCount = "4"
+End If
+
+If isEmpty(oldGraph) then
+	oldGraph = True
+End If
+
+'Call RebuildSubCrv()
+
+
+Sub RebuildSubCrv()
+	
+	Dim sCrv: sCrv = Rhino.GetObject("Select a curve",4,true)
+	If isNull(sCrv) then exit sub
+	
+	Dim spts, sdeg
+	
+	dim aItems, aValues
+	aItems = array("Degree", "Point count")
+	aValues = array(OldsDeg, oldsCount)
+
+	dim Deg, Count
+	Dim aInputs: aInputs = GetInputs( aItems, aValues)
+	Deg = aInputs(0)
+	Count = aInputs(1)
+	OldsDeg = Cstr(Deg)
+	OldsCount = Cstr(Count)
+	
+	aValues = array(OldsDeg, oldsCount)
+	
+	'Dim sCopy: sCopy = Rhino.CopyObject(sCrv)
+	Dim aPt1, aPt2, Param1, Param2
+	aPt1 = Rhino.GetPointOnCurve(sCrv, "First point")
+	aPt2 = Rhino.GetPointOnCurve(sCrv, "Second point")
+	Param1 = Rhino.CurveClosestPoint(sCrv,apt1)
+	Param2 =	Rhino.CurveClosestPoint(sCrv, apt2)
+	
+	Dim NewCurve: NewCurve = GetInputCurve(sCrv, Param1, Param2)
+	Dim TempPts: tempPts = Rhino.AddPoints(array(apt1, apt2))
+	Dim sCopy: sCopy = Rhino.CopyObject(NewCurve)'make a copy of the sub curve in case ssettings are changed.
+	Rhino.RebuildCurve NewCurve,Deg, Count
+	
+	dim BlnGraph: BlnGraph = OldGraph
+	dim atemp,sEdit, temp
+	
+
+	Do
+		If BlnGraph = true then GraphOn(NewCurve)
+		sEdit = Rhino.GetString("Edit?", , array("DegreeAndPoints", "Ends","Graph", "Deviation", "Done"))
+		
+		If isNull (sEdit) then exit Do
+		
+		If lCase (sEdit) = "ends" then
+			Rhino.DeleteObject sCopy
+			atemp = MoveEnds(sCrv, newCurve, Deg, Count, BlnGraph)
+			Rhino.DeleteObjects tempPts
+			sCopy = aTemp(1)
+			'	Rhino.DeleteObject NewCurve
+			NewCurve = aTemp(0)
+			tempPts = Rhino.AddPoints(array(Rhino.CurveStartPoint(NewCurve), Rhino.CurveEndPoint(NewCurve)))
+		
+			
+		elseif lCase(sEdit) = "degreeandpoints" then
+			
+			aInputs  = GetInputs (aItems, aValues)
+			Deg = aInputs(0)
+			Count = aInputs(1)
+			OldsDeg = Cstr(Deg)
+			OldsCount = Cstr(Count)
+			aValues = array(OldsDeg, oldsCount)
+			Rhino.DeleteObject NewCurve
+			NewCurve = Rhino.CopyObject (sCopy)
+			Rhino.RebuildCurve NewCurve,Deg, Count
+		
+		ElseIf lCase(sEdit) = "graph" then
+		
+			if BlnGraph = False then 
+				GraphOn(NewCurve)
+				BlnGraph = True
+			Else
+				Rhino.Command "_CurvatureGraphOff", False
+				BlnGraph = False
+			End if
+			
+		ElseIf lCase(sEdit) = "deviation" then
+			Rhino.Print "max deviation = " & Rhino.CurveDeviation(sCrv, newCurve)(2)
+			
+		ElseIf lCase(sEdit) = "done" then
+			Exit Do
+		End if
+		
+		Rhino.UnselectAllObjects()
+		Rhino.SelectObject NewCurve
+		
+	
+	Loop until isnull(sEdit)
+	
+	
+	Rhino.ObjectLayer NewCurve, Rhino.CurrentLayer()
+	OldGraph = BlnGraph
+	Rhino.EnableRedraw False
+	Rhino.UnselectAllObjects()
+	
+	If BlnGraph = True then Rhino.Command "_CurvatureGraphOff",False
+	
+	Rhino.DeleteObjects tempPts
+	Rhino.DeleteObject sCopy
+	Rhino.SelectObject NewCurve
+	Rhino.Redraw()
+	Rhino.EnableRedraw True
+	
+End Sub
+
+Function MoveEnds(sCrv, sCrv2, Deg, Count, blnGraph)
+	
+	Dim P1, P2, D1,D2
+	P1 = Rhino.CurveStartPoint(sCrv2)
+	P2 = Rhino.CurveEndPoint(sCrv2)
+	D1 =	Rhino.addTextDot("1", P1)
+	D2 =	Rhino.addTextDot("2", P2)
+
+	dim sobj, param1, param2, sCopy, temp
+	
+	Do 
+		If not IsEmpty(sCopy) then
+			If Rhino.IsObject(sCopy) then Rhino.DeleteObject sCopy
+		End if
+		sObj = Rhino.getObject("Select a dot to move",,,true,array(D1,D2))
+		If isNull(sObj) then exit Do
+		
+		Rhino.Command "_Move W" & Rhino.Pt2Str(Rhino.TextDotPoint(sObj),,True) & "_OnCrv SelID " & sCrv & " "
+		
+		Param1 = Rhino.CurveClosestPoint(sCrv, Rhino.TextDotPoint(D1))
+		Param2 = Rhino.CurveClosestPoint(sCrv, Rhino.TextDotPoint(D2))
+		
+		temp = GetInputCurve(sCrv, Param1, Param2)
+		
+		'Rhino.Print  "temp = " & Rhino.isObject(temp)
+		sCopy = Rhino.CopyObject(temp)
+		Rhino.RebuildCurve temp, Deg, Count
+		Rhino.DeleteObject sCrv2
+		If blnGraph = True then GraphOn(temp)
+		sCrv2 = temp
+		MoveEnds = 	array(sCrv2, sCopy)
+		
+	Loop Until isNull(sObj)
+	
+
+	Rhino.DeleteObjects array(D1,D2)
+
+	
+End Function
+
+Function GetInputCurve(sCrv, Param1, Param2)
+	
+	Dim aPt1, aPt2, MidParam
+
+	MidParam = (Param1 + Param2)/2
+	
+	dim aSplit: aSplit = Rhino.SplitCurve(sCrv, array(Param1,Param2), False)
+	
+	dim i, param, NewCurve
+	
+	For i = 0 to UBound(aSplit)
+		
+		param = MidParamCrv(aSplit(i))
+
+		If param = MidParam then
+			NewCurve = aSplit(i)
+		Else
+			Rhino.DeleteObject(aSplit(i))
+		End If
+		
+	Next
+	
+	GetInputCurve = NewCurve
+
+End Function
+
+Sub GraphOn(sCrv)
+	
+	Rhino.UnselectAllObjects()
+	Rhino.SelectObject sCrv
+	Rhino.Command "_CurvatureGraph", False
+	
+End Sub
+
+Function GetInputs( aItems, aValues)
+	Dim X, deg, Count
+	
+	Do
+		X = true
+	
+		dim aInputs: aINputs = Rhino.PropertyListBox(aItems,aValues,"Set curve degree and point count.", "Rebuild Sub-Curve")
+		If not isArray(aInputs) then exit Function
+	
+	
+	
+		Deg = CInt(aInputs(0))
+		If Deg <1 or deg >11 then
+			X = False
+		End If
+	
+		Count = CInt(aInputs(1))
+		If Count < Deg+1 then
+			X = False
+		End If
+	
+		If X = False then
+			MsgBox "Degree must be greater than zero and less than 12." &vbNewline & "Point count must be larger than the degree"
+		End If
+	
+	Loop until X = true
+	GetInputs = array(Deg, Count)
+	
+End Function
+
+Function MidParamCrv(sCrv)
+	Dim Dom: Dom = Rhino.CurveDomain(sCrv)
+	MidParamCrv = (Dom(0) + Dom(1))/2
+End Function

@@ -1,0 +1,21 @@
+Option Explicit
+
+'Call UnionDifference()
+Sub UnionDifference()
+ Dim strObject
+ 
+ strObject = Rhino.GetObject("Select Solid to Cut",16)
+ 
+ If Not Rhino.IsObjectSolid (strObject) Then  Exit Sub
+ 
+  strCuttingObj = Rhino.GetObject("Select Cutting Surface and Side of  the Solid to Remove",8+16)
+  if isnull(strCuttingObj) then Exit Sub
+ 
+  Rhino.UnselectAllObjects
+  Rhino.SelectObject (strCuttingObj)
+  Rhino.command  "_dir "
+ 
+  Rhino.command  "_BooleanIntersection  _SelId "+strObject+" _enter _selId "+strCuttingObj+" _Enter"
+ 
+
+End Sub

@@ -1,0 +1,76 @@
+Option Explicit
+'Script written by Mitch
+'Script version 27 January, 2010
+
+'added color recovery 17.02.10
+
+Sub RemoveShortCrvSegments()
+	
+	Dim arrCrvs,dblTol,sTime
+	dblTol=Rhino.UnitAbsoluteTolerance
+	arrCrvs=Rhino.GetObjects("Select curves to process",4,,True)
+	If Not IsArray(arrCrvs) Then Exit Sub
+	
+	Dim strCrv,arrSegs,arrGoodSegs(),arrNewCrv,arrCrvCol,i,j
+	Dim intError,intNoJoin,crvCount,delCount
+	Dim strErrLayer
+	strErrLayer="Curves_with_Problems"
+	crvCount=0 : delCount=0 : intError=0 : intNoJoin=0
+	
+	Call Rhino.EnableRedraw(False)
+	sTime=Timer
+	Call Rhino.Prompt("Processing curves...")
+	For each strCrv in arrCrvs
+		j=-1
+		arrCrvCol=Rhino.ObjectColor(strCrv)
+		arrSegs=Rhino.ExplodeCurves(strCrv,True)
+		If Not IsArray(arrSegs) Then Exit For
+		For i=0 to UBound(arrSegs)
+			If Rhino.CurveLength(arrSegs(i))>dblTol then
+				j=j+1
+				Redim Preserve arrGoodSegs(j)
+				arrGoodSegs(j)=arrSegs(i)
+			Else
+				Call Rhino.DeleteObject(arrSegs(i))
+				delCount=delCount+1
+			End If			
+		Next
+		
+		If j>-1 Then arrNewCrv=Rhino.JoinCurves(arrGoodSegs,True)
+		
+		If IsNull(arrNewCrv) Then
+			If Not Rhino.IsLayer(strErrLayer) Then 
+				Call Rhino.AddLayer(strErrLayer,RGB(255,0,0))					
+			End If
+			Call Rhino.ObjectLayer(arrGoodSegs,strErrLayer)
+			intError=intError+1
+			
+		ElseIf Ubound(arrNewCrv)>0 Then
+			If Not Rhino.IsLayer(strErrLayer) Then 
+				Call Rhino.AddLayer(strErrLayer,RGB(255,0,0))					
+			End If
+			Call Rhino.ObjectLayer(arrNewCrv,strErrLayer)
+			intNoJoin=intNoJoin+1
+		Else
+			Call Rhino.ObjectColor(arrNewCrv(0),arrCrvCol)
+		End If
+		
+		crvCount=crvCount+1
+		Call Rhino.Print(crvCount&"/"&(Ubound(arrCrvs)+1))
+	Next	
+	Call Rhino.EnableRedraw(True)
+	
+	Dim strMsg,strMsg2,strMsg3
+	strMsg="Finished processing "&Cstr(Ubound(arrCrvs)+1)&" curves after "
+	Call Rhino.Print(strMsg&Round(Timer-sTime)&" seconds")
+	If intError+intNoJoin>0 Then
+		strMsg2="Found "&intError&" errors and "&intNoJoin&" curves that didn't re-join"
+	Else
+		strMsg2="All curves have been fixed."
+	End If
+	
+	strMsg3="Removed "&delCount&" segments smaller than file tolerance. "	
+	Call Rhino.Print(strMsg3&strMsg2)
+End Sub
+
+'Call RemoveShortCrvSegments()

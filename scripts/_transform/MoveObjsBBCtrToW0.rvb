@@ -1,0 +1,24 @@
+Option Explicit
+'Script written by Mitch
+'Script version March 08, 2011
+
+'Call MoveObjsBBCtrToW0()
+Sub MoveObjsBBCtrToW0()
+
+	Dim arrObjs,arrMFP
+	arrObjs=Rhino.GetObjects("Select objects to center at world 0",,True,True)
+	If Not IsArray(arrObjs) Then Exit Sub
+
+	arrMFP=BBCP(arrObjs)
+	If Not IsNull(arrMFP) Then
+		Call Rhino.MoveObjects(arrObjs,arrMFP,Array(0,0,0))
+	End If	
+End Sub
+
+Private Function BBCP(ByVal objs)
+	BBCP=Null
+	Dim arrBB : arrBB=Rhino.BoundingBox(objs)
+	If IsArray(arrBB) Then
+		BBCP=Rhino.PointDivide(Rhino.PointAdd(arrBB(0),arrBB(6)),2)
+	End If	
+End Function

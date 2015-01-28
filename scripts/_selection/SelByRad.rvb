@@ -1,0 +1,88 @@
+Option Explicit
+'Script by Mitch Heynick
+'Version 31 October, 2010
+'31.10.10 - added "between" selection range
+
+Private oldUserR,oldCompare,oldMaxR,oldMinR
+If IsEmpty(oldUserR) Then oldUserR=.5
+If IsEmpty(oldMaxR) Then oldMaxR=1
+If IsEmpty(oldMinR) Then oldMinR=.25
+If IsEmpty(oldCompare) Then oldCompare="LessThan"
+
+'Call SelByRad()
+Sub SelByRad()
+	
+	Dim arrObjs,arrComp,strCompare
+	arrObjs=Rhino.ObjectsByType(4)
+	If not IsArray(arrObjs) Then Exit Sub
+	
+	arrComp=Array("LessThan","GreaterThan","Equal","LTorEqual","GTorEqual","Between")
+	strCompare=Rhino.GetString("Selection type for radius?",oldCompare,arrComp)
+	If IsNull(strCompare) Then Exit Sub
+	oldCompare=strCompare
+
+	If strCompare<>"Between" Then
+		Dim dblRad,dblUserR
+		dblUserR=Rhino.GetReal("Radius?",oldUserR,0)
+		If vartype(dblUserR)<>5 or dblUserR=0 then Exit Sub
+		oldUserR=dblUserR
+	Else
+		Dim dblMaxL,dblMinL
+		dblMaxL=Rhino.GetReal("Maximum radius?",oldMaxR,0)
+		If vartype(dblMaxL)<>5 or dblMaxL=0 then Exit Sub
+		oldMaxR=dblMaxL
+
+		dblMinL=Rhino.GetReal("Minimum radius?",oldMinR,0)
+		If vartype(dblMinL)<>5 or dblMinL=0 then Exit Sub
+		oldMinR=dblMinL		
+	End If
+			
+	Call Rhino.EnableRedraw(False)
+	Call Rhino.UnselectAllObjects
+	Call Rhino.Print("Working...")
+	
+	Dim strObj,dblTol : dblTol=Rhino.UnitAbsoluteTolerance
+	For Each strObj In arrObjs
+		dblRad=Null
+		If Rhino.IsObjectSelectable(strObj)  Then
+			If Rhino.IsCircle(strObj) Then
+				dblRad=Rhino.CircleRadius(strObj)
+			ElseIf Rhino.IsArc(strObj) Then
+				dblRad=Rhino.ArcRadius(strObj)
+			End If
+			
+			If vartype(dblRad)=5 Then				
+				Select Case strCompare
+					Case "LessThan"
+						If dblRad < dblUserR Then
+							Call Rhino.SelectObject(strObj)
+						End If
+					Case "GreaterThan"
+						If dblRad > dblUserR Then
+							Call Rhino.SelectObject(strObj)
+						End If
+					Case "Equal"
+						If Abs(dblRad-dblUserR)<dblTol Then
+							Call Rhino.SelectObject(strObj)
+						End If
+					Case "LTorEqual"
+						If dblRad <= dblUserR Then
+							Call Rhino.SelectObject(strObj)
+						End If
+					Case "GTorEqual"
+						If dblRad >= dblUserR Then
+							Call Rhino.SelectObject(strObj)
+						End If
+					Case "Between"
+						If dblRad <= dblMaxL and dblRad >= dblMinL Then
+							Call Rhino.SelectObject(strObj)
+						End If
+					Case Else
+						Exit Sub
+				End Select
+			End If
+			
+		End If	
+	Next
+	Call Rhino.EnableRedraw(True)
+End Sub

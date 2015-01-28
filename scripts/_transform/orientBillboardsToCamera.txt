@@ -1,0 +1,37 @@
+_-runscript (
+orientBillboardsToCamera
+Sub orientBillboardsToCamera()
+Dim objects
+objects=Rhino.GetObjects("Select billboard surfaces",8,,True)
+If Not IsArray(objects) Then Exit Sub
+Dim redrawing
+redrawing=Rhino.EnableRedraw(False)
+Dim cameraLine,flattenedCameraLocation
+cameraLine=Rhino.ViewCameraTarget
+flattenedCameraLocation=setZ(cameraLine(0),0)
+Dim objectID
+For Each objectID In objects
+orientBillboard objectID,flattenedCameraLocation
+Next
+Rhino.EnableRedraw redrawing
+End Sub
+Sub orientBillboard(objectID,flattenedCameraLocation)
+Dim centroidPoint,centroidUV,centroidNormal
+centroidPoint=Rhino.SurfaceAreaCentroid(objectID)
+centroidUV=Rhino.SurfaceClosestPoint(objectID,centroidPoint(0))
+centroidNormal=Rhino.SurfaceNormal(objectID,centroidUV)
+Dim referenceLine,targetLine
+'' start-update-for-V4.0
+dim refline_start
+refline_start=setZ(centroidPoint(0),0)
+dim refline_end
+refline_end=rhino.pointadd(setZ(centroidPoint(0),0),setZ(centroidNormal,0))
+referenceLine=Array(refline_start,refline_end)
+'' end-update
+targetLine=Array(referenceLine(0),flattenedCameraLocation)
+Rhino.OrientObject objectID,referenceLine,targetLine
+End Sub
+Function setZ(point,value)
+setZ=Array(point(0),point(1),value)
+End Function
+)

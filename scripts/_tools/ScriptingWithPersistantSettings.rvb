@@ -1,0 +1,23 @@
+ ' How to script with persisting settings
+ ' Jess Maertterer - 20.12.2004
+ Option Explicit
+ Private dblLength
+ 
+ If IsEmpty(dblLength) Then
+   dblLength = 2.00
+ End If
+ 
+ '/////////////////////////////////////////////////////////////
+ Sub Extend_Curve_Length_Persist
+   Dim arrCurves, strCurve, dblResult
+   arrCurves = Rhino.GetObjects("Select curves to extend", 4)
+   If Not IsNull(arrCurves) Then
+     dblResult = Rhino.GetReal("Length to extend", dblLength,0.00)
+     If Not IsNull(dblResult) Then
+       dblLength = dblResult
+       For Each strCurve in arrCurves
+         Rhino.ExtendCurveLength strCurve, 2, 2, dblLength
+       Next
+     End If
+   End If
+ End Sub

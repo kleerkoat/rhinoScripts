@@ -1,0 +1,442 @@
+' ****************************** RhinoScript.org ******************************
+'
+'   Surface Tessellation for paper, version 1
+'
+'   by Mantuano Fabio, published Mar 12, 2011
+'
+'
+'   This simple script splits and flattened surfaces.
+'   You can use three type of tessellation and change the size of the holes.
+'   
+'   I didn't use "Option Explicit" and variables are written in Italian and disorderly'^^ (this is my first work here, I will change soon the script)
+'   (sorry for my bad english)
+'   
+'   In the end you can use the Object Arranger by Hanno.
+'   http://www.rhinoscript.org/scripts/24
+'
+'
+'
+'
+'   This RhinoScript Tool has been downloaded from RhinoScript.org.
+'
+'   Rhino versions: Rhino 4 (at least service release 6)
+'
+'   LICENSE INFORMATION:
+'   This script is published under the GNU General Public License, version 3
+'   or any later version, and thus comes WITHOUT ANY WARRANTY. You can get
+'   the complete license text here: www.rhinoscript.org/gpl
+'
+' ****************************** RhinoScript.org ******************************
+
+
+
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' Surface Tessellation for Paper 1.0
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' Script written by Fabio Mantuano - ddrpochi@gmail.com
+' Script version 12 March 2011
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' Metodi e modelli matematici per le Applicazioni :: a.a. 2009-2010
+' http://www.formulas.it/metodi/ :: Università degli Studi Roma Tre 
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+
+
+
+enableredraw False
+Call main ()
+enableredraw True
+
+Sub SurfaceTessellationForPaperV1()
+ 
+ 
+ ' Mi serve per la generazione dei colori
+ random = (25*Rnd)+Rnd*pi
+ 
+
+
+ ' Ottengo e valuto la superficie
+ arr = Rhino.getsurfaceobject ("Select a surface") 
+ 
+     If IsNull(arr) Then
+        Rhino.Print "Error"
+      Exit Sub
+      End If
+      
+ srf = arr(0)
+
+ uu = surfaceDomain(srf,0)
+ vv = surfaceDomain(srf,1)
+  
+ u = uu(1)
+ v = vv(1)
+ 
+  printEx "Value of U =" & u 
+  printEx "Value of V =" & v
+ 
+  ' Dimensioni Griglia
+ 
+    n = Rhino.getinteger ("Number of strips (U)",  8,2)
+    m = Rhino.getinteger ("Number of elements (V)",    8,2)
+ 
+    
+    tipoforatura  = Rhino.getinteger ("Type of the holes 0/1/2",  1)
+    scalaforaturatemp = Rhino.getinteger ("Size of the holes 1-10",  7)
+    scalaforatura = scalaforaturatemp*0.1
+ 
+ ' Ciclo Righe 
+  For i = 0 To n
+   t1 = i/n
+   u = t1 *uu(1)
+   uplus = uu(1)/n
+
+     
+ 'Prenoto e ridefinisco due array che mi serviranno 
+   ReDim pspr(m-1)
+   ReDim colors(m-1)
+   
+ 'Ciclo Colonne  
+  For j = 0 To m 
+   t2 = j/m
+   v =  t2 *vv(1)
+   vplus = vv(1)/m
+
+  'Punti sulla curva
+   p1 = evaluateSurface (srf, Array(u       , v      ))
+   p2 = evaluateSurface (srf, Array(u+uplus , v      ))
+   p3 = evaluateSurface (srf, Array(u+uplus , v+vplus))
+   p4 = evaluateSurface (srf, Array(u       , v+vplus))
+   
+  'Raggio degli elementi
+   'r = (vv(1)/n)/20
+   r = 0.04
+   
+ If i < n Then
+ If j < m Then  
+    
+    ''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+    '''''''''''''Elementi sulla superficie originale''''''''''''
+    ''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+    
+          'Cilindri e superfici                
+            If   Rhino.PointsAreCoplanar (Array(p1,p2,p3,p4)) Then    
+                       
+                Rhino.addcylinder p2,p1,r
+                Rhino.addcylinder p1,p4,r
+                Rhino.addcylinder p2,p3,r
+                Rhino.addcylinder p3,p4,r 
+                
+                sup1 = addSuperficieTipo (p1,p2,p3,p4,4,tipoforatura,scalaforatura)
+                sup2 = Null
+             
+                
+            Else            
+                Rhino.addcylinder p2,p1,r
+                Rhino.addcylinder p1,p4,r
+                Rhino.addcylinder p2,p3,r
+                Rhino.addcylinder p3,p4,r   
+                
+               'In questo caso metto anche le diagonali        
+                Rhino.addcylinder p1,p3,r
+                                 
+                 sup1 = addSuperficieTipo (p1,p2,p3,p4,3,tipoforatura,scalaforatura)  
+                 sup2 = addSuperficieTipo (p1,p3,p4,p4,3,tipoforatura,scalaforatura)
+                                       
+            End If 
+                 
+         
+          'Distanze
+            distcyla = Rhino.vectorlength(Rhino.vectorsubtract(p2,p3)) 
+            distcylb = Rhino.vectorlength(Rhino.vectorsubtract(p3,p4)) 
+            distcylc = Rhino.vectorlength(Rhino.vectorsubtract(p1,p3)) 
+            distcyld = Rhino.vectorlength(Rhino.vectorsubtract(p1,p2)) 
+            distcyle = Rhino.vectorlength(Rhino.vectorsubtract(p1,p4)) 
+    
+           
+          'Colori  (si schiariscono progressivamente)                
+             
+            BRed   = 70 *Abs(Sin(random))
+            BGreen = 70 *Abs(Sin(random+pi/3))
+            BBlue  = 70 *Abs(Sin(random+pi*(2/3)))           
+          
+            Red   = BRed + (180/n)*i
+            Green = BGreen + (180/n)*i
+            Blue  = BBlue + (180/n)*i
+            
+            colors(j)= RGB(Red,Green,Blue)
+                    
+          'Colora le superfici solo se esistono
+           If IsNull (sup1) Then  
+             Else      
+              mi1 = Rhino.AddMaterialToObject(sup1) 
+              Rhino.MaterialColor mi1, colors(j) 
+           End If              
+    
+           If IsNull (sup2) Then 
+             Else 
+              mi2 = Rhino.AddMaterialToObject(sup2)    
+              Rhino.MaterialColor mi2, colors(j)
+           End If
+                
+    
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''' 
+    '''''''''''''Calcolo delle coordinate degli elementi sulla superficie piana'''''''''''''''''''''
+    ''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''   
+      
+          'Cambio il valore alle distanze ("+0.000001" fa funzionare il codice anche in caso di triangoli)
+            latoA = distcyld+0.000001
+            latoB = distcyla+0.000001
+            latoC = distcylc+0.000001
+            latoD = distcyle+0.000001
+            latoE = distcylb+0.000001
+            
+           'Calcolo gli angoli (con svariati (e a volte superflui) teoremi di Carnot)
+      
+            alfar    = Rhino.acos((((latob)^2)+((latoc)^2)-((latoa)^2))/(2*(latob)*(latoc))) 
+            alfa     = Rhino.ToDegrees(alfar)
+               
+            betar    = Rhino.acos((((latoa)^2)+((latoc)^2)-((latob)^2))/(2*(latoa)*(latoc)))
+            beta     = Rhino.ToDegrees(betar)
+                 
+            gammar   = pi-betar-alfar
+            gamma    = Rhino.ToDegrees(gammar)
+                
+            deltar   = Rhino.acos((((latoe)^2)+((latoc)^2)-((latod)^2))/(2*(latoe)*(latoc)))
+            delta    = Rhino.ToDegrees(deltar)    
+                
+            epsilonr = Rhino.acos((((latod)^2)+((latoc)^2)-((latoe)^2))/(2*(latod)*(latoc)))
+            epsilon  = Rhino.ToDegrees(epsilonr)
+            
+            gamma1r  = pi-epsilonr-deltar
+            gamma1   = Rhino.ToDegrees(gamma1r)
+          
+             
+    ''''''''''Calcolo il punto di riferimento e la rotazione
+         
+          'Angolo di rotazione (non ricordo come sia riuscito a risolvere questa cosa)
+           
+            ' i due "if" servono a farmi tornare l'angolo di base 0 per ogni nuova striscia
+             If j = 0 Then 
+              oldrotr = 0 
+             End If 
+                
+             rotr = (pi-betar-epsilonr-gamma1r)    
+             rotr = oldrotr+rotr                 
+             veryoldrotr = oldrotr         
+             oldrotr=rotr
+                   
+             If j = 0 Then       
+              veryoldrotr = 0 
+             End If             
+
+
+           'Punto di riferimento               
+             ang = (betar+epsilonr)-veryoldrotr  
+                                                                                  
+             x = Cos(ang)*LatoD
+             y = Sin(ang)*LatoD              
+             If j>0 Then
+               y=oldy+y
+               x=oldx+x       
+             End If       
+             oldx=x
+             oldy=y         
+         
+           'Sposta il primo punto di riferimento ad ogni ciclo di rhige
+            Pos = Array(x+(vv(1)*0.5)*i,y,0)
+            
+           ' Punti A,B,C,C1
+            C1 = Pos
+         
+            xB = C1(0) - latoD*Cos(betar+epsilonr-veryoldrotr)
+            yB = C1(1) - latoD*Sin(betar+epsilonr-veryoldrotr)
+            B  = Array(xB,yB,0)
+               
+            xA = B(0) + latoC*Cos(betar-veryoldrotr)
+            yA = B(1) + latoC*Sin(betar-veryoldrotr)
+            A  = Array(xA,yA,0)
+            
+            xC = A(0) - latoB*Cos(pi-gammar-veryoldrotr)
+            yC = A(1) - latoB*Sin(pi-gammar-veryoldrotr)
+            C  = Array(xC,yC,0)
+
+              
+          
+    ''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+    '''''''''''''Elementi sulla superficie piana''''''''''''''''
+    ''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''                
+          
+    
+            
+         If   Rhino.PointsAreCoplanar (Array(p1,p2,p3,p4)) Then
+              ' Faccio una superfice da 4 lati
+              sup1temp = addSuperficieTipo (a,c,b,c1,4,tipoforatura,scalaforatura)   
+                        
+              ' Utilizzo la funzione che mi mette le linguette         
+              sup3temp = addLinguette (b,c1,r*4)
+              sup4temp = addLinguette (a,c,r*4)
+         
+            
+             'Array che contiene le polisuperfici di una striscia
+               pspr (j) = Rhino.JoinSurfaces (Array(sup1temp,sup3temp,sup4temp,True)) 
+           
+           'Cancello le superfici temp
+            Rhino.deleteobjects Array(sup1temp,sup3temp,sup4temp)  
+            
+         Else
+              ' Faccio due triangoli
+            
+              sup1temp = addSuperficieTipo (a,c,b,b,3,tipoforatura,scalaforatura)     
+              sup2temp = addSuperficieTipo (a,b,c1,c1,3,tipoforatura,scalaforatura)   
+           
+              ' Metto le linguette         
+              sup3temp = addLinguette (b,c1,r*4)
+              sup4temp = addLinguette (a,c,r*4)
+       
+             'Unisco il tutto
+              pspr (j) = Rhino.JoinSurfaces (Array(sup1temp,sup2temp,sup3temp,sup4temp,True))  
+    
+             'Cancello le superfici temp
+              Rhino.deleteobjects Array(sup1temp,sup2temp,sup3temp,sup4temp)    
+            
+           
+         End If    
+
+ End If 
+ End If
+ 
+ 
+ Next 
+  
+    'Unisco le polisuperfici creando le strisce 
+    If i < n Then
+     Striscia =  Rhino.JoinSurfaces (pspr,True) 
+     
+    'Coloro le strisce piane dello stesso colore di quelle originali
+     mi3 = Rhino.AddMaterialToObject(Striscia)
+     Rhino.MaterialColor mi3, colors(m-1)
+     
+    End If
+
+Next
+   
+'Cancello la superficie originale   
+ Rhino.deleteobject srf
+     
+End Sub
+
+
+
+
+
+
+' Function che mette le linguette tra 2 punti
+
+
+  Function addLinguette(p0,p1,RapportoSpessore)        
+    ' Vettore P0->P1
+    V01 = vectorScale((Rhino.VectorCreate(P0,P1)),RapportoSpessore)
+    
+    ' Vettore Perpendicolare Scalato
+    VPS01 = Rhino.VectorCrossProduct(V01,Array(0,0,1))
+    
+    ' Punti Linguette
+    P0L0 = p0(0) + VPS01(0) -V01(0)*1.3
+    P0L1 = p0(1) + VPS01(1) -V01(1)*1.3
+    P0L2 = p0(2) + VPS01(2) -V01(2)*1.3
+    P0L  = Array (P0L0,P0L1,P0L2)
+      
+    P1L0 = p1(0) + VPS01(0) +V01(0)*1.3
+    P1L1 = p1(1) + VPS01(1) +V01(1)*1.3
+    P1L2 = p1(2) + VPS01(2) +V01(2)*1.3
+    P1L  = Array (P1L0,P1L1,P1L2)
+       
+ 
+    addLinguette = Rhino.addsrfpt (Array(P1,P1L,P0L,P0)) 
+    
+    
+   End Function
+
+
+
+ 
+ 
+  
+    
+     
+Function addSuperficieTipo (p1,p2,p3,p4,nlati,tipo,scala)        
+    
+    
+     
+If nlati = 3 Then
+    
+     'Tipo 0
+       If tipo = 0 Then        
+        addSuperficieTipo = Rhino.addsrfpt (Array(p1,p2,p3))
+       
+        PiegaT = Rhino.addCurve (Array (p1,p2,p3,p1),1) 
+        Rhino.ObjectLayer PiegaT,"pieghe" 
+     
+     'Tipo 1 -2  
+      Else
+       
+        'Curva perimetrale di primo grado   
+         curva1 =  Rhino.addCurve (Array (p1,p2,p3,p1),1)
+   
+        'Grado della curva del foro
+         curva1mod  =  Rhino.addCurve (Array (p1,p2,p3,p1),tipo)
+        
+        'Punto centrale
+         cCurva1temp = Rhino.CurveAreaCentroid (curva1mod)
+         cCurva1 = cCurva1temp(0)
+
+        
+        'Scalo la curva
+         dblScale = scala
+         curva11 = Rhino.ScaleObject (curva1mod,cCurva1, Array(dblScale,dblScale,dblScale), True )
+      
+        'Creo la superficie che collega la curva perimetrale con quella centrale
+         srfTemp = Rhino.addloftsrf (Array(curva1,Curva11))
+         addSuperficieTipo = srfTemp(0)
+        'Cancello
+         Rhino.deleteobjects Array(curva1mod,curva1,Curva11)   
+       End If 
+End If   
+
+
+     
+If nlati = 4 Then
+     'Tipo 0
+      If tipo = 0 Then
+        
+       PiegaQ = Rhino.addCurve (Array (p1,p2,p3,p4,p1),1)      
+       Rhino.ObjectLayer PiegaQ,"pieghe"     
+       addSuperficieTipo = Rhino.addsrfpt (Array(p1,p2,p3,p4))
+       
+     'Tipo 1 -2  
+      Else
+          
+      'Curva perimetrale di primo grado   
+      curva1 =  Rhino.addCurve (Array (p1,p2,p3,p4,p1),1)
+      
+      'Grado della curva del foro
+      curva1mod  =  Rhino.addCurve (Array (p1,p2,p3,p4,p1),tipo)
+      
+      'Punto centrale
+      cCurva1temp = Rhino.CurveAreaCentroid (curva1mod)
+      cCurva1 = cCurva1temp(0)
+      
+      'Scalo la curva
+      dblScale = scala
+      curva11 = Rhino.ScaleObject (curva1mod,cCurva1, Array(dblScale,dblScale,dblScale), True )
+              
+      'Creo la superficie che collega la curva perimetrale con quella centrale
+        srfTemp = Rhino.addloftsrf (Array(curva1,Curva11))
+        addSuperficieTipo = srfTemp(0)
+      'Cancello
+       Rhino.deleteobjects Array(curva1mod,curva1,Curva11)   
+      End If 
+      
+End If   
+
+End Function
+ 

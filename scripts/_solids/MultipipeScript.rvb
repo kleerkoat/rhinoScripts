@@ -1,0 +1,52 @@
+﻿Option Explicit
+'Script written by Mitch
+'Script version Friday, 17 September,2010
+
+Private oldsRValue,oldeRValue,oldEndStyle,oldShape
+If IsEmpty(oldsRvalue) Then oldsRValue=1
+If IsEmpty(oldEndStyle) Then oldEndStyle="Flat"
+If IsEmpty(oldShape) Then oldShape="Global"
+
+Call MultiPipeCurves
+Sub MultiPipeCurves()
+	
+	Dim arrCrvs,dblsRad,dbleRad,dblTol,endStyle,shape,ub
+	dblTol=Rhino.UnitAbsoluteTolerance
+	
+	'thick,shapeblending
+	arrCrvs=Rhino.GetObjects("Select curves to pipe",4,, True)
+	If IsNull(arrCrvs) Then	Exit Sub
+	ub=Ubound(arrCrvs)
+
+	dblsRad=Rhino.GetReal("Pipe start radius?",oldsRValue,dblTol)
+	If Not vartype(dblsRad)=5 Then Exit Sub
+	If IsEmpty(oldeRvalue) Then oldeRValue=dblsRad
+		
+	dbleRad=Rhino.GetReal("Pipe end radius?",oldeRValue,dblTol)
+	If Not vartype(dbleRad)=5 Then Exit Sub
+	
+	endStyle=Rhino.GetString ("End Style?",oldEndStyle,Array("None","Flat","Round"))
+	If Not vartype(endStyle)=8 Then Exit Sub
+	If endStyle<>"None" And endStyle<>"Flat" And endStyle<>"Round" Then Exit Sub
+	
+	shape=Rhino.GetString ("Shape blending?",oldShape,Array("Local","Global"))
+	If Not vartype(shape)=8 Then Exit Sub
+	If shape<>"Local" And shape<>"Global" Then Exit Sub
+		
+	oldsRValue=dblsRad
+	oldeRValue=dbleRad
+	oldEndStyle=endStyle
+	oldShape=shape
+	
+	Call Rhino.EnableRedraw(False)
+	Dim strComm,strCrv,i : i=1	
+	For Each strCrv In arrCrvs
+		strComm="_Pipe SelID "&strCrv&" _Radius _Thick=_No _Cap "
+		strComm=strComm&endStyle&" _ShapeBlending="&shape&" "
+		strComm=strComm&dblsRad&" "&dbleRad&" _Enter _Enter _Enter"
+		Call Rhino.Command(strComm,False)
+		Call Rhino.Print("Piping curve "&i&"/"&(ub+1))
+		i= i+1	
+	Next
+	Call Rhino.EnableRedraw(True)
+End Sub

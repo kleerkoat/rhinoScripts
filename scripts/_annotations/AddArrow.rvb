@@ -1,0 +1,62 @@
+Option Explicit
+'Script written by Pascal
+
+'Script version Monday, June 30, 2008
+
+Sub AddArrow()
+	Rhino.UnselectallObjects
+	Dim aPoints(7) 
+	
+	aPoints(0) =	Array(.22000,0.05000,0.000)
+	aPoints(1) =	Array(0.000,0.05000,0.000)
+	aPoints(2) =	Array(0.000,-0.05000,0.000)
+	aPoints(3) =	Array(.22000,-0.05000,0.000)
+	aPoints(4) =	Array(.22000,-.10000,0.000)
+	aPoints(5) =	Array(.35000,0.000,0.000)
+	aPoints(6) =	Array(.22000,.10000,0.000)
+	aPoints(7) =	Array(.22000,0.05000,0.000)
+
+	Dim aRef1: aref1 = array(.35,0,0)
+	Dim aref2: aref2 = array(0,0,0)
+	
+	Dim aTemp : atemp = CplaneToWorldPts(aPoints)
+	
+	Dim Arrow : arrow =	Rhino.AddPolyline (atemp)
+
+	Rhino.SelectObject arrow
+	'	Rhino.SelectObject arrow2
+	
+	Rhino.Command "_Orient _Scale=_3d _Copy=_No " & Rhino.pt2str(aRef1,,True) & Rhino.Pt2Str(aRef2,,True)
+	If Rhino.LastCommandResult <> 0 Then
+		Rhino.DeleteObject Arrow
+	Else 
+		Dim aArrow:	aArrow = Rhino.SelectedObjects
+		Rhino.UnselectAllObjects
+		Arrow = aArrow(0)
+	End If
+	Dim sGrp: sGrp = Rhino.AddGroup
+	Dim arrow2: arrow2 = Rhino.Addhatch (arrow,"Solid")
+	Rhino.AddObjectsToGroup array(arrow,arrow2), sGrp
+	
+End Sub
+
+'Rhino.AddStartUpScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "AddArrow", "_NoEcho _-Runscript (addArrow)"
+
+Function CplaneToWorldPts(ByRef arrPts)
+
+	Dim arrPlane, i
+	arrPlane = Rhino.ViewCplane
+	Dim Bound: Bound =  UBound (arrPts)
+	Dim temp()
+	
+	For i = 0 To  Bound
+
+		ReDim Preserve temp(i)
+		temp(i) = Rhino.XformCPlaneToWorld (arrPts(i), arrPlane)
+		
+	Next
+
+	CplaneToWorldPts = temp
+
+End Function

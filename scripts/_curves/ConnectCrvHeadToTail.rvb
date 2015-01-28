@@ -1,0 +1,11 @@
+Option Explicit
+'Script written by willemderks
+'Script version Friday, June 22, 2012 15:14:30
+'Call ConnectCrvHeadToTail()
+Sub ConnectCrvHeadToTail()
+  Dim arrObj : arrObj = Rhino.Getobjects("Select Curves to connect Head to Tail", 4)
+  Dim i
+  For i= 0 To Ubound(arrObj) - 1
+  Call Rhino.AddLine(Rhino.CurveEndPoint(arrOBJ(i)), Rhino.CurveStartPoint(arrObj(i + 1)))
+  Next
+End Sub 

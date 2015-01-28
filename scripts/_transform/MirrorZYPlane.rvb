@@ -1,0 +1,15 @@
+'--------------------------------------------------------------
+'Command   :  mizy (Mirror ZY Plane)
+'Date      :  2011/01/24
+'Version   :  alfa
+'Organization   :  Rhino+
+'--------------------------------------------------------------
+Option Explicit
+
+Sub MirrorZYPlane
+  
+Rhino.Command "!_Mirror Pause _3Point 0,0,0 0,1,0 0,0,1"
+
+End Sub
+
+'MirrorZYPlane

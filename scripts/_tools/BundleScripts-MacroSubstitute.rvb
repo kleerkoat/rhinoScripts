@@ -1,0 +1,14 @@
+Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version Monday, November 14, 2011 10:05:02 AM
+
+Call Main()
+Sub Main()    
+	Rhino.Command "_Polyline"
+	If Rhino.LastCommandResult = 0 Then
+		Rhino.SelectObject Rhino.LastCreatedObjects()(0)
+		Rhino.Command "_Slab"
+	Else Rhino.Print "The command did not complete." 
+	End If
+End Sub

@@ -1,0 +1,72 @@
+Option Explicit
+'Script written by Rodrigo Medina
+'Script copyrighted by designplaygrounds.com
+'This script is Protected under a Creative Commons 2.5 Licence
+'If you are going to use it for comercial purposes please notify to rodrigo_medina23@hotmail.com
+'Script version Tuesday, August 12, 2008 5:45:47 PM
+
+'Call DiagridGenerativeStructures()
+Sub DiagridGenerativeStructures()
+	Dim strsurface,Udomain,Vdomain,Uparam,Vparam,arrpoints,i,j,secu,secv,pipeRadius
+	Const Objecttype=8
+	strsurface=rhino.GetObject("select surface",Objecttype)
+	If IsNull (strsurface) Then Exit Sub 
+	secu=Rhino.GetInteger("seccions in U")
+	secv=Rhino.GetInteger("seccions in V")
+	pipeRadius=Rhino.GetReal("pipes radius")
+	
+	
+	ReDim collec(secu,secv)
+	'inputs
+		
+	
+	If IsNull (strsurface) Then Exit Sub 
+	'surface min and max of u and v
+	Udomain=Rhino.SurfaceDomain(strsurface,0)
+	Vdomain=Rhino.SurfaceDomain(strsurface,1)
+	'looping
+	For i= 0 To secu
+		For j =0 To secv
+			Uparam=Udomain(0)+ i*((Udomain(1)-Udomain(0))/secu)	
+			Vparam =Vdomain(0) + j*((Vdomain(1)-Vdomain(0))/secv)
+			'fix points on surface
+			arrpoints=rhino.evaluatesurface(strsurface,array(Uparam,Vparam))
+			'Rhino.AddPoint arrpoints
+			Call rhino.addsphere(arrpoints,pipeRadius)
+			'charge the 2 diomension array with the size in i and j 
+			collec(i,j)= arrpoints
+		
+	Next
+	
+	Next
+	'names for teh points inside the array
+	Dim npoint1,npoint2,npoint3,npoint4
+	'position of the poinst inside  of the array
+	For i= 0 To secu -1
+		For j= 0 To secv -1
+			npoint1=collec(i,j)
+			npoint2=collec(i+1,j+1)
+			npoint3=collec(i+1,j)
+			npoint4=collec(i,j+1)
+			Call pipe(npoint1,npoint2,pipeRadius)
+			Call pipe(npoint3,npoint4,pipeRadius)
+		
+		Next
+	Next
+
+End Sub
+
+Function pipe(npoint1,npoint2,pipeRadius)
+	Dim strline,strcmd
+	strline= rhino.addline(npoint1,npoint2)
+	pipeRadius
+	strcmd ="! _Pipe _SelID " & strline & " " & pipeRadius/2 & " _Enter _Enter"
+	Call rhino.command(strcmd)
+End Function
+Function pipe(npoint3,npoint4,pipeRadius)
+	Dim strline2,strcmd
+	strline2= rhino.addline(npoint3,npoint4)
+	
+	strcmd ="! _Pipe _SelID " & strline2 & " " & pipeRadius & " _Enter _Enter"
+	Call rhino.command(strcmd)
+End Function

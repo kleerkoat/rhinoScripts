@@ -1,0 +1,88 @@
+Option Explicit
+'
+' Description:
+' This script recursively subdivides a rectangle into smaller and smaller entities
+' based on the condition that a reference curve is intersecting the current rectangle
+'
+' Author: Tobias Schwinn - http://www.tobesch.de
+'
+' Last modified: 04 July 2008
+
+Call SubdividePlaneByCurve()
+Sub SubdividePlaneByCurve()
+	
+	' set the number of generations
+	Dim numGenenerations: numGenenerations = Rhino.GetInteger("Number of recursions", 5, 1, 10)
+	
+	' Select a rectangle
+	Const rhObjectCurve = 4
+	Dim strObject: strObject = Rhino.GetObject("Select a rectangle", rhObjectCurve)
+		
+	' Select reference points
+	Dim arrCurves: arrCurves = Rhino.GetObjects("Select reference curves inside the rectangle", rhObjectCurve)
+
+	' subdivide the plane
+	Call subdividePlane_byCurve(strObject, arrCurves, numGenenerations, RGB(0, 0, 0))
+
+	Call Rhino.Messagebox("Done!")
+
+End Sub
+
+Sub subdividePlane_byCurve(strObject, arrCurves, numGenenerations, lngColor)
+	
+	Dim numGen: numGen = numGenenerations - 1
+	Dim dblScale(2): dblScale(0) = 0.5: dblScale(1) = 0.5: dblScale(2) = 0.5
+	
+	Dim i
+	For i = 0 To 3
+		
+		Dim strNewObject: strNewObject = ScaleAndMove(strObject, dblScale, i)
+		
+		' check if one of the curves is intersecting the current rectangle
+		Dim blnCheck: blnCheck = False'
+		Dim strCurve, arrIntersectionInfo
+		For Each strCurve In arrCurves
+			
+			' get the color of the current point
+			'Dim lngPointColor: lngPointColor = Rhino.ObjectColor(strPoint)
+			'lngColor = lngPointColor
+			arrIntersectionInfo = Rhino.CurveCurveIntersection (strCurve, strNewObject)
+			If IsArray(arrIntersectionInfo) Then
+				blnCheck = True
+				Exit For
+			End If
+		Next
+		
+		If numGen > 0 And blnCheck = True Then
+			Call subdividePlane_byCurve(strNewObject, arrCurves, numGen, lngColor)
+		Else
+			'Exit Sub
+		End If
+		
+	Next
+	
+	Call Rhino.HideObject(strObject)
+
+End Sub
+
+Function ScaleAndMove(strObject, dblScale, i)
+	
+	Call Rhino.EnableRedraw(False)
+
+	' scale the rectangle by half
+	Dim strNewObject: strNewObject = Rhino.ScaleObject(strObject, Array(0, 0, 0), dblScale, True)
+		
+	' get the vertices of the strObject
+	Dim arrVertices: arrVertices = Rhino.CurvePoints(strObject)
+		
+	' get the vertices of strNewObject
+	Dim arrNewVertices: arrNewVertices = Rhino.CurvePoints(strNewObject)
+		
+	' move strNewObject from the nth corner point to the nth corner point of strObject
+	Call Rhino.MoveObject(strNewObject, arrNewVertices(i), arrVertices(i))
+	
+	Call Rhino.EnableRedraw(True)
+	
+	ScaleAndMove = strNewObject
+	
+End Function

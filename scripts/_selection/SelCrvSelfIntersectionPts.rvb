@@ -1,0 +1,39 @@
+Option Explicit
+' Script to extract self intersection points 
+' © 2011, Clement Greiner - CG3D
+'12-02-11 - changed the routine name from CSI to SelCrvSelfIntersectionPts'
+
+'Call CrvSelfIntersectionPts()
+Sub SelCrvSelfIntersectionPts()
+	
+	Dim arrCurves, arrCCX, c, i, arrPts(), p, s
+	
+	arrCurves = Rhino.GetObjects("Select curves", 4, True, True, False)
+	If IsNull(arrCurves) Then Exit Sub
+	
+	p = 0
+	
+	For c = 0 To UBound(arrCurves)
+		arrCCX = Rhino.CurveCurveIntersection(arrCurves(c))
+		If Not IsNull(arrCCX) Then
+			If IsArray(arrCCX) Then 
+				For i = 0 To UBound(arrCCX)
+					If arrCCX(i, 0) = 1 Then
+						ReDim Preserve arrResult(p)
+						arrResult(p) = Rhino.AddPoint(arrCCX(i, 1))
+						p = p + 1
+					End If
+				Next
+			End If
+		End If
+	Next
+	
+	If p <> 0 Then 
+		If p = 1 Then s = "" Else s = "s"
+		Rhino.Print "Found " & p & " intersection point" & s
+		Rhino.SelectObjects arrResult
+	Else
+		Rhino.Print "No intersections found"
+	End If
+
+End Sub

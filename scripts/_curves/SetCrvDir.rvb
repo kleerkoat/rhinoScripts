@@ -1,0 +1,119 @@
+Option Explicit
+
+
+'Rhino.AddStartUpScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "SetCurvesClockwise", "_NoEcho _-RunScript (SetCurvesClockwise)"
+
+'Call SetCrvDir()
+Sub SetCrvDir()
+	
+	Dim aCrv, sCrv
+	
+	aCrv = Rhino.GetObjects("Select closed curves", 4,, True)
+	If Not IsArray(aCrv) then Exit Sub
+
+	Dim blnDir, aDir
+	
+	aDir = Rhino.GetBoolean("Set curve direction.", array("CurveDirection", "Clockwise", "CounterClockwise"), array(true))
+	If not IsArray(aDir) then exit sub
+	
+	blnDir = aDir(0)
+	
+	dim n: n = 0
+	for each sCrv in aCrv
+		
+		if Rhino.IsCurveClosed(sCrv) then
+			MakeCrvClockWise sCrv, blnDir
+			n = n + 1
+		end if
+		
+	Next
+	
+	dim sDir: sDir = "clockwise."
+	if BlnDir = True then sDir = "counterclockwise."
+	
+	if n = 1 then
+		Rhino.Print " 1 curve set to " & sDir
+	else
+		Rhino.Print n & " curves set to " & sDir
+	End If
+	
+	
+	
+End Sub
+
+
+Function MakeCrvClockWise(sCrv, blnDir)
+	
+	dim aLine, pt, vectan, aBB, aInt, n, Tol
+	dim temp, xform
+	
+	
+	Tol = Rhino.UnitAbsoluteTolerance()
+	n = 0
+
+			
+	xform = Rhino.XformPlanarProjection(Rhino.ViewCPlane())
+	temp = Rhino.TransformObject(sCrv, xform, true)
+	aBB = Rhino.BoundingBox(temp, Rhino.CurrentView())
+	aLine = array(aBB(0), aBB(1))
+	
+	aInt = Rhino.LineCurveIntersection(aLine, temp, Tol)
+	If not isArray(aInt) then
+	
+		Rhino.DeleteObject temp
+	End If
+	if aInt(0, 0) = 1 then 
+		pt = aint(0, 1)
+	else
+		pt = aInt(0, 3)
+	End if
+	
+	vecTan = Rhino.CurveTangent(Temp, Rhino.CurveClosestPoint(sCrv, pt))
+	Rhino.DeleteObject temp
+		
+	if blnDir = False then
+		If VectorAngle(Vectan, array(1, 0, 0)) < 90 then 
+			Rhino.ReverseCurve sCrv
+		end if
+			
+	else
+		If VectorAngle(Vectan, array(1, 0, 0)) > 90 then
+			Rhino.ReverseCurve sCrv
+		end if
+			
+	End if
+			
+
+	
+End Function
+
+Function VectorAngle(Vec1, vec2)
+	
+	Vec1 = Rhino.VectorUnitize(Vec1)
+	Vec2 = Rhino.VectorUnitize(Vec2)
+	
+	Dim DP: DP = Vec1(0) * Vec2(0) + Vec1(1) * Vec2(1) + Vec1(2) * Vec2(2)
+	
+	If DP > .999999 then
+		VectorAngle = 0
+	ElseIf DP < -.999999 then  
+		VectorAngle = Rhino.ToDegrees(Rhino.Pi())
+	Else
+		VectorAngle = arcos(DP, False)
+	End If
+	
+End Function
+
+
+
+Function Arcos(dblAng, blnRad)
+	'dblAng input in radians
+	
+	If BlnRad = True then 'output in radians
+		Arcos = Atn(-dblAng / Sqr(-dblAng * dblAng + 1)) + 2 * Atn(1)
+	Else 'output in degrees
+		Arcos = Rhino.ToDegrees(Atn(-dblAng / Sqr(-dblAng * dblAng + 1)) + 2 * Atn(1))
+	End if
+	
+End Function

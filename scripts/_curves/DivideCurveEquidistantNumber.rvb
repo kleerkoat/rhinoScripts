@@ -1,0 +1,54 @@
+Option Explicit
+' Divides a Curve by specified Number of equidistant Segments
+' Jess Maertterer - 22.10.2009
+
+'DivideCurveEquidistantNumber()
+Sub DivideCurveEquidistantNumber()
+  
+  Dim strObject
+  strObject = Rhino.GetObject ("Select Curve to divide", 4, true)
+  If IsNull(strObject) Then Exit Sub
+  
+  Dim intDiv
+  intDiv = Rhino.GetInteger ("Number of equidistant segments", 5, 2)
+  If IsNull(intDiv) Then Exit Sub
+  
+  Dim dDistance
+  dDistance = Rhino.CurveLength(strObject)/intDiv
+  
+  Dim dTolerance : dTolerance = Rhino.UnitAbsoluteTolerance()
+  Dim dTooShort : dTooShort = 0
+  Dim dTooLong : dTooLong = Rhino.CurveLength(strObject)
+  Dim aEndPoint : aEndPoint = Rhino.CurveEndPoint(strObject)
+  Dim arrParams, arrPoint
+  
+  Rhino.Prompt "Dividing..."
+  Do 
+    arrParams = Rhino.DivideCurveEquidistant (strObject, dDistance, false,false)
+    If ubound(arrParams) = intDiv Then
+      arrPoint = Rhino.EvaluateCurve(strObject,arrParams(ubound(arrParams)))
+      If Rhino.Distance(arrPoint,aEndPoint)< dTolerance Then
+        Exit Do
+      Else
+        If (dTooLong-dTooShort) < 0.000000001 Then 
+          MsgBox "Sorry - didn't find a solution with " & intDiv & " Segments!"
+          Exit Sub
+        End If
+        dTooShort = dDistance
+      End If
+    Else
+      If ubound(arrParams) < intDiv Then
+        dTooLong = dDistance
+      Else 
+        dTooShort = dDistance
+      End If
+    End If
+    dDistance = dTooShort + (dTooLong-dTooShort)/2
+    Rhino.StatusBarMessage (dDistance)
+  Loop
+  
+  Call Rhino.DivideCurveEquidistant (strObject, dDistance, true)
+  Rhino.Print intDiv &" Segments at Distance: " & dDistance
+    
+End Sub
+

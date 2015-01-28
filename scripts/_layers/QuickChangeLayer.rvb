@@ -1,0 +1,28 @@
+Option Explicit
+
+'Call QuickChangeLayer()
+Sub QuickChangeLayer()
+    
+Dim aObj
+aObj = Rhino.GetObjects("Select objects for layer change",,,True)
+
+    If Not isArray(aObj) Then Exit Sub
+    
+Dim starg
+starg = Rhino.GetObject("Select an object on the target layer")
+    If isNull(starg) Then Exit Sub
+    
+    Dim TargLayer:TargLayer = Rhino.ObjectLayer(sTarg)
+    Dim sObj
+    
+    Rhino.EnableRedraw(False)
+    
+    For Each sObj In aObj
+       
+        Rhino.ObjectLayer sObj, TargLayer
+       
+    Next
+    
+    Rhino.EnableRedraw(True)
+    
+End Sub

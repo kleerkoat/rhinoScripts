@@ -1,0 +1,24 @@
+Option Explicit
+'Script written by willemderks
+
+'Rhino.AddStartUpScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "PanViewAccurate","_NoEcho _-RunScript (PanViewAccurate)"
+
+'Call PanViewAccurate()
+Sub PanViewAccurate()
+
+	Dim arrCam
+	arrCam = Rhino.ViewCameraTarget()
+	
+	Dim View
+	View = Rhino.CurrentView(,False)
+	
+	Dim arrVec
+	arrVec = Rhino.GetLine(1,,"Set point to pan from","Set point to pan to")
+	If IsNull (arrVec) Then Exit Sub
+
+	arrCam = Rhino.PointArrayTransform(arrCam,Rhino.XformTranslation(Rhino.VectorCreate(arrVec(1),arrVec(0))))
+		
+	Call Rhino.ViewCameraTarget(View,arrCam(0),arrCam(1))
+	
+End Sub

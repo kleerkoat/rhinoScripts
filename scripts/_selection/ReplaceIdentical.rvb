@@ -1,0 +1,466 @@
+Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version den 20 juni 2008 17:42:58
+'Call ReplaceIdentical()
+Sub ReplaceIdentical()
+	Dim strOriginalObject, arrSelObjects, arrObjects, strObject, dblOrigArea, intArrSize, i, j,  arrPoint, intOrigArrSize
+	Dim dblBiggest, intType, intOrigType, arrOrigDistances, arrThisDistances, dblDiff, arrOrig(), arrOrigPoints, arrThisPoints
+	Dim arrOrigProportions, arrThisProportions, intInputTol, arrItems, arrDefaults, arrResults
+	Dim ptOrigPoint, strReplacement, blnOnlyMoved, arrNormal
+	Dim arrReplacement,arrReplacer,arrReplacer2	
+	strOriginalObject = Null
+	arrObjects = Rhino.GetObjects ("Select objects for processing", 2 + 4 + 8 + 16 + 32 ,True,True)
+	
+	If IsNull (arrObjects) Then
+		Exit Sub
+	End If
+	
+	If UBound(arrObjects) = 0 Then
+		strOriginalObject = arrObjects(0)
+		arrObjects = Rhino.AllObjects(False,True)
+	End If
+	arrItems = Array("SelectRotatedAndMirrored", "No", "Yes", _ 
+		"SelectRescaled", "No", "Yes", _
+		"SelectComparisonObject", "No", "Yes", _
+		"DefaultTolerance", "No", "Yes", _
+		"DeleteOriginals", "No","Yes")
+	
+	arrDefaults = array(True, False, True, True, False)
+	
+	Dim strFolder
+	strFolder = Rhino.InstallFolder & "\Plug-ins\"
+		
+	For i = 0 To ubound(arrDefaults)
+		If Not IsNull(Rhino.GetSettings(strFolder & "Squirrel.ini", "ReplaceIdentical", CStr(i))) Then
+			arrDefaults(i) = CBool(Rhino.GetSettings(strFolder & "Squirrel.ini", "ReplaceIdentical",CStr(i)))
+		End If
+	Next
+	If Not IsNull(Rhino.GetSettings(strFolder & "Squirrel.ini", "ReplaceIdentical", "Tolerance")) Then
+		intInputTol = CInt(Rhino.GetSettings(strFolder & "Squirrel.ini", "ReplaceIdentical","Tolerance"))
+	End If
+	
+	
+	arrResults = Rhino.GetBoolean("Options?", arrItems, arrDefaults)
+	
+	If IsNull (arrResults) Then
+		Exit Sub
+	End If
+	
+	intInputTol = 6
+	If Not arrResults(3) Then
+		Call Rhino.Print("Change to a smaller tolerance if objects with too big deviation are selected") 
+		intInputTol = Rhino.GetInteger ("Type integer between 1 and 9 to change tolerance, default is 6 ( = 1/1000000)", 6, 1, 9)
+	
+		If IsNull (intInputTol) Then
+			Exit Sub
+		End If
+	End If
+	
+	
+	For i = 0 To ubound(arrResults)
+		Rhino.SaveSettings strFolder & "Squirrel.ini", "ReplaceIdentical", CStr(i),CStr(arrResults(i))
+	Next
+	
+	
+	strOriginalObject = Rhino.GetObject ("Select comparison object (object to replace)", 2 + 4 + 8 + 16 + 32 ,True,True,arrObjects)
+	
+	If IsNull(strOriginalObject) Then
+		strOriginalObject = Rhino.GetObject ("Select comparison object", 2 + 4 + 8 + 16 + 32 ,True,True,arrObjects)
+	End If
+	If IsNull (strOriginalObject) Then
+		Exit Sub
+	End If
+	arrReplacement = Rhino.GetObjects("Select replacement object or objects", 2 + 4 + 8 + 16 + 32 ,True,False,True)
+	If IsNull (arrReplacement) Then
+		Exit Sub
+	End If
+	
+	
+	While (arrReplacement(0) = strOriginalObject) And Ubound(arrReplacement)=1
+		arrReplacement = Rhino.GetObjects("CANNOT BE SAME AS COMPARISON OBJECT! Select replacement object", 2 + 4 + 8 + 16 + 32 ,True,False,True)
+		If IsNull (arrReplacement(0)) Then
+			Exit Sub
+		End If
+	
+	Wend
+	
+	Dim curView
+	curView	= Rhino.Currentview
+				
+	
+	arrSelObjects = Array(strOriginalObject)
+	intOrigType = Rhino.ObjectType(strOriginalObject)
+	Call ExtractPoints(strOriginalObject, arrOrigPoints)
+	
+	Call DistancesFromPoints(arrOrigPoints, arrOrigDistances)		
+			
+	Call DistancesProportions(arrOrigDistances, arrOrigProportions)		
+	
+	Call Rhino.EnableRedraw(False)
+	
+	For Each strObject In arrObjects
+		
+		intType = Rhino.ObjectType(strObject)
+	
+		If strObject <> strOriginalObject And intType = intOrigType Then
+			Call ExtractPoints(strObject, arrThisPoints)
+	
+			Call DistancesFromPoints(arrThisPoints, arrThisDistances)
+			
+			Call DistancesProportions(arrThisDistances, arrThisProportions)
+		
+			
+			If arrResults(1) And CheckIfIdentical(arrThisProportions,arrOrigProportions,intInputTol) Or _
+				Not arrResults(1) And CheckIfIdentical (arrThisDistances, arrOrigDistances, intInputTol) Then
+		
+				
+				If Not arrResults(0) Then
+					If CheckRotation(arrThisPoints, arrOrigPoints, intInputTol) = 0 Then
+				
+						arrReplacer = Replacer(arrOrigPoints, arrThisPoints, arrReplacement)
+					
+						dblScale = arrThisDistances(0)/arrOrigDistances(0)
+						arrScale = Array(dblScale,dblScale,dblScale)
+					
+						If arrResults(1) Then
+							Call Rhino.ScaleObjects(arrReplacer, arrThisPoints(0), arrScale)
+						End If
+	
+						ReDim Preserve arrSelObjects(UBound(arrSelObjects)+1)
+						arrSelObjects(UBound(arrSelObjects)) = strObject
+					End If
+				End If		
+				
+			
+				If arrResults(0) Then	
+					
+					
+					Dim strNewObject, arrNewPoints, dblRotationAngle, strNewObject2
+					Dim dblScale, arrScale, arrInvScale, arrMovement, strReplacer
+						
+					dblScale = arrThisDistances(0)/arrOrigDistances(0)
+					arrScale = Array(dblScale,dblScale,dblScale)
+					
+					arrInvScale = Array(1/dblScale,1/dblScale,1/dblScale)
+					
+					Dim	arrNewObject, arrNewObject2, arrStrObject : arrStrObject = Array(strObject)
+					
+					arrNewObject = Replacer(arrThisPoints, arrOrigPoints, arrStrObject)
+					
+					Call Rhino.ScaleObjects(arrNewObject, arrThisPoints(0), arrInvScale)
+					Call ExtractPoints(arrNewObject(0), arrNewPoints)
+					
+					arrNewObject2 = Replacer(arrNewPoints, arrOrigPoints, arrNewObject)
+					Call ExtractPoints(arrNewObject2(0), arrNewPoints)
+					
+					
+					Call Rhino.DeleteObjects(arrNewObject)
+					Call Rhino.DeleteObjects(arrNewObject2)
+				
+					
+					Call Rhino.CurrentView("Right")
+					
+					Dim arrNewOrigPoints, strNewOrig, k, strReplacer2
+					strNewOrig =   Rhino.MirrorObject(strOriginalObject, arrOrigPoints(0),arrOrigPoints(1),True)
+					arrReplacer2 = Rhino.MirrorObjects(arrReplacement, arrOrigPoints(0),arrOrigPoints(1),True)
+								
+					Call ExtractPoints(strNewOrig, arrNewOrigPoints)
+				
+					k=1
+							
+					While CheckIfIdentical(arrNewOrigPoints, arrOrigPoints,intInputTol)
+						Call Rhino.DeleteObjects(arrReplacer2)
+						arrReplacer2 = Rhino.MirrorObjects(arrReplacement, arrOrigPoints(k),arrOrigPoints(k+1),True)
+						strNewOrig =   Rhino.MirrorObject(strNewOrig, arrOrigPoints(k),arrOrigPoints(k+1),False)
+									
+						'		Call Rhino.DeleteObject(strNewOrig)
+						k = k+1
+						Call ExtractPoints(strNewOrig, arrNewOrigPoints)
+					Wend
+							
+			
+					'detect mirrored replicas
+					If CheckIfIdentical(arrNewPoints,arrNewOrigPoints,intInputTol) Then
+							
+						arrReplacer = Replacer(arrOrigPoints, arrThisPoints, arrReplacer2)	
+					Else
+						'mirrored replicas
+						arrReplacer = Replacer(arrOrigPoints, arrThisPoints, arrReplacement)
+					End If
+					
+					
+					Call Rhino.ScaleObjects(arrReplacer, arrThisPoints(0), arrScale)
+					
+					ReDim Preserve arrSelObjects(UBound(arrSelObjects)+1)
+					arrSelObjects(UBound(arrSelObjects)) = strObject
+					
+					Call Rhino.DeleteObject(strNewOrig)
+					Call Rhino.DeleteObjects(arrReplacer2)
+					
+				End If
+				
+			End If
+				
+		End If
+	Next
+	
+	
+	
+	Dim arrSelObjNew
+	If Not arrResults(2) Then
+		arrSelObjNew = arrSelObjects
+		ReDim arrSelObjects(UBound(arrSelObjects)-1)
+		
+		For i=0 To UBound(arrSelObjects)
+			arrSelObjects(i) = arrSelObjNew(i+1)
+		Next
+		
+	End If
+	
+	Call Rhino.UnselectAllObjects
+	
+	Call Rhino.SelectObjects(arrSelObjects)
+	
+	'Call Rhino.DeleteObjects(arrSelObjects)
+			
+	Call Rhino.CurrentView(curView)
+	
+	Call Rhino.Print("Number of Objects replaced: " + CStr(UBound(Rhino.SelectedObjects)+1))
+	If arrResults(4) Then
+		Call Rhino.DeleteObjects(Rhino.SelectedObjects)
+	Else
+		Call Rhino.Print("Press Del to delete all replaced objects")
+	End If
+	
+	Call Rhino.EnableRedraw(True)
+	
+End Sub
+Function ExtractPoints(strObject, ByRef arrPoints)
+	Dim intType, intArrSize2, i, arrPoint, dblDistance, intArrSize3, strSurface, k
+	
+	'ReDim arrDistances(0)
+	ReDim arrPoints(0)
+	
+	intType = Rhino.ObjectType(strObject)
+	
+	If (intType = 2) Then
+		
+		arrPoints = Rhino.PointCloudPoints(strObject)
+	End If
+	
+	If (intType = 4) Then
+	
+		arrPoints = Rhino.CurvePoints(strObject)
+	End If
+	
+	If (intType = 8) Then
+		
+		arrPoints = Rhino.SurfacePoints(strObject)
+	End If
+	
+	If (intType = 16) Then
+		
+		Dim arrSurfaces, arrNestedPoints
+		
+		arrSurfaces = Rhino.ExplodePolysurfaces (strObject)
+		Call Rhino.EnableRedraw(False)
+		i = 0
+		
+		Dim arrNested(), j
+		ReDim arrNested(UBound(arrSurfaces))
+		
+		For Each strSurface In arrSurfaces
+			arrNestedPoints = Rhino.SurfacePoints(strSurface)
+			arrNested(i) = arrNestedPoints
+			'Call Rhino.Print(CStr(i))
+			i = i+1	
+			
+		Next
+		
+		ReDim arrPoints(0)
+		i = 0
+		For Each arrNestedPoints In arrNested
+			For j=0 To UBound(arrNestedPoints)
+				ReDim Preserve arrPoints(i)
+				arrPoints(i) = arrNestedPoints(j)
+				'Call Rhino.Print(Rhino.Pt2Str(arrPoints(i)))
+				i=i+1
+				'Call Rhino.Print(CStr(i))
+				
+				
+				If i > 60 Then
+					Exit For
+				End If
+				
+			Next
+			
+			If i > 60 Then
+				Exit For
+			End If
+			
+		Next
+		
+		Call Rhino.DeleteObjects(arrSurfaces)
+		
+	End If
+	If (intType = 32) Then
+		Dim intVertices
+		
+		arrPoints = Rhino.MeshVertices(strObject)
+	
+		intVertices = Rhino.MeshVertexCount(strObject)
+		
+		If intVertices > 60 Then
+			ReDim Preserve arrPoints(60)
+		End If
+				
+	End If
+	
+End Function
+Function DistancesFromPoints(arrPoints, ByRef arrDistances)
+	Dim i
+	ReDim arrDistances(0)
+	
+	For i=1 To UBound(arrPoints)	
+				
+		ReDim Preserve arrDistances(i-1)
+		arrDistances(i-1) = Rhino.Distance(arrPoints(i), arrPoints(i-1))		
+					
+	Next
+	
+End Function
+Function DistancesProportions(arrDistances, ByRef arrProportions)
+	Dim i
+	ReDim arrProportions(0)
+	
+	For i=1 To UBound(arrDistances)	
+				
+		ReDim Preserve arrProportions(i-1)
+		arrProportions(i-1) = arrDistances(i)/arrDistances(i-1)	
+					
+	Next
+	
+End Function
+Function CheckIfIdentical(arrArray1, arrArray2, intTolerance)
+	Dim dblDiff, i
+	
+	CheckIfIdentical = True
+	
+	If IsNull (arrArray1) Then
+		CheckIfIdentical = False
+		Exit Function
+	End If
+	
+	If IsNull (arrArray2) Then
+		CheckIfIdentical = False
+		Exit Function
+	End If
+	
+	If IsNull (intTolerance) Then
+		intTolerance = 6
+	End If
+	
+	If UBound(arrArray1) <> UBound(arrArray2) Then
+		CheckIfIdentical = False
+		Exit Function
+	Else
+		For i=0 To UBound(arrArray1)
+			
+			If IsNumeric(arrArray1(i)) And IsNumeric(arrArray2(i)) Then
+			
+				dblDiff = abs(arrArray1(i) - arrArray2(i))
+				
+			Else
+				dblDiff = Rhino.Distance(arrArray1(i),arrArray2(i))
+			End If
+			
+			If dblDiff > 1/(10^intTolerance) Then
+				CheckIfIdentical = False
+				Exit Function			
+			End If
+			
+		Next
+	End If
+	CheckIfIdentical = True
+	
+End Function
+Function  CheckIfOnlyMoved(arrThisPoints, arrOrigPoints, intTolerance)
+	Dim dblDist, dblLastDist, dblDiff, i
+	
+	If UBound(arrThisPoints) <> UBound(arrOrigPoints) Then
+		CheckIfOnlyMoved = False
+		Exit Function
+	Else
+		
+		dblDist = Rhino.Distance(arrThisPoints(0), arrOrigPoints(0))
+		
+		'	For i=1 To UBound(arrThisPoints)
+		'		dblLastDist = dblDist
+		'		dblDist = Rhino.Distance(arrThisPoints(i), arrOrigPoints(i))
+		'		dblDiff = dblDist - dblLastDist
+		'		
+		'		If dblDiff > 0.0001/(10^intTolerance) Then
+		'			CheckIfOnlyMoved = False
+		'			Exit Function
+		'		End If
+		'		
+		'	Next
+	End If
+	
+	
+	CheckIfOnlyMoved = True
+		
+End Function
+Function CheckRotation(arrNewPoints, arrOrigPoints, intInputTol)
+	Dim arrThisVec, arrOrigVec, arrXVec, arrThisAngle, arrOrigAngle, arrPlane, dblRotationAngle
+	Dim strSurfacePlane, i
+	
+	CheckRotation = 0
+	
+	For i=1 To UBound(arrNewPoints)
+		arrThisVec = Rhino.VectorUnitize(Rhino.PointSubtract(arrNewPoints(i),arrNewPoints(i-1)))
+		arrOrigVec = Rhino.VectorUnitize(Rhino.PointSubtract(arrOrigPoints(i),arrOrigPoints(i-1)))
+	
+			dblRotationAngle = VectorAngle(arrOrigVec, arrThisVec)
+			
+			If dblRotationAngle > CheckRotation Then
+				CheckRotation = dblRotationAngle
+			End If
+		i=i+1
+	Next
+	
+	
+End Function
+Function Replacer(arrRefPoints, arrTargetPoints, arrReplacement)
+	Dim arrRef, arrTarget
+	If UBound(arrRefPoints) > 1 Then
+		arrRef = Array(arrRefPoints(0),arrRefPoints(1),arrRefPoints(2))
+		arrTarget = Array(arrTargetPoints(0),arrTargetPoints(1),arrTargetPoints(2))
+	Else
+		arrRef = Array(arrRefPoints(0),arrRefPoints(1))
+		arrTarget = Array(arrTargetPoints(0),arrTargetPoints(1))				
+	End If
+				
+	
+	Replacer =  Rhino.OrientObjects(arrReplacement,arrRef,arrTarget, 1)
+	
+	
+End Function
+Function VectorAngle(v0, v1)
+	Dim u0  : u0  = Rhino.VectorUnitize(v0)
+	Dim u1  : u1  = Rhino.VectorUnitize(v1)  
+	Dim dot : dot = Rhino.VectorDotProduct(u0, u1)
+	' Force the dot product of the two input vectors to 
+	' fall within the domain for inverse cosine, which 
+	' is -1 <= x <= 1. This will prevent runtime 
+	' "domain error" math exceptions.
+	If (dot < -1.0) Then
+		dot = -1.0
+	ElseIf (dot > 1.0) Then
+		dot = 1.0
+	End If
+	VectorAngle = Rhino.ToDegrees(Rhino.ACos(dot))
+End Function
+
+

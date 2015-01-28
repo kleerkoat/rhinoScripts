@@ -1,0 +1,74 @@
+Option Explicit
+'Script written by Mitch
+'Version Saturday, 20 November 2010
+
+Private oldStackAxis,oldMoveDir
+If IsEmpty(oldStackAxis) Then oldStackAxis="Z"
+If IsEmpty(oldMoveDir) Then oldMoveDir=True
+	
+'Call StackObjectsAlongAxis()
+Sub StackObjectsAlongAxis()
+	Dim arrObjs,axis,arrAxes,arrDir,arrRes,blnDown,dirVec,A,B
+	arrObjs=Rhino.GetObjects("Select objects to stack",,False,True)
+	If Not IsArray(arrObjs) Then Exit Sub
+	
+	arrAxes=Array("X","Y","Z")
+	axis=Rhino.GetString("Axis along which to stack?",oldStackAxis,arrAxes)
+	If axis<>"X" and axis<>"Y" and axis<>"Z" Then Exit Sub
+	
+	arrDir=Array("MoveObjects","TowardsPlus","TowardsMinus")	
+	arrRes=Rhino.GetBoolean("Direction to move objects?",arrDir,Array(oldMoveDir))
+	If Not IsArray(arrRes) Then Exit Sub
+	blnDown=arrRes(0) : oldMoveDir=arrRes(0)	
+	oldStackAxis=axis
+		
+	Select Case axis	
+		Case "X" : A=1 : B=0 : dirVec=Array(1,0,0)
+		Case "Y" : A=3 : B=1 : dirVec=Array(0,1,0)
+		Case "Z" : A=4 : B=2 : dirVec=Array(0,0,1)
+	End Select	
+	
+	Dim arrZ(),arrBB,arrObjSort,target,dblMove,arrMOve,ub,i
+	ub=Ubound(arrObjs)
+	ReDim arrZ(ub)
+	
+	For i=0 To ub
+		arrBB=Rhino.BoundingBox(arrObjs(i))
+		arrZ(i)=arrBB(A)(B)
+	Next
+	arrObjSort=GnomeKVSort(arrObjs,arrZ,arrRes(0))	
+	
+	arrBB=Rhino.BoundingBox(arrObjSort(0))
+	If blnDown Then target=arrBB(A)(B) Else target=arrBB(0)(B)
+	
+	Call Rhino.EnableRedraw(False)
+	For i=1 To ub		
+		arrBB=Rhino.BoundingBox(arrObjSort(i))
+		If blnDown Then dblMove=target-arrBB(0)(B) Else dblMove=target-arrBB(A)(B)
+		arrMove=Rhino.VectorScale(dirVec,dblMove)		
+		Call Rhino.MoveObject(arrObjSort(i),arrMove)
+		If blnDown Then target=arrBB(A)(B)+dblMove Else target=arrBB(0)(B)+dblMove
+	Next
+	Call Rhino.EnableRedraw(True)
+End Sub
+
+Function GnomeKVSort(ByVal arrK, ByVal arrV, blnAsc)	
+	'Sorts Keys (objects - arrK) by Values (numbers - arrV)
+	'blnAsc=True sorts ascending, False sorts descending
+	Dim arrVTemp,arrKTemp,i,j
+	i=1 : j=2
+	Do While i <= Ubound(arrV)
+		If (blnAsc And (arrV(i-1)<=arrV(i))) Or (Not blnAsc And (arrV(i-1)>=arrV(i))) Then
+			i=j : j= j+1 
+		Else 'swap values
+			arrVTemp=arrV(i) : arrKTemp=arrK(i)
+			arrV(i)=arrV(i-1) : arrK(i)=arrK(i-1)
+			arrV(i-1)=arrVTemp : arrK(i-1)=arrKTemp
+			i=i-1 'go back one index
+			If i=0 Then
+				i=j : j=j+1
+			End If
+		End If		
+	Loop
+	GnomeKVSort=arrK 'output is array of keys
+End Function

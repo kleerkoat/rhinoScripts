@@ -1,0 +1,112 @@
+Option Explicit
+'Script written by Pascal
+'Script date Friday, August 14, 2009 
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "WorldCplaneToView", "_NoEcho _-Runscript (WorldCplaneToView)"
+'Rhino.AddAlias "OrientViewCplaneToWorld", "_NoEcho _-Runscript (OrientViewCplaneToWorld)"
+'Call WorldCplaneToView()
+'OrientViewCplaneToWorld()
+
+Sub OrientViewCplaneToWorld()
+	
+	dim aPt: aPt = Rhino.ViewCPlane()(0)
+	
+	Rhino.EnableRedraw(false)
+	WorldCplaneToView()
+	
+	Dim Plane: Plane= 	Rhino.ViewCPlane()
+	
+	Plane(0) = aPt
+	Rhino.ViewCPlane ,Plane
+	Rhino.EnableRedraw(true)
+	
+End Sub
+
+Sub  WorldCplaneToView()
+
+	dim avec(5)
+	
+	avec(0) = array(1,0,0)
+	avec(1) = array(0,1,0)
+	avec(2)= array(0,0,1)
+	avec(3) = array(-1,0,0)
+	avec(4) = array( 0,-1,0)
+	avec(5) = array(0,0,-1)
+	
+	Dim aPlanes(5)
+	
+	aPlanes(0) = array(array(0,0,0),array(0,-1,0),array(0,0,1),array(-1,0,0))
+	aPlanes(1) = array(array(0,0,0),array(1,0,0),array(0,0,1),array(0,-1,0))
+	aPlanes(2) = array(array(0,0,0),array(1,0,0),array(0,-1,0),array(0,-1,0))
+	aPlanes(3) = array(array(0,0,0),array(0,1,0),array(0,0,1),array(1,0,0))
+	aPlanes(4) = array(array(0,0,0),array(-1,0,0),array(0,0,1),array(0,1,0))
+	aPlanes(5) = array(array(0,0,0),array(1,0,0),array(0,1,0),array(0,-1,0))
+	
+	Dim aStr(5)
+	
+	astr(0) = "Left."
+	astr(1) = "Front." 
+	astr(2) = "Bottom."
+	astr(3) = "Right."
+	astr(4) = "Back."
+	astr(5) = "Top."
+
+	Dim VecDir: VecDir = Rhino.ViewCameraPlane()(3)
+
+	Dim n: n = MostParallel(VecDir, aVec)
+	'	Rhino.Print n
+	
+	Rhino.ViewCPlane  Rhino.CurrentView,aPlanes(n)
+	Rhino.Print "Cplane set to " & aStr(n)
+	
+End Sub
+
+
+Function MostParallel(vec,avec)
+	
+	Dim i, n, idx, ang, tempAng
+	idx = 0
+	i = 0
+	ang = VectorAngle(Vec, aVec(0))
+	
+	For i =1 to UBound(aVec)
+		
+		tempang = VectorAngle(Vec, aVec(i))
+		If tempAng > ang then
+			ang = tempang
+			idx = i
+		end if
+	Next
+	
+	MostParallel = idx
+	
+End Function
+
+Function VectorAngle(vec1, vec2)
+	'find the angle between two vectors
+	Dim test1, test2
+	
+	test1 = Rhino.VectorUnitize(Vec1)
+	test2 = Rhino.VectorUnitize(Vec2)
+
+	Dim DblDot : dblDot = Rhino.VectorDotProduct(Test1, Test2)
+
+	Dim dblAngle : dblAngle = Rhino.aCos(dblDot)
+	
+	If round(dblDot,5) = 1.00000 Then
+		dblAngle = 0
+	
+	End If
+
+	If dblAngle = 0 Then 
+		'msgbox "Zero"
+		VectorAngle = 0
+		Exit Function
+	Else 
+		'Msgbox n
+		VectorAngle = Rhino.ToDegrees(dblAngle)
+		
+	End If
+	
+End Function

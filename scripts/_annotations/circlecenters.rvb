@@ -1,0 +1,11 @@
+Dim arrObjects, strObject, arrPoint
+	arrObjects = Rhino.GetObjects("Select circles")
+If IsArray(arrObjects) Then
+	For Each strObject In arrObjects
+		If Rhino.IsCircle(strObject) Then
+			arrPoint = Rhino.CircleCenterPoint(strObject)
+			Rhino.AddPoint arrPoint
+		End If
+	Next
+End If
+

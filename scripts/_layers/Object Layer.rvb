@@ -1,0 +1,23 @@
+Option Explicit
+
+'Call ObjectLayer()
+Sub ObjectLayer()
+	Dim strObject,strLayer,strParent,strMessage,intCancel
+	Do	
+		strObject = Rhino.GetObject("Select object.")
+		Call Rhino.UnselectAllObjects
+		
+		If Not IsNull(strObject) Then
+			
+			strLayer=Rhino.ObjectLayer(strObject)
+			strParent=Rhino.ParentLayer(strLayer)
+			strMessage="Layer:      "&strLayer&VbCrLf&VbLf&"Parent:     "&strParent
+			intCancel=Rhino.MessageBox(strMessage,1,"Object Layer (Cancel to exit script)")
+
+			If intCancel=2 Then Exit Sub
+			
+	End If
+			
+	Loop
+		
+End Sub

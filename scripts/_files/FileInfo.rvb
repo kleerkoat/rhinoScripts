@@ -1,0 +1,257 @@
+
+Option Explicit
+Sub FileInfo
+	Dim strFileSize,strTotal,strBreak
+	strFileSize = CurrentFileSize
+	strTotal = HowManyInScene
+	strBreak = ObjectBreakDown
+	
+	Rhino.TextOut strFileSize &vbNewLine &strTotal & vbNewLine &strBreak
+	'	MsgBox   strFileSize &vbNewLine &strTotal & vbNewLine &strBreak
+	Rhino.Print strFileSize &vbNewLine &strTotal & vbNewLine &strBreak
+End Sub
+
+'////////////////////////////////////////
+'Reports the current 3dm file size if saved.
+'///////////////////////////////////////
+
+Sub HowManyScene
+	
+	Dim strTotal: strTotal = HowManyInScene
+
+	If isNull(strTotal) Then Exit Sub
+	
+	Rhino.Print strTotal
+	Rhino.TextOut strTotal
+	
+End Sub
+Function CurrentFileSize
+
+
+	Dim Size, Saved, strFile, strTime
+	Dim strFileSize
+
+	strTime = CStr(Time)
+	strFile = Rhino.DocumentPath &Rhino.DocumentName
+	Rhino.Print DocumentPath & " " & DocumentName
+
+	If IsNull(Rhino.DocumentPath) Or IsNull(Rhino.DocumentName) Then
+		strFileSize = "Unable to determine file size"
+	End If
+	Size = ShowFileSize(strFile)
+	If Size = Null Then
+		strFileSize = "File has not been saved, no size available"
+
+	End If
+	Saved = ShowLastSaved(strFile)
+	If Saved = Null Then
+		MsgBox "This file has not been saved." &vbNewLine &"No size is available. "
+     
+      
+	End If
+	If Not IsNull(Size) And Not IsNull(saved) Then
+		strFileSize = Rhino.DocumentName & " was last saved " _
+			&vbNewLine & Saved & vbNewLine & "As last saved it uses" _
+			&vbNewLine & Round(Size/1048576, 2) &" MB" & vbNewLine  &"of disk space." &vbNewLine
+      
+	Else
+		strFileSize = "This file has not been saved. No file size is available. " &vbNewLine
+       
+	End If
+        
+	CurrentFileSize = strFileSize
+        
+End Function
+
+
+'//////////////////////////////////////////////////////
+
+Function ShowFileSize(filespec)
+	Dim fso, f, s
+	Set fso = CreateObject("Scripting.FileSystemObject")
+	If (fso.FileExists(filespec)) Then
+		Set f = fso.GetFile(filespec)
+	Else
+		s=Null
+		ShowFileSize = s
+		Exit Function
+	End If
+	s =  f.size
+	ShowFileSize = s
+End Function
+
+'//////////////////////////////////////////////////////
+
+Function ShowLastSaved(filespec)
+	Dim fso, f, s
+	Set fso = CreateObject("Scripting.FileSystemObject")
+	If (fso.FileExists(filespec)) Then
+		Set f = fso.GetFile(filespec)
+	Else
+		s=Null
+		ShowLastSaved = S
+		Exit Function
+	End If
+	Set f = fso.GetFile(filespec)
+	s = f.DateLastModified
+	ShowLastSaved = s
+End Function
+
+'/////////////////////////////////////////////////////
+
+Sub HowMany
+
+	Dim arrObjects, U, strResult
+	arrObjects=Rhino.SelectedObjects
+
+	If IsArray(arrObjects) Then
+		U = UBound(arrObjects)
+		If U > 0 Then
+			strResult = U + 1 &" objects are selected. "
+		Else 
+			strResult = "1 object is selected"
+		End If
+	Else 
+		strResult = "No objects are selected"
+	End If
+	Rhino.Print strResult
+	MsgBox strResult, 64
+End Sub
+
+Function HowManyInScene
+
+	Dim arrObjects, U, strResult
+	arrObjects=Rhino.AllObjects
+
+	If IsArray(arrObjects) Then
+		U = UBound(arrObjects)
+		If U > 0 Then
+			strResult = U + 1 &" objects found in the file. "
+		Else
+			strResult = "1 object found in the file"
+		End If
+	Else
+		strResult = "No objects found in the file"
+	End If
+	HowManyInScene = strResult
+End Function
+
+Rhino.AddAlias "HowMany", "_NoEcho _-Runscript HowMany"
+Rhino.AddAlias "HowManyScene", "_NoEcho _-Runscript HowManyScene"
+Rhino.AddAlias "FileInfo", "_NoEcho _-Runscript FileInfo"
+
+Function ObjectBreakDown
+  
+	Dim arrObj, strFound, strAll
+  
+	arrObj = Rhino.AllObjects
+  
+	If IsArray(arrObj) Then
+  
+
+    
+	End If
+	strFound = ""'" found."  in the file."
+	strAll = CStr(UBound(Rhino.ObjectsByType(0))) & " Objects"  &strFound
+  
+	Dim arrTypes(13)
+	If isUpperBound(Rhino.ObjectsByType(1)) Then 
+		arrTypes(0) = UBound(Rhino.ObjectsByType (1))+1 & " points" &strfound
+	Else arrtypes(0) = "0"
+	End If
+  
+	If isUpperBound(Rhino.ObjectsByType(2)) Then
+		arrTypes(1) = UBound(Rhino.ObjectsByType(2))+1 & " point clouds" &strfound
+	Else arrtypes(1) = "0"
+	End If
+  
+	If isUpperBound(Rhino.ObjectsByType(4)) Then
+		arrTypes(2) = UBound(Rhino.ObjectsByType(4))+1 & " curves" &strfound
+	Else arrtypes(2) = "0"
+	End If
+  
+	If isUpperBound(Rhino.ObjectsByType(8)) Then  
+		arrTypes(3) = UBound(Rhino.ObjectsByType (8))+1 & " surfaces" &strfound
+	Else arrtypes(3) = "0"
+	End If  
+    
+	If isUpperBound(Rhino.ObjectsByType (16)) Then  
+		arrTypes(4) = UBound(Rhino.ObjectsByType (16))+1 & " polysurfaces" &strfound
+	Else arrtypes(4) = "0"
+	End If   
+    
+	If isUpperBound(Rhino.ObjectsByType (32)) Then   
+		arrTypes(5) = UBound(Rhino.ObjectsByType (32))+1 & " meshes" &strfound
+	Else arrtypes(5) = "0"
+	End If     
+    
+	If isUpperBound(Rhino.ObjectsByType (256)) Then  
+		arrTypes(6) = UBound(Rhino.ObjectsByType (256))+1 & " lights" &strfound
+	Else arrtypes(6) ="0"
+	End If    
+    
+	If isUpperBound(Rhino.ObjectsByType (512)) Then
+		arrTypes(7) = UBound(Rhino.ObjectsByType (512))+1 & " annotations" &strfound
+	Else arrtypes(7) = "0"
+	End If  
+  
+	If isUpperBound(Rhino.ObjectsByType (4096)) Then    
+		arrTypes(8) = UBound(Rhino.ObjectsByType (4096))+1 & " block instances" &strfound
+	Else arrtypes(8) = "0"
+	End If   
+    
+	If isUpperBound(Rhino.ObjectsByType (8192)) Then    
+		arrTypes(9) = UBound(Rhino.ObjectsByType (8192))+1 & " dots" &strfound
+	Else arrtypes(9) = "0"
+	End If   
+  
+	If isUpperBound(Rhino.ObjectsByType (65536)) Then   
+		arrTypes(10) = UBound(Rhino.ObjectsByType (65536))+1 & " hatches" &strfound
+	Else arrtypes(10) = "0"
+	End If 
+  
+	If isUpperBound(Rhino.ObjectsByType (131072)) Then   
+		arrTypes(11) = UBound(Rhino.ObjectsByType (131072))+1 & " controls" &strfound
+	Else arrtypes(11) = "0"
+	End If 
+  
+	If isUpperBound(Rhino.ObjectsByType (134217728)) Then    
+		arrTypes(12) = UBound(Rhino.ObjectsByType (134217728))+1 & " cages" &strfound
+	Else arrtypes(12) = "0"
+	End If  
+  
+	If isUpperBound(Rhino.ObjectsByType (536870912)) Then  
+		arrTypes(13) = UBound(Rhino.ObjectsByType (536870912))+1 & " clipping planes" &strfound
+	Else arrtypes(13) = "0"
+	End If    
+    
+	Dim strType, n, strResult
+	For Each strType In arrTypes 
+		If strType <> "0" Then
+			ReDim Preserve arrResults(n)
+			arrResults(n) = strType & vbNewLine
+			n = n +1
+		End If 
+	Next
+
+	strResult = Join (arrresults, " ")
+	ObjectBreakDown = strResult
+  
+End Function
+
+Function IsUpperBound(ByRef arr)
+
+	IsUpperBound = False
+
+	If IsArray(arr) Then
+
+		On Error Resume Next
+
+		UBound arr
+
+		If Err.Number = 0 Then IsUpperBound = True
+
+	End If
+
+End Function
+

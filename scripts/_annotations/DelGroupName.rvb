@@ -1,0 +1,30 @@
+﻿Option Explicit
+'Script written by Damien Alomar
+'Script copyrighted by <insert company name>
+'Script version Friday, February 01, 2008
+
+Call Main()
+Sub Main()
+
+	Dim arrGroupNames, strGroupName, arrGroupIDs, blnDelete
+		
+	arrGroupNames = Rhino.GroupNames
+	
+	If IsArray(arrGroupNames) Then
+		strGroupName = Rhino.ListBox (arrGroupNames, "Pick Group to Delete...Objects will Not be Deleted", "Delete a Group")
+		If Not IsNull(strGroupName) Then
+			arrGroupIDs = Rhino.ObjectsByGroup (strGroupName)
+			If IsArray(arrGroupIDs) Then
+				blnDelete = Rhino.GetBoolean ("Group has Objects Associated With, Do You Still Want to Delete It?", Array("Delete", "No", "Yes"), Array(False))
+				If blnDelete(0) Then
+					Rhino.DeleteGroup (strGroupName)
+				End If
+			Else
+				Rhino.DeleteGroup (strGroupName)
+			End If
+		End If
+	Else
+		Rhino.Print "There are No Groups in the File"
+	End If
+	
+End Sub

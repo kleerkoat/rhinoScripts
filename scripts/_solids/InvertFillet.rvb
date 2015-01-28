@@ -1,0 +1,99 @@
+Option Explicit
+'Script written by Pascal
+
+'Script date Monday, August 24, 2009 
+Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+Rhino.AddAlias "InvertFillet", "_NoEcho _-Runscript (InvertFillet)"
+
+'Call InvertFillet()
+
+Sub InvertFillet
+	
+	Dim aSrf: aSrf = Rhino.GetObjects("Select fillet surfaces",8,,true)
+	If not isArray(aSrf) then exit sub
+	dim sSrf
+	
+	Rhino.EnableRedraw(false)
+	For each sSrf in aSrf
+		invertTheFillet(sSrf)
+	next
+	Rhino.EnableRedraw(true)
+	
+End Sub
+
+Sub InvertTheFillet(sSrf)
+
+	dim Flip: Flip = false
+	If not CheckFilletDir(sSrf) then
+		Flip = true
+		Rhino.Command "_Dir _SwapUV _Enter"
+	End if
+	
+	Dim Cnt: Cnt = Rhino.SurfacePointCount(sSrf)
+	Dim max: max = Cnt(1)-1
+	Dim Pts: Pts = Rhino.SurfacePoints(sSrf,true)
+	
+	dim i, plane1, planeMir, X, n, temp(),d
+	dim VecX, VecY
+	dim   atarg(),g
+	g = 0
+	
+	Rhino.Command "_CreaseSplitting _SplitAlongCreases=_No _Enter", false
+	Rhino.EnableObjectGrips sSrf
+	
+	For i = 0 to Ubound(Pts) Step max + 1
+		
+		d = 0
+		
+		VecX = Rhino.vectorunitize(Rhino.VectorCreate(Pts(i+max),Pts(i)))
+		VecY = Rhino.vectorunitize(Rhino.VectorCreate(Pts(i+1),Pts(i)))
+		Plane1 = Rhino.PlaneFromFrame(Pts(i),VecX, VecY)
+		PlaneMir = Rhino.RotatePlane(Plane1,180,VecX)
+		X = Rhino.XformRotation(Plane1,planeMir)
+	
+		For N = i To i + Max
+			Redim Preserve ATarg(G)
+			aTarg(G) = Rhino.PointTransform(Pts(n),X)
+			G = G + 1
+		Next
+
+	Next
+	
+	If Flip = true then
+		Rhino.Command "_Dir _SwapUV _Enter"
+	End If
+	
+	Rhino.ObjectGripLocations sSrf,aTarg
+	Rhino.EnableObjectGrips sSrf,false
+	Rhino.Command "_CreaseSplitting _SplitAlongCreases=_Yes _Enter", false
+
+End Sub
+
+Function CheckFilletDir(sSrf)
+	
+	CheckFilletDir = false
+	Dim param: param = MidParam(sSrf)
+	
+	Dim aIso: aIso = Rhino.ExtractIsocurve(sSrf,param,2)
+	
+	If  Rhino.IsArc(aiso(1)) then CheckFilletDir = true
+	Rhino.DeleteObjects aIso
+
+End Function
+
+Function MidParam(sSrf)
+	'find the midlle parameters of a surface
+	Dim uDom,VDom
+	
+	UDom = Rhino.SurfaceDomain(sSrf,0)
+	VDom = Rhino.SurfaceDomain(sSrf,1)
+	
+	Dim Umid, VMid
+	
+	UMid = UDom(0) + (0.5*(UDom(1)-Udom(0)))
+	
+	VMid =  VDom(0)+ (0.5*(VDom(1)-Vdom(0)))
+	
+	MidParam = array(UMid,Vmid)
+	
+End Function

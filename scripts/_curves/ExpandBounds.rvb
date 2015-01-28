@@ -1,0 +1,32 @@
+﻿Option Explicit
+'Script written by <David Ray>
+'Script copyrighted by <David Ray> ©
+'Script version Friday, June 22, 2007 8:03:06 AM
+'Usage: ExpandBounds ([Objects],[Expand by value or Scale],[X value/scale],[Y value/scale],[Draw boundry])
+Public ObjBound
+ExpandBounds Rhino.getobjects,2,50,50,1
+Public Function ExpandBounds(ArrObj,Etype,x,y,draw)
+	Dim Bounds: Bounds=rhino.BoundingBox(ArrObj)
+	x=x/2
+	y=y/2
+	Select Case Etype
+		Case 1	'expand by value
+			Bounds(0)= Rhino.PointAdd(Bounds(0),Array(-x,-y,0))
+			Bounds(1)= Rhino.PointAdd(Bounds(1),Array(x,-y,0))
+			Bounds(2)= Rhino.PointAdd(Bounds(2),Array(x,y,0))
+			Bounds(3)= Rhino.PointAdd(Bounds(3),Array(-x,y,0))
+		Case 2	'expand by scale
+			x=(x/100)*rhino.Distance(Bounds(0),Bounds(1))
+			y=(y/100)*rhino.Distance(Bounds(0),Bounds(3))
+			Bounds(0)= Rhino.PointAdd(Bounds(0),Array(-x,-y,0))
+			Bounds(1)= Rhino.PointAdd(Bounds(1),Array(x,-y,0))
+			Bounds(2)= Rhino.PointAdd(Bounds(2),Array(x,y,0))
+			Bounds(3)= Rhino.PointAdd(Bounds(3),Array(-x,y,0))
+		Case Else
+			msgbox "Invalid Type For ""ExpandBounds"""
+	End Select
+	ExpandBounds=Bounds
+	If draw =1 Then 
+		ObjBound=Rhino.AddPolyline(array(Bounds(0),Bounds(1),Bounds(2),Bounds(3),Bounds(0)))
+	End If
+End Function

@@ -1,0 +1,92 @@
+﻿
+Option Explicit
+Private OldElevation
+If IsEmpty(oldElevation) Then
+	oldElevation = 0
+End If
+
+
+'//////////////////////////////////////////
+'//////////////////////////////////////////
+
+'Set the camera and target elevation.
+
+Sub LevelView
+  
+	Dim dblElevation, arrCamera, arrCam, arrTarg
+
+	dblElevation = Rhino.GetReal("Camera elevation", oldElevation)
+	If Not IsNull(dblElevation) Then
+		oldElevation = dblElevation
+			Else Exit Sub
+	End If
+    
+	arrCamera = Rhino.ViewCameraTarget
+
+  
+	If IsArray(arrCamera) Then
+    
+		arrCam = Array( arrCamera(0)(0),arrCamera(0)(1),dblElevation)
+			arrTarg =Array( arrCamera(1)(0),arrCamera(1)(1),dblElevation)
+			Rhino.ViewCameraTarget , arrcam, arrtarg
+    
+			Else Exit Sub
+	End If
+    
+End Sub
+  
+'//////////////////////////////////////////
+'//////////////////////////////////////////
+
+'Pick the camera and target elevation.
+
+Sub LevelViewPick
+  
+	Dim dblElevation, arrCamera, arrCam, arrTarg, arrElevation
+
+	arrElevation = Rhino.GetPoint("Camera elevation")
+	If IsArray(arrElevation) Then
+		dblElevation = arrElevation(2) 
+			oldElevation = dblElevation
+			Else Exit Sub
+	End If
+    
+	arrCamera = Rhino.ViewCameratarget
+  
+	If IsArray(arrCamera) Then
+    
+		arrCam = Array( arrCamera(0)(0),arrCamera(0)(1),dblElevation)
+			arrtarg =Array( arrCamera(1)(0),arrCamera(1)(1),dblElevation)
+			Rhino.ViewCameraTarget , arrcam, arrtarg
+    
+			Else Exit Sub
+	End If
+    
+End Sub
+  
+'////////////////////////////////////////////
+'////////////////////////////////////////////
+'Level up the camera point to the same Z as the target
+
+Sub LevelUpView
+  
+	Dim  arrCamera, arrCam, arrTarg
+    
+	arrCamera = Rhino.ViewCameratarget
+  
+	If IsArray(arrCamera) Then 
+		arrCam = Array( arrCamera(0)(0),arrCamera(0)(1),arrCamera(1)(2))
+			arrTarg =Array( arrCamera(1)(0),arrCamera(1)(1),arrCamera(1)(2))
+			Rhino.ViewCameraTarget, arrCam, arrTarg
+			Else Exit Sub
+	End If
+    
+End Sub
+
+'////////////////////////////////////////////
+'////////////////////////////////////////////
+
+Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+Rhino. addAlias "LevelView", "_-Runscript LevelView"
+Rhino. addAlias "LevelViewPick", "_-Runscript LevelViewPick"
+Rhino. addAlias "LevelUpView", "_-Runscript LevelUpView"

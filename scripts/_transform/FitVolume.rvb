@@ -1,0 +1,65 @@
+option explicit
+
+''''''''''''''''''''''''''''''''''''''''''''''''''
+''  scale object to given volume                ''
+''  4.4.2007 :: tyglik :: no right reserved :)  ''
+''''''''''''''''''''''''''''''''''''''''''''''''''
+
+call fit_volume()
+
+
+sub fit_volume()
+
+  dim ddata: ddata = rhino.getdocumentdata( "Default", "Litre"     )
+
+  dim default
+  if isnull( ddata ) then
+    default = 0.5
+  else
+    default = cdbl( ddata )
+  end if
+
+  dim litre: litre = rhino.getreal( "Enter the resulting object's volume in litres: ", default, 0 )
+
+  if isnull( litre ) or ( litre = 0 ) then exit sub
+
+  call rhino.setdocumentdata( "Default", "Litre", cstr( litre ) )
+
+  dim units: units = rhino.unitsystem
+
+  dim volume
+  select case ( units )
+    case ( 0 )
+      volume = litre
+    case ( 2 )
+      volume = ( 10 ^  6 ) * litre
+    case ( 4 )
+      volume = ( 10 ^ -3 ) * litre
+    case else
+      exit sub
+  end select
+
+  dim object: object = rhino.getobject( "Select the object to scale.", 24, true, true )
+  if isnull( object ) then exit sub
+
+  if rhino.isobjectsolid( object ) then
+    call do_scale( object, volume )
+    call rhino.command( "_Volume" )
+  else
+    call rhino.print( "Selected object is not a solid!" )
+  end if
+
+end sub
+
+
+function do_scale( object, volume )
+
+  dim factor: factor = ( volume / ( rhino.surfacevolume( object ) )(0) ) ^ ( 1 / 3 )
+
+  dim origin: origin = ( rhino.surfacevolumecentroid( object ) )(0)
+
+  dim scalexyz: scalexyz = array( factor, factor, factor )
+
+  call rhino.scaleobject( object, origin, scalexyz )
+
+end function

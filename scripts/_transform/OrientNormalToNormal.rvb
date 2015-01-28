@@ -1,0 +1,66 @@
+
+' Script to orient one object from its normal to another objects normal
+' © 2011, Clement Greiner - CG3D
+
+Option Explicit
+
+'Call OrientNormalToNormal
+
+Sub OrientNormalToNormal()
+
+	Dim arrA, arrB, arrCP_A, arrCP_B, arrNormalA, arrNormalB, arrFrom, arrTo, strResult
+	Dim arrCamera, arrPtA, arrPtB, arrDirA, arrDirB
+	
+	arrA = Rhino.GetObjectEx("Select object to orient, pick near planar orientation plane", 8+16, False, False)
+	If IsNull(arrA) Then Exit Sub
+	
+	If arrA(2) <> 1 Then Rhino.Print "Error, please select objects by picking only." : Exit Sub
+	
+	arrCamera = Rhino.ViewCameraTarget(Rhino.CurrentView)	
+
+	arrDirA = Rhino.VectorReverse(Rhino.VectorUnitize(Rhino.VectorCreate(arrCamera(0), arrA(3))))
+	arrPtA = Rhino.ShootRay (arrA(0), arrCamera(0), arrDirA, 2)
+	If IsNull(arrPtA) Then Rhino.Print "Error A" : Exit Sub
+			
+	arrB = Rhino.GetObjectEx("Select destination object near planar orientation plane", 8+16, False, False)
+	If IsNull(arrB) Then Exit Sub
+	
+	If arrB(2) <> 1 Then Rhino.Print "Error, please select objects by picking only." : Exit Sub
+	
+	arrCamera = Rhino.ViewCameraTarget(Rhino.CurrentView)	
+	arrDirB = Rhino.VectorReverse(Rhino.VectorUnitize(Rhino.VectorCreate(arrCamera(0), arrB(3))))
+	arrPtB = Rhino.ShootRay (arrB(0), arrCamera(0), arrDirB, 2)
+	If IsNull(arrPtB) Then Rhino.Print "Error B" : Exit Sub
+			
+	If Rhino.IsSurface(arrA(0)) Then
+		arrNormalA = Rhino.SurfaceNormal(arrA(0), Rhino.SurfaceClosestPoint(arrA(0), arrPtA(1)))
+	Else
+		arrCP_A	= Rhino.BrepClosestPoint(arrA(0), arrPtA(1))
+		If arrCP_A(2)(0) = 3 Then
+			arrNormalA = arrCP_A(3)
+		Else
+			Rhino.Print "Error getting Brep normal from edge or vertex" : Exit Sub
+		End If
+	End If 
+
+	If Rhino.IsSurface(arrB(0)) Then
+		arrNormalB = Rhino.SurfaceNormal(arrB(0), Rhino.SurfaceClosestPoint(arrB(0), arrPtB(1) ))
+	Else
+		arrCP_B	= Rhino.BrepClosestPoint(arrB(0), arrPtB(1))
+		If arrCP_B(2)(0) = 3 Then
+			arrNormalB = arrCP_B(3)
+		Else
+			Rhino.Print "Error getting Brep normal from edge or vertex" : Exit Sub
+		End If
+	End If 
+	
+	arrNormalB = Rhino.VectorReverse(arrNormalB)
+	arrFrom = Array(arrPtA(1) , Rhino.VectorAdd(arrPtA(1), arrNormalA)	)
+	arrTo   = Array(arrPtB(1) , Rhino.VectorAdd(arrPtB(1), arrNormalB)	)
+	
+	strResult = Rhino.OrientObject(arrA(0), arrFrom, arrTo)
+	If IsNull(strResult) Then Exit Sub
+	
+	Rhino.SelectObject strResult
+
+End Sub

@@ -1,0 +1,97 @@
+Option Explicit
+'Script written by Pascal
+
+''Script date Wednesday, September 09, 2009 
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "PolylinePtSpacing", "_NoEcho _-Runscript PolylinePtSpacing ()"
+'Rhino.AddAlias "PolylinePtCount", "_NoEcho _-Runscript PolylinePtCount ()"
+Private OldDblSpc, oldCount
+
+If isEmpty(OldDblSpc) Then
+	oldDblSpc = 10
+End If
+
+If isEmpty(OldCount) Then
+	oldCount = 10
+End If
+
+
+'Call PolylinePtSpacing()
+
+Sub PolylinePtSpacing
+	
+	Dim aCrvs: aCrvs = Rhino.GetObjects("Select curves",4,,true)
+	If not isArray(aCrvs) then exit sub
+	
+	Dim DblSpc: dblSpc = Rhino.GetReal("Set desired polyline vertex spacing",oldDblSpc)
+	If not isNumeric(dblSpc) then exit sub
+	OldDblSpc = dblSpc
+	
+	Dim Delete: Delete = Rhino.GetBoolean("Delete input?",array("Delete", "No","Yes"),array(False))
+	
+	Rhino.EnableRedraw(False)
+	
+	PolylinePtSet aCrvs,0,dblSpc
+	
+	If Delete(0) = True then Rhino.DeleteObjects (aCrvs)
+	
+	Rhino.EnableRedraw(True)
+	
+End Sub
+
+Sub PolylinePtCount()
+	
+	Dim aCrvs: aCrvs = Rhino.GetObjects("Select curves",4,,true)
+	If not isArray(aCrvs) then exit sub
+	
+	Dim intDiv: IntDiv = Rhino.GetReal("Set desired polyline segment count",oldDblSpc)
+	If not isNumeric(intDiv) then exit sub
+	oldCount = intDiv
+	
+	Dim Delete: Delete = Rhino.GetBoolean("Delete input?",array("Delete", "No","Yes"),array(False))
+	
+	Rhino.EnableRedraw(False)
+	
+	PolylinePtSet aCrvs,1,IntDiv
+	
+	If Delete(0) = True then Rhino.DeleteObjects (aCrvs)
+	
+	Rhino.EnableRedraw(True)
+	
+End Sub
+
+
+
+
+Sub PolylinePtSet(aCrvs,DivStyle,Div)
+
+	'0 = Spacing, 1 = Number (DivStyle)
+	dim sCrv, aDiv, Bound
+	
+	For each sCrv in aCrvs
+		
+		if DivStyle =0 then
+			aDiv =  Rhino.DivideCurveLength(sCrv,Div)
+				
+			Bound = UBound(aDiv)
+			redim preserve aDiv(Bound+1)
+			aDiv (Bound+1) = Rhino.CurveEndPoint(sCrv)
+			
+		else
+			aDiv = Rhino.DivideCurve(sCrv,Div)
+		End If
+	
+	
+		Rhino.AddPolyline (aDiv)
+	Next
+	
+
+	
+End Sub
+
+
+Function DivPolyline(sCrv, intStyle,Div)
+	
+
+	
+End Function

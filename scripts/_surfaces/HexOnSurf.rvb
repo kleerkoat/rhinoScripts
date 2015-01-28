@@ -1,0 +1,92 @@
+﻿Option Explicit
+'Script written and copyrighted by Ted Ngai	Feb 2007
+'This work is licensed under a  Creative Commons Attribution-Share Alike 3.0 United States License.
+'http://creativecommons.org/licenses/by-sa/3.0/us/
+
+Call HexOnSurf()
+
+Sub HexOnSurf()
+	
+	'Rhino.Command "_SelAll Delete"
+	
+	'Get Surface
+	Dim strObject,arrDomU, arrDomV
+	strObject = Rhino.GetObject ("Select Surface", 8, True)
+	If IsNull(strObject) Then Exit Sub
+
+	arrDomU = Rhino.SurfaceDomain(strObject, 0)
+	arrDomV = Rhino.SurfaceDomain(strObject, 1)
+	 
+	Dim u,v,t
+	Dim stp : stp = Pi/3 
+	Dim Hex_uCount : Hex_uCount = 10
+	Dim Hex_vCount : Hex_vCount = 10
+	Dim off_int : off_int = 4
+	Dim hex_off : hex_off = 0.9
+	Dim hex,cir
+	
+	Dim uLength : uLength = Hex_uCount*(3*Cos(stp))+Cos(stp)
+	Dim vLength : vLength = Hex_vCount*(2*Sin(stp))+Sin(stp)
+	Dim dUspacing : dUspacing = (arrDomU(1)-arrDomU(0))/(uLength)
+	Dim dVspacing : dVspacing = (arrDomV(1)-arrDomV(0))/(vLength)
+
+	Call Rhino.EnableRedraw(False)
+	For v = 0 To Hex_vCount-1
+		For u = 0 To Hex_uCount-1
+			hex = DrawHex (strObject,u,v,stp,dUspacing,dVspacing,hex_off,off_int)
+		Next
+	Next
+	Call Rhino.EnableRedraw(True)
+End Sub
+
+Function DrawHex (ByVal strObject,ByVal u,ByVal v,ByVal stp,ByVal dU,ByVal dV, ByVal hex_off, ByVal off_int)
+	
+	Dim t
+	Dim c1,c2
+	Dim x,y,z
+	Dim Pi : Pi = Rhino.Pi
+	Dim arrPointsN,arrPointsO
+	Dim arrParam,arr3DPts
+	
+	For t = 0 To 2*Pi Step stp 
+
+		x = u+u*Cos(stp)+2*Cos(stp)+(Cos(t)*hex_off)
+		y = (2*v*Sin(stp))+(Sin(stp)*(0)^(u Mod 2))+Sin(stp)+(Sin(t)*hex_off)
+		z = off_int
+		
+		arrParam = Array((x*dU),(y*dV))
+		arr3DPts = Rhino.EvaluateSurface(strObject, arrParam)
+		
+		'Offset Curve
+		Dim arrNormal,crvScale
+		Dim arrNormalOffset,arrOffsetPts
+						
+		arrNormal = Rhino.SurfaceCurvature(strObject, arrParam)
+		'crvScale =  (arrNormal(2)* z)- z
+		arrNormalOffset = Rhino.VectorScale(arrNormal(1),1*z)
+		arrOffsetPts = Rhino.VectorAdd(arr3DPts, arrNormalOffset)
+		
+		arrPointsN = AddPtToArray(arrPointsN, arr3DPts)
+		arrPointsO = AddPtToArray(arrPointsO,arrOffsetPts)
+		 
+	Next 
+	c1=Rhino.AddPolyline (arrPointsN)
+	c2=Rhino.AddPolyline(arrPointsO)
+	Rhino.AddLoftSrf Array(C1,C2)
+	
+	DrawHex=arrPointsN
+End Function
+
+Function AddPtToArray (arrPoints, arrPt)
+
+	If IsArray(arrPoints) Then
+		ReDim Preserve arrPoints( UBound(arrPoints) + 1 )
+	Else
+		ReDim arrPoints(0)
+	End If
+   
+	arrPoints(UBound(arrPoints))= arrPt
+	
+	AddPtToArray = arrPoints
+
+End Function

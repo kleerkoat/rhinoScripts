@@ -1,0 +1,85 @@
+Option Explicit
+ 
+'Call RotateObjectsExport()
+Sub RotateObjectsExport()
+	
+	If IsNull(Rhino.DocumentName) Then
+		Rhino.MessageBox "File is not saved." & (Chr(13)) & (Chr(13)) & "Please save file to continue." & (Chr(13)) & "Export will be saved where this file is located.",, "Export to SigmaNEST"
+		Rhino.Command("_Save ")
+	End If
+	
+	'checking if open file is read only, if it is save file
+	Dim filename,objFSO,objFile,strFileStatus
+
+	filename = Rhino.DocumentPath & Rhino.DocumentName
+	
+	Set objFSO = CreateObject("Scripting.FileSystemObject")
+	Set objFile = objFSO.GetFile(filename)
+	
+	If objFile.Attributes And 1 Then
+		'need fix, if user clicks cancel or hits escape during the save dialog because the script continues
+		Rhino.MessageBox "File is read only." & (Chr(13)) & (Chr(13)) & "Please save file to continue." & (Chr(13)) & (Chr(13)) & "Export will be saved where this file is located.",, "Export to SigmaNEST"
+		'		If Rhino.MessageBox = 2 Then
+		'			Exit Sub
+		'		Else
+		'			Rhino.Command("_Save ")
+		'		End If
+		Rhino.Command("_Save ")
+		
+	End If
+	
+	Set objFile = Nothing
+	Set objFSO = Nothing 
+	
+	Dim arrObjs, arrBBox, arrBBCen, n
+	
+	' To avoid three encapsulating If clauses you can simply state
+	arrObjs = Rhino.GetObjects("Select objects to export", 16,, True)
+	
+	'To get the number of objects, counted starting @ 0
+	If Not IsArray(arrObjs) Then Exit Sub
+	n = Ubound(arrObjs) + 1
+	
+	'check if BBox is able to be made
+	arrBBox = Rhino.BoundingBox(arrObjs)
+	If Not IsArray(arrBBox) Then
+		Rhino.Print "Unable to calculate bounding box"
+		Exit Sub
+	End If
+	
+	'Check if objects are solid
+	Dim strDelimiter, strObjects
+	strDelimiter = ","
+	strObjects = join(arrObjs, strDelimiter)
+	For Each strObjects In arrObjs 
+		If Not Rhino.IsObjectSolid(strObjects) Then
+			Rhino.Print "Export failed, open solids found. Check for Naked Edges."
+			Exit Sub
+		End If
+	Next
+	
+	'Easier way to calculate BBox Center
+	arrBBCen = Rhino.PointDivide(Rhino.PointAdd(arrBBox(0), arrBBox(6)), 2)
+	
+	'Beginning of File Operations
+	Dim strFile, strPath, strComm
+	Rhino.EnableRedraw False
+	
+	Rhino.RotateObjects arrObjs, arrBBCen, 270
+	
+	Rhino.UnselectAllObjects
+	Rhino.SelectObjects arrObjs
+
+	strPath = Chr(34) & Rhino.DocumentPath & Rhino.DocumentName & Chr(34)
+	strFile = strPath
+	strFile = Replace(strFile, ".3dm", "-00.3dm")
+	strComm = "_-NoEcho _-Export _Version=4 _SaveSmall=No _GeometryOnly=No _SavePlugInData=Yes "
+	Rhino.Command strComm & strFile 
+		
+	Rhino.RotateObjects arrObjs, arrBBCen, 90
+	
+	Rhino.EnableRedraw True
+	Rhino.UnselectAllObjects
+	Rhino.Print "Sucessfully exported " & Cstr(n) & " objects."
+	
+End Sub

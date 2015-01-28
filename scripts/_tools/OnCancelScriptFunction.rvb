@@ -1,0 +1,9 @@
+' User-defined cancel script handler
+
+Sub OnCancelScript
+
+  ' Do script cancelling operations here...
+
+  Call MsgBox("Script Cancelled!", vbOkOnly + vbExclamation, "RhinoScript")
+
+End Sub

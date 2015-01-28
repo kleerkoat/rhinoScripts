@@ -1,0 +1,150 @@
+' ****************************** RhinoScript.org ******************************
+'
+'   Add Tab Tool, version 1
+'
+'   by Mantuano Fabio, published Mar 19, 2011
+'
+'
+'   This simple script add Glue Tab On the Edges of surfaces.
+'   You can change the size of the Tab.
+'   I didn't use "Option Explicit" and variables are written in Italian and disorderly.
+'   
+'   - Create a solid With flat surfaces
+'   - Use On it _UnrollSrf
+'   - Add Glue Tabs  With my script
+'   - Use Object Arranger by Hanno (http://www.rhinoscript.org/scripts/24)
+'   - Print, cut And assemble it!
+'
+'
+'
+'
+'   This RhinoScript Tool has been downloaded from RhinoScript.org.
+'
+'   Rhino versions: Rhino 4 (at least service release 6)
+'
+'   LICENSE INFORMATION:
+'   This script is published under the GNU General Public License, version 3
+'   or any later version, and thus comes WITHOUT ANY WARRANTY. You can get
+'   the complete license text here: www.rhinoscript.org/gpl
+'
+' ****************************** RhinoScript.org ******************************
+
+
+
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' AddTabTool for surfaces 1.0
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' Script written by Fabio Mantuano - ddrpochi@gmail.com
+' Script version 19 March 2011
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+' Metodi e modelli matematici per le Applicazioni :: a.a. 2010-2011
+' http://www.formulas.it/metodi/ :: Università degli Studi Roma Tre 
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+
+
+'Call AddGlueTabs()
+Sub AddGlueTabs() 
+
+  arr = Rhino.GetObjects("Select surfaces",8) 
+ 
+  ScalaTab = Rhino.GetReal ("Size of the Tab 0-1", 0.1 ,0.0001,1)
+
+
+     If IsNull(arr) Then
+      Exit Sub
+     End If
+     
+     n = UBound(arr)
+     
+     For i = 0 To n    
+      SuperficieConLinguette arr(i),ScalaTab
+     Next
+ 
+End Sub
+  
+  
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''' 
+  ' Funzione che estrae le curve di bordo, aggiunge su ognuna una linguetta e unisce il tutto
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+Function SuperficieConLinguette(srf,ScalaT)
+
+     ' Tiro fuori le curve di bordo
+      CurveBordo =   Rhino.DuplicateEdgeCurves (srf)
+    
+     ' Mi prenoto un array per le linguette + la superficie centrale
+      ReDim srfL (UBound(CurveBordo)+1)
+     
+     ' Come primo elemento dell'array metto la superficie centrale
+      srfL(0) = srf
+  
+     ' Per ogni curva di bordo chiamo la funzione "linguette"
+      For j = 0 To UBound(CurveBordo) 
+          
+       StartPoint = Rhino.CurveStartPoint (CurveBordo(j))
+       EndPoint   = Rhino.CurveEndPoint   (CurveBordo(j))
+   
+      Rhino.deleteobject CurveBordo(j)   
+     
+      ' Aggiungo all'array le linguette   
+      srfL (j+1) = linguette (StartPoint,EndPoint,ScalaT,srf)
+             
+      Next
+      
+  ' Unisco il tutto in una polisuperficie
+  SuperficieConLinguette =  Rhino.joinsurfaces (srfl,True)
+
+End Function
+  
+  
+  
+  
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+  ' Funzione "linguette" 
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''  
+Function linguette(p0,p1,RapportoSpessore,superficie) 
+          
+    ' Vettore P0->P1
+    V01 = vectorScale((Rhino.VectorCreate(P0,P1)),RapportoSpessore)
+    
+    ' Vettore Perpendicolare Scalato
+    VPS01 = Rhino.VectorCrossProduct(V01,Array(0,0,1))
+    
+    ' Vettore Medio P0->P1
+    VMedio = vectorScale((Rhino.VectorCreate(P0,P1)),0.5)
+    
+    ' Punto Medio
+    PM = Array(p1(0)+VMedio(0),p1(1)+VMedio(1),p1(2)+VMedio(2))
+    
+    ' Punto Medio che deve stare all'interno interno alla superfice
+    PMedioInterno = Array(PM(0)-VPS01(0),PM(1)-VPS01(1),PM(2)-VPS01(2))
+    
+
+    If Rhino.IsPointOnSurface(Superficie,PMedioInterno) Then
+           
+          P0L0 = p0(0) + VPS01(0) -V01(0)*2
+          P0L1 = p0(1) + VPS01(1) -V01(1)*2
+          P0L2 = p0(2) + VPS01(2) -V01(2)*2
+          P0L  = Array (P0L0,P0L1,P0L2)
+          
+          P1L0 = p1(0) + VPS01(0) +V01(0)*2
+          P1L1 = p1(1) + VPS01(1) +V01(1)*2
+          P1L2 = p1(2) + VPS01(2) +V01(2)*2
+          P1L  = Array (P1L0,P1L1,P1L2)  
+         
+     Else
+           
+          P0L0 = p0(0) - VPS01(0) -V01(0)*2
+          P0L1 = p0(1) - VPS01(1) -V01(1)*2
+          P0L2 = p0(2) - VPS01(2) -V01(2)*2
+          P0L  = Array (P0L0,P0L1,P0L2)
+          
+          P1L0 = p1(0) - VPS01(0) +V01(0)*2
+          P1L1 = p1(1) - VPS01(1) +V01(1)*2
+          P1L2 = p1(2) - VPS01(2) +V01(2)*2
+          P1L  = Array (P1L0,P1L1,P1L2)   
+   
+    End If
+        
+    linguette = Rhino.addsrfpt (Array(P1,P1L,P0L,P0))    
+     
+End Function

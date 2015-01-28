@@ -1,0 +1,268 @@
+'Script written by Pascal
+'RMA
+'Script version Wednesday, January 09, 2008
+
+
+'True up an extruded surface so that its input curve
+'is normal to the extrusion direction.
+
+Sub TrueUpExtrusionAuto
+    Dim aSrfs: aSrfs = Rhino.GetObjects("Select surfaces",8,True, True)
+    Dim sSrf
+    If Not isArray(aSrfs) Then Exit Sub
+       
+    For Each sSrf In aSrfs
+        Rhino.ShrinkTrimmedSurface sSrf
+        TrueUp(sSrf)
+    Next
+    
+End Sub
+
+
+Sub TrueUp(sSrf)
+    
+    Dim CrntPlane: CrntPlane = Rhino.ViewCPlane
+    'Dim sSrf: sSrf = Rhino.GetObject("Select surface",8,True)
+    Dim sSrfOld: sSrfOld = sSrf
+    sSrf = CopySurface(sSrfOld)
+    If isNull(sSrf) Then Exit Sub
+    
+    '   
+    '    Dim str: str = "_Untrim _All=_yes _KeepTrimObjects=_Yes _Pause _Enter"
+    '    Rhino.Command str
+    '   
+    Dim aTemp,  i, sObj, str
+    '
+    '    If Rhino.LastCommandResult <> 0 Then
+    '        Exit Sub
+    '    Else aTemp = Rhino.LastCreatedobjects
+       
+    '        For Each sObj In atemp
+    '            If Rhino.IsCurve(sobj) Then
+    '                ReDim Preserve     atrim(i)
+    '                aTrim(i) = sObj
+    '                i = i + 1
+    '            End If
+    '    Next
+    '       
+    'End If
+    '   
+    
+    Dim aTrim:aTrim = Rhino.DuplicateEdgeCurves (sSrfOld)
+    Dim sGroup: sgroup = Rhino.AddGroup
+    Rhino.AddObjectsToGroup atrim,sGroup
+    
+    Dim strDir: strDir = FindStraightDirection(sSrfOld)
+    Dim sEdge, aEdge
+    
+    If StrDir <> "Pick" Then
+        Rhino.EnableRedraw(False)
+        Dim aDomU:    aDomU = Rhino.SurfaceDomain(sSrf,0)
+        Dim aDomV:    aDomV = Rhino.SurfaceDomain(sSrf,1)
+       
+        If strDir = "U" Then
+            aEdge = Rhino.ExtractIsoCurve(sSrf,array(aDomV(0),aDomU(0)),1)
+            sEdge = aEdge(0)
+        Else
+            aEdge = Rhino.ExtractIsoCurve(sSrf,array(aDomV(0),aDomU(0)),0)
+            sEdge = aEdge(0)
+        End If
+       
+    Else
+    
+    
+            str = "_DupEdge _Pause _Enter"
+        Rhino.Command str
+    
+        If Rhino.LastCommandResult <>0 Then
+            Exit Sub
+    
+        Else aTemp = Rhino.SelectedObjects
+        End If
+    
+    
+        Rhino.EnableRedraw(False)
+    
+        If IsArray(aTemp) Then
+            sEdge = atemp(0)
+        Else
+            Rhino.EnableRedraw(True)
+            Exit Sub
+        End If
+    End If
+    
+    Dim aStart: aStart = Rhino.CurveStartPoint(sEdge)
+    Dim aEnd: aEnd = Rhino.CurveEndPoint(sEdge)
+    
+    Dim DomU:DomU = Rhino.SurfaceDomain(sSrf,0)
+    Dim DomV: DomV = Rhino.SurfaceDomain(sSrf, 1)
+    Dim DomCrv: DomCrv = Rhino.CurveDomain(sEdge)
+    
+    Dim DomAv: DomAv = AverageUV (DomU, DomV)
+    
+    Dim aMarker: aMarker = Rhino.EvaluateSurface(sSrf, DomAv)
+    '   
+    '    Dim a2: a2 = Rhino.EvaluateSurface(sSrf, array(DomU(0),DomV(0)))
+    '    Rhino.AddPoint A2
+
+    Dim aIso, sIso
+    
+    If CheckCurveDir(DomCrv,DomU,DomV,sEdge) = "U" Then
+       
+        aIso = Rhino.ExtractIsoCurve(sSrf,array(DomU(0),DomV(0)),1)
+    Else     aIso = Rhino.ExtractIsoCurve(sSrf,array(DomU(0),DomV(0)),0)
+    End If
+    
+    sIso = aIso(0)
+       
+    aStart = Rhino.CurveStartPoint(sIso)
+    aEnd = Rhino.CurveEndPoint(sIso)
+    Rhino.DeleteObject sIso
+    sIso = Rhino.AddLine (aStart, aEnd)
+    
+    Dim Vec : Vec = Rhino.VectorCreate(aEnd, aStart)
+    Dim Plane : Plane = Rhino.PlaneFromNormal(aEnd,Vec)
+    
+    Rhino.ViewCPlane Rhino.CurrentView,Plane
+    '    Rhino.Deleteobject sIso
+    Rhino.UnselectAllObjects
+    Rhino.SelectObject sEdge
+    
+    Dim aBB: aBB = Rhino.BoundingBox(sSrf,Rhino.CurrentView)
+    
+    Dim dblDiag: dblDiag = Rhino.Distance(aBB(0),aBB(6))
+    '    Dim sIso2:    sIso2 = Rhino.ExtendCurveLength (sIso,0,2,dblDiag/2)
+    Rhino.ExtendCurveLength  sIso,0,2,dblDiag/2
+    'Rhino.SimplifyCurve sIso2,0
+    Rhino.SimplifyCurve sIso,0
+    str = "_ProjectToCplane _Yes "
+    Rhino.Command str,False
+    
+    aTemp = Rhino.SelectedObjects
+    Dim sTemp : stemp = aTemp(0)
+    
+    Rhino.ViewCPlane Rhino.Currentview,CrntPlane
+    Dim sNew: sNew = Rhino.ExtrudeCurve (stemp, sIso)
+    'Rhino.Deleteobject sIso
+    Dim aNewDomU: aNewDomU = Rhino.SurfaceDomain(sNew,0)
+    
+    Dim anewDomV: anewDomV = Rhino.SurfaceDomain(sNew,1)
+    
+    Dim abase: abase = Rhino.EvaluateSurface(sNew,array(aNewDomU(0), (aNewDomV(0)+anewDomV(1))/2))
+    Dim aTarg: aTarg = Rhino.CurveMidPoint (sIso)
+    
+    Rhino.MoveObject sNew, aBase, aTarg
+       
+    Rhino.UnselectAllObjects
+    Rhino.Selectobject sNew
+    Rhino.Command "_Split _SelGroup " &sGroup &" _Enter"
+    
+    If Rhino.LastCommandresult = 0 Then
+        Dim aSplit: aSplit = Rhino.SelectedObjects
+        Rhino.Command "_ShrinkTrimmedSrfToEdge"
+        KeepSplitPiece aSplit, aMarker
+    End If
+    
+    Rhino.DeleteObject sIso
+    Rhino.DeleteObject sTemp
+    Rhino.DeleteObjects aTrim
+    Rhino.DeleteObject sSrfOld
+    Rhino.DeleteObject sSrf
+    Rhino.DeleteGroup sGroup
+    Rhino.EnableRedraw(True)
+    
+End Sub
+
+'Rhino.AddAlias "TrueUpExtrusionAuto", "_NoEcho _-Runscript TrueUpExtrusionAuto"
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+
+Function CheckCurveDir(DomCrv,DomU,DomV, sCrv)
+    Dim Result
+    
+    If abs(DomCrv(0)) = abs(DomU(0)) And  abs(DomCrv(1)) = Abs(DomU(1)) Then
+        Result = "U"
+    
+    ElseIf  abs(DomCrv(1)) = abs(DomU(0)) And  abs(DomCrv(0)) = Abs(DomU(1)) Then
+        Result = "U"
+        Rhino.ReverseCurve(sCrv)
+       
+       
+    ElseIf abs(DomCrv(0)) = abs(DomV(0)) And  abs(DomCrv(1)) = Abs(DomV(1)) Then
+        Result = "V"
+       
+    ElseIf abs(DomCrv(1)) = abs(DomV(0)) And  abs(DomCrv(0)) = Abs(DomV(1)) Then
+        Rhino.ReverseCurve(sCrv)
+        Result = "V"
+    End If
+    'msgbox Result
+    CheckCurveDir = Result
+    
+End Function
+
+Sub KeepSplitPiece(aSrf, aPt)
+    Dim aTest, sSrf
+
+    For Each sSrf In aSrf
+       
+        atest = Rhino.PullPoints(sSrf,array(aPt))
+
+        If  Not isArray(aTest) Then
+           
+            Rhino.DeleteObject sSrf
+       
+        End If
+       
+    Next
+    
+    
+End Sub
+
+Function AverageUV(Param1, Param2)
+    Dim result
+    
+    Dim UPar: Upar = (Param1(0) + Param1(1))/2
+    Dim VPar: Vpar = (Param2(0) + Param2(1))/2
+    
+    Result = array(Upar,Vpar)
+    AverageUV= result
+
+End Function
+
+Function CopySurface(SSrf)
+    
+    Dim Result
+    
+    Dim aPtCount: aPtCount = Rhino.SurfacePointCount(SSrf)
+    Dim aPts: aPts =Rhino.SurfacePoints(sSrf)
+    Dim aKnots: aKnots =Rhino.SurfaceKnots(sSrf)
+    Dim aKnotsU: aKnotsU = aKNots(0)
+    Dim aKnotsV: aKnotsV = aKnots(1)
+    Dim aDegree : aDegree = Rhino.SurfaceDegree(SSrf, 2)
+    Dim aWeights: aWeights = Rhino.SurfaceWeights(SSrf)
+       
+    Result = Rhino.AddNurbsSurface (aPtCount, aPts, aKnotsU, aKnotsV, aDegree , aWeights)
+    Rhino.ObjectColor Result, vbBlue
+    CopySurface = Result
+    
+End Function
+
+Function FindStraightDirection(sSrf)
+    
+    Dim result
+    Dim aPts: apts = Rhino.SurfacePointCount(sSrf)
+    Dim ptsU : PtsU = aPts(0)
+    Dim ptsV : PtsV =    apts(1)
+    
+    If PtsU = 2 Then
+        result = "U"
+    ElseIf  ptsV = 2 Then
+        Result = "V"
+    Else result = "Pick"
+    End If
+    
+
+
+    FindStraightDirection = result
+
+End Function
+'TrueUpExtrusionAuto

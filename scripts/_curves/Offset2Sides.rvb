@@ -1,0 +1,44 @@
+Option Explicit
+
+Sub Offset2Sides()
+
+Dim strCrv, dblOdist, dblTol, arrStPt, strSph, arrIntPt
+dblTol=Rhino.UnitAbsoluteTolerance
+
+strCrv=Rhino.GetObject("Select curve to offset both sides",4,True,True)
+If IsNull(strCrv) Then Exit Sub
+dblODist=Rhino.GetReal("Distance to offset",,dblTol)
+If IsNull(dblODist) Then Exit Sub
+
+Call Rhino.EnableRedraw(False)
+arrStPt=Rhino.CurveStartPoint(strCrv)
+strSph=Rhino.AddSphere(arrStPt, (2*dblTol))
+arrIntPt=Rhino.CurveBrepIntersect(strCrv, strSph)
+If Not IsArray(arrIntPt) Then
+ Rhino.Print("Unable to calculate offset")
+ Call Rhino.EnableRedraw(True)
+ Exit Sub
+ElseIf UBound(arrIntPt)>1 Then
+ Rhino.Print("Unable to calculate offset")
+ Call Rhino.EnableRedraw(True)
+ Exit Sub
+ElseIf UBound(arrIntPt)=1 Then
+ Call Rhino.DeleteObject(arrIntPt(1))
+End If
+
+Dim strPt, arrPt
+strPt=Rhino.RotateObject(arrIntPt(0),arrStPt,90)
+arrPt=Rhino.PointCoordinates(strPt)
+Call Rhino.OffsetCurve(strCrv,arrPt,dblODist)
+Call Rhino.RotateObject(strPt,arrStPt,180)
+arrPt=Rhino.PointCoordinates(strPt)
+Call Rhino.OffsetCurve(strCrv,arrPt,dblODist)
+Call Rhino.DeleteObject(strSph)
+Call Rhino.DeleteObject(strPt)
+Call Rhino.EnableRedraw(True)
+Call Rhino.UnselectObject(strCrv)
+
+End Sub
+
+'Call Offset2Sides()
+

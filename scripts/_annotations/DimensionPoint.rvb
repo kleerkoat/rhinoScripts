@@ -1,0 +1,25 @@
+﻿
+Sub DimensionPoint
+	Dim arrPts
+
+	'after sr4 is released, remove the point count restriction and use the Rhino.Addleader method
+	'currently commented out below instead of Rhino.Command
+	
+	arrPts = Rhino.getPoints(True, False, "Tip of leader", "Next point on leader",3)
+	
+	If IsArray(arrPts) Then
+		If Ubound(arrpts)= 2   Then
+			Dim arrText: arrText = Array(Round(arrPts(0)(0), 4), Round(arrpts(0)(1),4), Round(arrpts(0)(2), 4))
+			Dim strText: strText = Join(arrText,",")
+			Dim strPt: strPt = Rhino.addPoint (arrPts(0))
+			Rhino.Command "_-Leader W" &Pt2Str(arrPts(0)) &" W"  &Pt2Str(arrpts(1)) &" W"  &Pt2Str(arrpts(2)) &" Enter " & strText &" "
+			'Rhino.Addleader arrPts,Rhino.CurrentView,strText
+		Else Exit Sub
+		End If
+	Else Exit Sub
+	End If
+	
+End Sub
+
+Rhino.AddStartUpScript Rhino.lastLoadedScriptFile
+Rhino.AddAlias "DimPt", "_NoEcho _-Runscript DimensionPoint"

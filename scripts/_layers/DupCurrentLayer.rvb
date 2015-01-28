@@ -1,0 +1,22 @@
+Option Explicit
+'Script written by Don Lewis
+'Script copyrighted by Lewis Tool & Engineering llc
+'Script version Tuesday, January 12, 2010 6:25:05 AM
+
+'Call DupCurrentLayer()
+Sub DupCurrentLayer()
+
+	Dim arrObject, strLayer, arrObjects, lngColor
+	
+	arrObject = Rhino.GetObject("Select an object to duplicate layer",,True)
+	strLayer = Rhino.ObjectLayer(arrObject)
+	
+	arrObjects = Rhino.ObjectsByLayer(strLayer,True)
+	
+	lngColor = Rhino.LayerColor(strLayer)
+	Call Rhino.AddLayer("Dup " & strLayer, lngColor,True,False,strLayer)
+	
+	Call Rhino.CopyObjects(arrObjects)
+	Call Rhino.ObjectLayer(arrObjects,"Dup " & StrLayer)
+	
+End Sub

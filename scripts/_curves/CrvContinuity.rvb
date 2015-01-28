@@ -1,0 +1,246 @@
+' script for Rhinoceros V3
+' display the continuity between sub segments of selected polycurves
+' also displays continuity between crv start end of single closed curves
+' copyright 2004, clement greiner
+
+Option Explicit
+
+Dim blnDebug : blnDebug = False
+
+'Sub PolyCurveContinuity
+Sub CrvContinuity
+
+Dim arrPolyCurves			' all polycurves
+Dim StrPolyCurve			' single polycurve
+Dim intClosed				' a toggle (0 = open, 1 = closed)
+Dim arrXPCurves				' array of exploded polyCurve segments
+Dim bound, Index			' a counter through all subcurves
+Dim StrGCon					' the geometric continuity (G0 or G1)
+Dim arrGConPt				' the connection point between measured curves
+Dim arrGConDots()			' the IDs of the dot or point display objects
+Dim count					' obj counter
+Dim StrGroup
+
+' command line display option(s)
+Dim StrDisplayMode, arrDisplay, Ready
+
+' get the last display mode from the document
+StrDisplayMode = Rhino.GetDocumentData("PolyCrvContinuity", "DisplayMode")
+If IsNull(StrDisplayMode) Then StrDisplayMode = "TextDisplay"
+
+' select some polycurves
+arrPolyCurves = Rhino.GetObjects("Select PolyCurves to display subcurve continuity", 4, vbTrue, vbTrue)
+If IsNull(arrPolyCurves) Then Print "Command aborted" : Exit Sub
+
+' reset counter
+count = 0
+If Not blnDebug Then Rhino.EnableRedraw(vbFalse) Else Rhino.UnselectAllObjects
+
+' Process each polycurve
+For Each StrPolyCurve In arrPolyCurves
+		' check if closed (to fillet between start end end pt of polycurve)
+		If Rhino.IsCurveClosed(StrPolyCurve) Then intClosed = 1 Else intClosed = 0
+		' explode the polycurve in arrXPCurves, delete original !
+		arrXPCurves = Rhino.ExplodeCurves(StrPolyCurve, vbFalse)
+		' do something if it is a single and open curve object
+		Rhino.UnselectObject StrPolyCurve
+		If Not IsArray(arrXPCurves) And intClosed = 0 Then
+			Print "Error - single, open curve found !"
+		' do something if it is a single and closed curve object
+		ElseIf Not IsArray(arrXPCurves) And intClosed = 1 Then
+			arrGConPt = Rhino.CurveStartPoint(StrPolyCurve)
+			StrGCon = GET_CurveStartEndContinuity(StrPolyCurve)
+			If StrGCon = "G1" Then
+				Redim Preserve arrGConDots(count)
+				If StrDisplayMode = "TextDisplay" Then arrGConDots(count) = Rhino.AddTextDot("G1", arrGConPt)
+				If StrDisplayMode = "PointDisplay" Then arrGConDots(count) = Rhino.AddPoint(arrGConPt)
+				Rhino.ObjectColor arrGConDots(Count), 65280
+			Else
+				Redim Preserve arrGConDots(count)
+				If StrDisplayMode = "TextDisplay" Then arrGConDots(count) = Rhino.AddTextDot("G0", arrGConPt)
+				If StrDisplayMode = "PointDisplay" Then arrGConDots(count) = Rhino.AddPoint(arrGConPt)
+				Rhino.ObjectColor arrGConDots(Count), 255
+			End If
+			count = count + 1
+		End If
+
+		If IsArray(arrXPCurves) Then
+		    bound = UBound(arrXPCurves)
+            ' iterate through each 2 curve segments in arrXPCurves / from start to end, all segments
+            For Index = 0 To bound-1
+                If blnDebug Then Rhino.SelectObject arrXPCurves(Index) : Rhino.SelectObject arrXPCurves(Index+1)
+                arrGConPt = Rhino.CurveEndPoint(arrXPCurves(Index))
+                ' get geometric continuity between curve1-end / curve2-start
+                StrGCon = GET_CurveTangency(arrXPCurves(Index), arrXPCurves(Index+1))
+                If StrGCon = "G1" Then
+                    Redim Preserve arrGConDots(count)
+                    If StrDisplayMode = "TextDisplay" Then arrGConDots(count) = Rhino.AddTextDot("G1", arrGConPt)
+                    If StrDisplayMode = "PointDisplay" Then arrGConDots(count) = Rhino.AddPoint(arrGConPt)
+                    Rhino.ObjectColor arrGConDots(Count), 65280
+                Else
+                    Redim Preserve arrGConDots(count)
+                    If StrDisplayMode = "TextDisplay" Then arrGConDots(count) = Rhino.AddTextDot("G0", arrGConPt)
+                    If StrDisplayMode = "PointDisplay" Then arrGConDots(count) = Rhino.AddPoint(arrGConPt)
+                    Rhino.ObjectColor arrGConDots(Count), 255
+                End If
+                count = count + 1
+                If blnDebug Then Rhino.UnselectAllObjects
+            Next
+
+            ' process the same for the last and first segment of a closed polycurve (if closed)
+            If intClosed = 1 Then
+                    If blnDebug Then Rhino.SelectObjects Array(arrXPCurves(bound),arrXPCurves(0))
+                    arrGConPt = Rhino.CurveEndPoint(arrXPCurves(bound))
+                    ' get geometric continuity between curve1-end / curve2-start
+                    StrGCon = GET_CurveTangency(arrXPCurves(bound),arrXPCurves(0))
+                    If StrGCon = "G1" Then
+                        Redim Preserve arrGConDots(count)
+                        If StrDisplayMode = "TextDisplay" Then arrGConDots(count) = Rhino.AddTextDot("G1", arrGConPt)
+                        If StrDisplayMode = "PointDisplay" Then arrGConDots(count) = Rhino.AddPoint(arrGConPt)
+                        Rhino.ObjectColor arrGConDots(Count), 65280
+                    Else
+                        Redim Preserve arrGConDots(count)
+                        If StrDisplayMode = "TextDisplay" Then arrGConDots(count) = Rhino.AddTextDot("G0", arrGConPt)
+                        If StrDisplayMode = "PointDisplay" Then arrGConDots(count) = Rhino.AddPoint(arrGConPt)
+                        Rhino.ObjectColor arrGConDots(Count), 255
+                    End If
+                    count = count + 1
+                    If blnDebug Then Rhino.UnselectAllObjects
+            End If
+
+            ' rejoin up the exploded curves
+            Rhino.DeleteObjects arrXPCurves
+   	   End If
+Next
+Rhino.EnableRedraw(vbTrue)
+
+arrDisplay = arrGConDots
+
+Do While Ready = 0
+	If StrDisplayMode = "TextDisplay" Then
+		StrDisplayMode = Rhino.GetString("Choose display mode" , , Array("PointDisplay","KeepDisplay"))
+	ElseIf StrDisplayMode = "PointDisplay" Then
+		StrDisplayMode = Rhino.GetString("Choose a display mode" , , Array("TextDisplay","KeepDisplay"))
+    End If
+
+	Select Case StrDisplayMode
+    Case "KeepDisplay"
+         Rhino.SelectObjects arrPolyCurves
+         Dim strDisplayGroup
+         strDisplayGroup = Rhino.AddGroup
+         Rhino.AddObjectsToGroup arrDisplay, strDisplayGroup
+    	 Ready = 1
+    Case "PointDisplay"
+    	 arrDisplay = GET_PolyCrvDisplay(arrDisplay)
+    	 Rhino.SetDocumentData "PolyCrvContinuity", "DisplayMode", StrDisplayMode
+    Case "TextDisplay"
+		 arrDisplay = GET_PolyCrvDisplay(arrDisplay)
+		 Rhino.SetDocumentData "PolyCrvContinuity", "DisplayMode", StrDisplayMode
+    Case Else
+    	 If Count = 0 Then Print "Error - No PolyCrvContinuity measured." : Exit Sub
+         Rhino.DeleteObjects arrDisplay
+         Rhino.SelectObjects arrPolyCurves
+         Ready = 1
+End Select
+
+Loop
+
+End Sub
+
+' function to check if curves are tangent to each other (first curve must end in the start of the second curve !!!)
+Function GET_CurveTangency(StrCrv_A, StrCrv_B)
+
+Dim arrCPoint, dblParam_A, dblParam_B, arrNormal_A, arrNormal_B
+Dim DotA, DotB
+GET_CurveTangency = vbNull
+If IsNull(StrCrv_A) Then MsgBox "GET_CurveTangency input A = NULL", 0, "Error" : Exit Function
+If IsNull(StrCrv_B) Then MsgBox "GET_CurveTangency input B = NULL", 0, "Error" : Exit Function
+' define the connexion point of the two curves
+arrCPoint = Rhino.CurveEndPoint(StrCrv_A)
+' If blnDebug Then Rhino.AddTextDot "arrCPoint", arrCPoint
+' measure the geometric continuity from connexion point
+
+dblParam_A = Rhino.CurveClosestPoint(StrCrv_A, arrCPoint)
+arrNormal_A = Rhino.CurveTangent(StrCrv_A, dblParam_A)
+If blnDebug Then DotA = Rhino.AddTextDot("Normal A", arrNormal_A)
+
+dblParam_B = Rhino.CurveClosestPoint(StrCrv_B, arrCPoint)
+arrNormal_B = Rhino.CurveTangent(StrCrv_B, dblParam_B)
+If blnDebug Then DotB = Rhino.AddTextDot("Normal B", arrNormal_B)
+
+If blnDebug Then Rhino.DeleteObjects Array(DotA, DotB)
+
+' compare tangent vectors
+' If PtComp(arrNormal_A,arrNormal_B) = 0 Then GET_CurveTangency = "G1" Else GET_CurveTangency = "G0"
+If Rhino.Distance(arrNormal_A, arrNormal_B) <= 0.001 Then GET_CurveTangency = "G1" Else GET_CurveTangency = "G0"
+
+End Function
+
+' function to check a single closed curve for start/end point continuity
+Function GET_CurveStartEndContinuity(StrTestCrv)
+Dim arrNormalStart, arrNormalEnd, arrTestDomain
+GET_CurveStartEndContinuity = vbNull
+' get the curve domain
+arrTestDomain = Rhino.CurveDomain(StrTestCrv)
+' get tangent at start/end
+arrNormalStart = Rhino.CurveTangent(StrTestCrv, arrTestDomain(0))
+arrNormalEnd = Rhino.CurveTangent(StrTestCrv, arrTestDomain(1))
+' If PtComp(arrNormalStart,arrNormalEnd) Then GET_CurveStartEndContinuity = "G1" Else GET_CurveStartEndContinuity = "G0"
+If Rhino.Distance(arrNormalStart, arrNormalEnd) <= 0.001 Then GET_CurveStartEndContinuity = "G1" Else GET_CurveStartEndContinuity = "G0"
+End Function
+
+' function to compare two points returns 0 if points are equal
+' Private Function PtComp(arrA, arrB)
+' Dim arA, arB
+
+' PtComp = vbNull
+' If IsNull(arrA) Then MsgBox "PtComp Function, arrA = NULL", 0, "Error" : Exit Function
+' If Not IsArray(arrA) Then MsgBox "Error PtComp Function, arrA = no array", 0, "Error" : Exit Function
+' If IsNull(arrB) Then MsgBox "Error PtComp Function, arrB = NULL", 0, "Error" : Exit Function
+' If Not IsArray(arrB) Then MsgBox "Error PtComp Function, arrB = no array", 0, "Error" : Exit Function
+
+' If StrComp(Rhino.Pt2Str(arA,5),Rhino.Pt2Str(arB,5)) = 0 Then PtComp = 0 Else PtComp = 1
+' Rhino.Print "PtComp = " & PtComp
+' End Function
+
+Function GET_Dist2Pt(ByRef A, ByRef B)
+	' GET_Dist2Pt = Null
+	' If IsNull(A) Or IsNull(B) Then Exit Function
+	GET_Dist2Pt = Sqr((A(0)-B(0))*(A(0)-B(0))+(A(1)-B(1))*(A(1)-B(1))+(A(2)-B(2))*(A(2)-B(2)))
+End Function
+
+' function to change from text dot display to point display
+Function GET_PolyCrvDisplay(ByVal arrObjects)
+Dim StrObject, arrPtLoc, arrReturn(), PtCount, lngColor
+PtCount = 0
+GET_PolyCrvDisplay = vbNull : If IsNull(arrObjects) Then Exit Function
+Rhino.EnableRedraw(vbFalse)
+For Each StrObject in arrObjects
+		lngColor = Rhino.ObjectColor(StrObject)
+		If Rhino.IsTextDot(StrObject) Then
+			arrPtLoc = Rhino.TextDotPoint(StrObject)
+			Redim Preserve arrReturn(PtCount)
+			arrReturn(PtCount) = Rhino.AddPoint(arrPtLoc)
+			Rhino.ObjectColor arrReturn(PtCount), lngColor
+			PtCount = PtCount + 1
+		ElseIf Rhino.IsPoint(StrObject) Then
+			arrPtLoc = Rhino.PointCoordinates(StrObject)
+			Redim Preserve arrReturn(PtCount)
+			If lngColor = 255 Then
+				arrReturn(PtCount) = Rhino.AddTextDot("G0",arrPtLoc)
+		    ElseIf lngColor = 65280 Then
+		    	arrReturn(PtCount) = Rhino.AddTextDot("G1",arrPtLoc)
+		    End If
+		    Rhino.ObjectColor arrReturn(PtCount), lngColor
+		    PtCount = PtCount + 1
+		End If
+
+		Rhino.DeleteObject StrObject
+Next
+Rhino.EnableRedraw(vbTrue)
+' return array of new object ids
+If IsArray(arrReturn) Then GET_PolyCrvDisplay = arrReturn
+End Function
+
+
+'PolyCurveContinuity

@@ -1,0 +1,208 @@
+Option Explicit
+'Script written by Pascal
+
+'Hi all- here is a first run at the simpler version- View (actually
+'Cplane) based, points are slammed onto a plane normal to the view cplane.
+'Select the surface, then a direction, U or V, then pick points in the
+'rows to planarize- select one point, the rest of the row or column will
+'sort itself out. In theory. '
+' With FairSrfPts you can select a point again if the first try does not fair 
+'the row enough. I'll probably have to add some control or how much to fair- 
+'it might be too much now. '
+
+'Script version Friday, May 06, 2011 
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile()
+'Rhino.AddAlias "PlanarizeSrfPts", "_NoEcho _-Runscript (PlanarizeSrfPts)"
+'Rhino.AddAlias "FairSrfPts", "_NoEcho _-Runscript (FairSrfPts)"
+
+Private OldDir
+If isEmpty(OldDir) Then
+	OldDir = "U"
+End If
+
+'Call PlanarizeSrfPts()
+Sub PlanarizeSrfPts()
+	AdjustSrfPts("Planar")
+	
+End Sub
+
+Sub FairSrfPts()
+	AdjustSrfPts("Fair")
+	
+End Sub
+
+
+Sub AdjustSrfPts(SStyle)
+
+	Dim sSrf: sSrf = Rhino.GetObject("Select surface", 8, True)
+	If isNull(sSrf) Then Exit Sub
+	
+	If Not Rhino.ObjectGripsOn(sSrf) Then Rhino.EnableObjectGrips sSrf
+	
+	'Sorts grips into a two dimensional (U and V) array of indices
+	Dim aIdx: aIdx = SortSurfacePointsUV(sSrf)
+	
+	Dim BoundU: BoundU = Ubound(aIdx, 1)
+	Dim BoundV: BoundV = Ubound(aIdx, 2)
+	
+	Dim  srfPoints, idx, idxGrp, Coord, U, V
+	Dim Row, Col
+	Dim n,  aGrips
+	Dim i,  testPt1, testPt2
+	Dim ValidGrip, Owner
+	
+	Dim sDir: sDir = Rhino.GetString("Direction to planarize?", OldDir, array("U", "V"))
+	If isNull(sDir) Then Exit Sub
+	
+	If UCase(sDir) = "U" Then
+		sDir = "U"
+	ElseIf	UCase(sDir) = "V" Then
+		sdir = "V"
+	Else Exit Sub
+	End If
+	
+	OldDir = sDir
+	
+	Do
+	
+		Do
+			idxGrp = Rhino.GetObjectGrip("Select a surface control point", False, False)
+	
+			If Not IsArray(idxGrp) Then Exit Sub
+			idx = idxGrp(1)
+			Owner = idxGrp(0)
+			ValidGrip = True
+			
+			'check to be sure the selected grip is on the input surface
+			If Owner <> sSrf Then 
+				Rhino.FlashObject sSrf
+				Rhino.FlashObject sSrf
+				msgbox "Please pick a surface conttrol point on the input surface only"
+				Rhino.FlashObject sSrf
+				Rhino.FlashObject sSrf
+				ValidGrip = False
+			End If
+			
+		Loop While ValidGrip = False
+	
+		Rhino.EnableRedraw False
+		For U = 0 To BoundU
+			For V = 0 To BoundV
+			
+				'determine the row and column of the selected grip
+				If idx = aIdx(U, V) Then
+					Row = U
+					Col = V
+					Exit For
+				End If
+			
+			Next
+		Next
+
+		n = 0
+		
+		If sDir = "U" Then
+			ReDim aGrips(BoundV)
+
+			For n = 0 To BoundV 
+				aGrips(n) = aIdx(n, Col)
+
+			Next
+			
+		Else
+		
+			ReDim aGrips(BoundU)
+
+			For n = 0 To BoundU 
+				aGrips(n) = aIdx(Row, n)
+
+			Next
+		End If
+	
+		
+		If sStyle = "Fair" Then
+		Dim aLoc: aLoc = CurveThroughGrips(sSrf, aGrips)
+		
+		For i = 1 To n - 1
+			Rhino.ObjectGripLocation sSrf, aGrips(i), aLoc(i)
+		Next
+		Else
+		Dim	plane: plane = Rhino.PlaneFromPoints(Rhino.ObjectGripLocation(sSrf, aGrips(0)), Rhino.ObjectGripLocation(sSrf, aGrips(n - 1)), Rhino.PointAdd(Rhino.ObjectGripLocation(sSrf, aGrips(0)), Rhino.ViewCPlane()(3)))
+				For i = 1 To n - 1
+		
+					testPt1 = Rhino.PlaneClosestPoint(plane, Rhino.ObjectGripLocation(sSrf, aGrips(i)))
+					Rhino.ObjectGripLocation sSrf, aGrips(i), testPt1
+				
+				Next
+		End If
+			
+		Rhino.EnableRedraw True
+		
+		Rhino.UnselectAllObjects()
+	Loop Until isNull(idx)
+	
+End Sub
+
+
+Function CurveThroughGrips(sSrf, aIdx)
+	Dim aLoc, i, Bound
+	Bound = Ubound(aidx)
+	ReDim aLoc(Bound)
+	For i = 0 To Bound
+		aloc(i) = Rhino.ObjectGripLocation(sSrf, aidx(i))
+	Next
+	
+	
+	Dim tempCrv: tempCrv = Rhino.AddInterpCurveEx(aLoc, 3, 2)
+	Rhino.FairCurve(tempCrv)
+	
+	Dim result
+	ReDim result(Bound)
+	Result(0) = aLoc(0)
+	result(Bound) = aLoc(Bound)
+	Dim X: X = 0
+	Do 
+	For i = 1 To Bound - 1
+		
+		Result(i) = Rhino.EvaluateCurve(tempCrv, Rhino.CurveClosestPoint(tempCrv, aLoc(i)))
+		
+	Next
+		Rhino.FairCurve(tempCrv)
+		X = X + 1
+	Loop Until X = 10
+	Rhino.DeleteObject tempCrv
+	
+	CurveThroughGrips = Result
+	
+End Function
+
+Function SortSurfacePointsUV(sSrf)
+	'Sorts grips into a two dimensional (U and V) array of indices
+	
+	If Not Rhino.ObjectGripsOn(sSrf) Then Rhino.EnableObjectGrips sSrf
+	
+	Dim aCount: aCount = Rhino.SurfacePointCount(sSrf)
+	Dim intU, intV
+
+	intU = aCount(0) - 1
+	intV = aCount(1) - 1
+	Dim  u, v
+	
+	Dim aIdx, i
+	i = 0
+	ReDim aIdx(intU,intV)
+	
+	For u = 0 To intU
+
+		For v = 0 To intV
+			aIdx(U, V) = i
+			i = i + 1
+		Next
+
+	Next
+	'Rhino.SelectObjectGrip sSrf, aIdx(7,7)
+	SortSurfacePointsUV = aIdx
+	'rhino.SelectObjectGrip sSrf, aIdx(3,1)
+
+End Function

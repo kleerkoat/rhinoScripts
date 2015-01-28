@@ -1,0 +1,45 @@
+'Script written by Ryan Gilmore (monkeygrip@gmail.com)
+'Script version Sunday, October 07, 2012 6:00:29 PM
+
+'Description: DRAW LINE, MAKES CALLOUT DOT WITH XYZ COORDINATES OF START POINT
+'
+'Edits:
+'Todo:
+
+Option Explicit
+
+
+'Call CalloutDotXYZ()
+Sub CalloutDotXYZ()
+	Dim strObject, arrPointEnd, arrPointStart, strPointStart, intStyle, arrPline
+
+	arrPline = Rhino.GetPolyline
+
+	If IsArray(arrPline) Then
+
+		strObject = Rhino.AddPolyline(arrPline) 
+	Else Exit Sub
+
+	End If
+	
+	'strCallout = Rhino.StringBox("Enter text for callout:",, "Callout Text.")
+	
+	If Rhino.IsCurve(strObject) Then
+	
+		arrPointEnd = Rhino.CurveEndPoint(strObject)
+		arrPointStart = Rhino.CurveStartPoint(strObject)
+		
+		strPointStart = Rhino.Pt2Str(arrPointStart, 3)
+		
+		Rhino.AddTextDot strPointStart, arrPointEnd
+		'Rhino.AddTextDot strCallout, arrPoint
+			
+	End If
+	
+	If Rhino.CurveArrows(strObject) <> 1 Then
+
+		Rhino.CurveArrows strObject, 1
+
+	End If
+	
+End Sub

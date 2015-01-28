@@ -1,0 +1,86 @@
+﻿Option Explicit
+' Script written by G. C. Webster� (aka Guilherme Cozer Webster) - October, 2005
+' RhinoScript June 16, 2005
+' Designed to automatically create open curves from the intersection between given 
+' cross-section and profile curves.
+
+Sub CrvsFromProfilesAndSections()
+
+	Dim arrCSCrv, strCSCrv, strCSSrf
+	Dim arrPCrv, strPCrv
+	Dim arrWAxis, strWAxis
+	Dim arrMoveStart, arrMoveEnd, Move
+	Dim arrObj, HideObj, ShowObj, strPath
+
+	arrPCrv = Rhino.GetObjects ("Select all profile curves", 4, True, True)
+	If IsNull (arrPCrv) then Exit Sub
+
+	arrCSCrv = Rhino.GetObjects ("Select cross-section curves", 4)
+	If IsNull (arrCSCrv) then Exit Sub
+
+	ReDim arrWAxis (2)
+	arrWAxis (0) = "World_X"
+	arrWAxis (1) = "World_Y"
+	arrWAxis (2) = "World_Z"
+
+	strWAxis = Rhino.GetString ("Select the projection axis", "World_Z", arrWAxis)
+	If IsNull (strWAxis) then Exit Sub
+
+	Rhino.EnableRedraw (false)
+        
+	Rhino.CopyObjects (arrCSCrv)
+	arrMoveStart = (array(0,0,0))
+
+	Select Case strWAxis
+		Case "World_X"
+			strPath = Rhino.AddLine(Array(-1000000,0,0), Array(1000000,0,0))
+			arrMoveEnd = (array(-1000000,0,0))
+		Case "World_Y"
+			strPath = Rhino.AddLine(Array(0,-1000000,0), Array(0,1000000,0))
+			arrMoveEnd = (array(0,-1000000,0))
+		Case "World_Z"
+			strPath = Rhino.AddLine(Array(0,0,-1000000), Array(0,0,1000000))
+			arrMoveEnd = (array(0,0,-1000000))
+	End Select
+
+	Move = Rhino.MoveObjects (arrCSCrv, arrMoveStart, arrMoveEnd)
+
+	Rhino.command "NoEcho", False
+
+	Rhino.command "SelNone", False
+	Rhino.command "SelPt", False
+	Rhino.command "SelSrf", False
+	Rhino.command "SelPolySrf", False
+	arrObj = Rhino.SelectedObjects
+	If Not IsNull (arrObj) Then
+		HideObj = Rhino.HideObjects (arrObj)
+	End If
+
+	For each strCScrv in arrCSCrv
+		strCSSrf = Rhino.ExtrudeCurve (strCSCrv, strPath)
+		For each strPCrv in arrPCrv
+			Rhino.command "SelNone", False
+			Rhino.command "SelSrf", False
+			Rhino.SelectObject (strPCrv)
+			Rhino.command "Intersect", False
+		Next
+		Rhino.DeleteObject (strCSSrf)
+		Rhino.command "SelNone", False
+		Rhino.command "SelPt", False
+		Rhino.command "CurveThroughPt Degree=3 CurveType=Interpolated Knots=Chord Closed=No Enter", False
+		Rhino.command "SelPt", False
+		Rhino.command "Delete", False
+	Next
+	Rhino.DeleteObjects (arrCSCrv)
+	Rhino.DeleteObject (strPath)
+	If Not IsNull (arrObj) Then
+		ShowObj = Rhino.ShowObjects (arrObj)
+	End If
+	Rhino.command "SelNone", False
+
+	Rhino.command "Echo", False
+
+	Rhino.EnableRedraw (True)
+
+End Sub
+

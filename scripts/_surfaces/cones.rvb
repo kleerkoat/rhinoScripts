@@ -1,0 +1,28 @@
+'Script copyright 02-09-2008 Giulio Piacentino And Ryoko Ikeda
+'licenced under GNU-GPL Version 3
+
+Option Explicit
+
+Sub makeManycones
+		Dim intNumOfCones, intNumbOfConeOftheRow, column, row
+		Dim arrConeOrigin, arrConeHeight, dblRadius
+
+		intNumOfCones = 81
+		intNumbOfConeOftheRow = Sqr (intNumOfCones)
+
+		For row=0 To intNumbOfConeOftheRow-1
+		
+			For column=0 To intNumbOfConeOftheRow-1
+			arrConeOrigin = Array (column*3,row*2.5,0)
+			arrConeHeight = Array (column*2.5,row*3,5)
+			dblRadius = row^(1/3)
+	
+			Call Rhino.AddCone (arrConeOrigin, arrConeHeight, dblRadius)
+			Next
+			
+		Next
+End Sub
+
+Rhino.EnableRedraw False
+Call makeManycones
+Rhino.EnableRedraw True

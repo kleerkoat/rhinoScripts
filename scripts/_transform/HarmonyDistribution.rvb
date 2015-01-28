@@ -1,0 +1,2157 @@
+'Script by Thomas Anagnostou
+'Rhino V4
+'RhinoScript 20060906
+'Apr/24/2007
+
+'ToDo: Add support for groups
+
+'Function list:
+'	DoTell
+'	DoBboxHandles
+'	DoJitter
+'	DoManipulateThese
+'	DoTranslate
+'	DoRotate
+'	DoSortPT
+'	DoEquidistant
+'	DoSurfaceDeltas
+'	DoScale
+'	DoProportionize
+'	DoSpikeDeltas
+'	DoVectorAngle(dot product)
+'	DoInvCos
+'	DoVersionCheck
+'	DoGetDefaults
+'	DoSummary
+'	DoAppend
+'	DoSplit
+'	DoSwapEquivalent
+'	DidRequested
+'	DoAskQuartet
+'	DoAlign
+
+'All functions (should) return a zero based array of at least (2) elements
+'position 0 contains the result arrays/data (or Null on error)
+'position 1 contains other arrays/data returned (or an error code on error)
+
+option explicit
+'HarmonyDistribution
+sub HarmonyDistribution()
+
+const version	=20060906
+
+'for UserSays array
+const TargetObjects	=0
+const Surface		=1
+const NoAction		=2
+const Equidist		=3
+const Align		=4
+const Displace		=5
+const Rotate		=6
+const Scale		=7
+const Jitter		=8
+const Handle		=9
+const SurfaceDatum	=10
+
+'for ThisView array
+const name		=0
+const cplanepoints	=1
+const useWorld		=2
+
+dim temp
+dim ask
+
+dim ThisView		(2)
+dim UserSays
+dim xformDisplace
+dim xFormRotate
+dim xFormScale
+dim freshDeltas
+dim surfDeltas
+dim tempArray
+dim HandlePT
+dim DefaultLocale
+
+if DoVersionCheck(version)=false then exit sub
+
+'Viewport capture
+'capture the current view only once for the duration of the script
+ThisView(name)=rhino.currentview
+ThisView(cplanePoints)=rhino.viewcplane
+ThisView(useWorld)=false
+
+'Data Harvest Region
+DefaultLocale=setlocale(1033) 'en-us
+ask=DoAskUser(ThisView)
+setlocale(DefaultLocale)
+if isnull(ask(0)) then
+	rhino.print ask(1)
+	exit sub
+end if
+
+usersays=ask(0)
+'<--
+
+'Data Implementation Region
+if DidRequested(NoAction,usersays)(0) then
+	Rhino.print DoTell(00)(0)&DoTell(44)(0)
+	exit sub
+end if
+
+HandlePT=DoBboxHandles(usersays(TargetObjects),usersays(handle),ThisView)
+
+if DidRequested(surface,usersays)(0) then
+	'exects DoSurfaceDeltas(SurfID,HandlePT,BoxZ,TheView)
+	surfDeltas=DoSurfaceDeltas(userSays(Surface),HandlePT(0),UserSays(SurfaceDatum)(0),false,ThisView)
+	if isnull(surfDeltas(0)) then
+		rhino.print DoTell(20)(0)&surfDeltas(1)
+		rhino.enableredraw true
+		exit sub
+	end if
+end if
+
+'Equidist
+if DidRequested(Equidist,usersays)(0) then
+	'Expects: equidist(thisObj,BoxAttrib,ThisAxis,byHandles)
+	freshDeltas=DoEquidistant(usersays(TargetObjects),HandlePT,usersays(Equidist)(0),Usersays(Equidist)(1))
+	if isnull(freshDeltas(0)) then
+		rhino.print DoTell(20)(0)&freshDeltas(1)
+		rhino.enableredraw true
+		exit sub
+	end if
+
+	if vartype(xformDisplace)<8000 then xformDisplace=freshDeltas
+
+end if
+
+'Align
+if DidRequested(Align,usersays)(0) then
+	if (usersays(align)(0)<>3) then
+		freshDeltas=DoAlign(HandlePT(0),usersays(align)(0),usersays(align)(1))
+	else
+		freshDeltas=array(surfDeltas(2),"")
+	end if
+
+	if vartype(xformDisplace)<8000 then
+		xFormDisplace=freshDeltas
+	else
+		tempArray=DoManipulateThese(xFormDisplace(0),freshDeltas(0),"+",null,null)
+		xFormDisplace=tempArray
+	end if
+
+	if isnull(xformDisplace(0)) then
+		rhino.print DoTell(20)(0)&freshDeltas(1)
+		rhino.enableredraw true
+		exit sub
+	end if
+end if
+
+'Displace
+if DidRequested(Displace,usersays)(0) then
+	if (usersays(Displace)(3)=true and usersays(Displace)(4)=false) then
+		'Expects: DoJitter(howMany,axis,jitterON)
+		tempArray=DoJitter( ubound(usersays(TargetObjects)),usersays(Displace),false,false)
+		freshDeltas=DoManipulateThese(surfDeltas(0),tempArray(0),"*",array(2,2,2),null)
+	elseif (usersays(Displace)(3)=true and usersays(Displace)(4)=true) then
+		temp=DoManipulateThese(surfDeltas(0),null,"*",array(2,2,2),null)
+		tempArray=DoManipulateThese(surfDeltas(1),null,"*",array(2,2,2),null)
+		'Expects: DoProportionize(HandlePT,HandlePtMinMax,RawDeltas,SumDeltas,axisMulti)
+		FreshDeltas=DoProportionize(HandlePT(0),HandlePT(2),temp(0),tempArray(0),usersays(Displace))
+	else
+		freshDeltas=DoJitter( ubound(usersays(TargetObjects)),usersays(Displace),false,false)
+	end if
+	
+	if vartype(xformDisplace)<8000 then
+		xformDisplace=freshDeltas
+	else
+		tempArray=DoManipulateThese(xFormDisplace(0),freshDeltas(0),"+",null,null)
+		xFormDisplace=tempArray
+	end if
+	
+	if isnull(xformDisplace(0)) then
+		rhino.print DoTell(20)(0)&freshDeltas(1)
+		rhino.enableredraw true
+		exit sub
+	end if
+
+end if
+
+'Jitter Displacement
+if didrequested(Jitter,usersays)(1)(0) then
+	if (usersays(Jitter)(0)(3)=true) then
+		'Expects: DoJitter(howMany,axis,jitterON)
+		tempArray=DoJitter( ubound(usersays(TargetObjects)),usersays(Jitter)(0),true,false)
+		freshDeltas=DoManipulateThese(surfDeltas(0),tempArray(0),"*",array(2,2,2),null)
+	else
+		freshDeltas=DoJitter( ubound(usersays(TargetObjects)),usersays(Jitter)(0),true,false)
+	end if
+
+	if vartype(xformDisplace)<8000 then
+		xformDisplace=freshDeltas
+	else
+		tempArray=DoManipulateThese(xFormDisplace(0),freshDeltas(0),"+",null,null)
+		xFormDisplace=tempArray
+	end if
+	
+	if isnull(xformDisplace(0)) then
+		rhino.print DoTell(20)(0)&freshDeltas(1)
+		rhino.enableredraw true
+		exit sub
+	end if
+end if
+
+'Rotate
+if DidRequested(Rotate,usersays)(0) then
+	if (usersays(Rotate)(3)=true) then
+		'Expects: DoJitter(howMany,axis,jitterON)
+		tempArray=DoJitter( ubound(usersays(TargetObjects)),usersays(Rotate),false,false)
+		freshDeltas=DoManipulateThese(surfDeltas(0),tempArray(0),"*",array(2,2,2),null)
+	else
+		freshDeltas=DoJitter( ubound(usersays(TargetObjects)),usersays(Rotate),false,false)
+	end if
+
+	if vartype(xformRotate)<8000 then
+		xformRotate=freshDeltas
+	else
+		tempArray=DoManipulateThese(xFormRotate(0),freshDeltas(0),"+",null,null)
+		xFormRotate=tempArray
+	end if
+	
+	if isnull(xformRotate(0)) then
+		rhino.print DoTell(20)(0)&freshDeltas(1)
+		rhino.enableredraw true
+		exit sub
+	end if
+
+end if
+
+'Jitter Rotation
+if didrequested(Jitter,usersays)(1)(1) then
+	if (usersays(Jitter)(1)(3)=true) then
+		'Expects: DoJitter(howMany,axis,jitterON)
+		tempArray=DoJitter( ubound(usersays(TargetObjects)),usersays(Jitter)(1),true,false)
+		freshDeltas=DoManipulateThese(surfDeltas(0),tempArray(0),"*",array(2,2,2),null)
+	else
+		freshDeltas=DoJitter( ubound(usersays(TargetObjects)),usersays(Jitter)(1),true,false)
+	end if
+
+	if vartype(xformRotate)<8000 then
+		xformRotate=freshDeltas
+	else
+		tempArray=DoManipulateThese(xFormRotate(0),freshDeltas(0),"+",null,null)
+		xFormRotate=tempArray
+	end if
+	
+	if isnull(xformRotate(0)) then
+		rhino.print DoTell(20)(0)&freshDeltas(1)
+		rhino.enableredraw true
+		exit sub
+	end if
+end if
+
+'Scale
+if DidRequested(Scale,usersays)(0) then
+	if (usersays(Scale)(3)=true) then
+		'Expects: DoJitter(howMany,axis,jitterON)
+		tempArray=DoJitter( ubound(usersays(TargetObjects)),usersays(Scale),false,false)
+		freshDeltas=DoManipulateThese(surfDeltas(0),tempArray(0),"*",array(2,2,2),null)
+	else
+		freshDeltas=DoJitter( ubound(usersays(TargetObjects)),usersays(Scale),false,false)
+	end if
+
+	if vartype(xformScale)<8000 then
+		xformScale=freshDeltas
+	else
+		tempArray=DoManipulateThese(xFormScale(0),freshDeltas(0),"+",null,null)
+		xFormScale=tempArray
+	end if
+	
+	if isnull(xformScale(0)) then
+		rhino.print DoTell(20)(0)&freshDeltas(1)
+		rhino.enableredraw true
+		exit sub
+	end if
+
+end if
+
+'Jitter Scale
+if didrequested(Jitter,usersays)(1)(2) then
+	if (usersays(Jitter)(2)(3)=true) then
+		'Expects: DoJitter(howMany,axis,jitterON)
+		tempArray=DoJitter( ubound(usersays(TargetObjects)),usersays(Jitter)(2),true,true)
+		freshDeltas=DoManipulateThese(surfDeltas(0),tempArray(0),"*",array(2,2,2),null)
+	else
+		freshDeltas=DoJitter( ubound(usersays(TargetObjects)),usersays(Jitter)(2),true,true)
+	end if
+
+	if vartype(xformScale)<8000 then
+		xformScale=freshDeltas
+	else
+		tempArray=DoManipulateThese(xFormScale(0),freshDeltas(0),"+",null,null)
+		xFormScale=tempArray
+	end if
+	
+	if isnull(xformScale(0)) then
+		rhino.print DoTell(20)(0)&freshDeltas(1)
+		rhino.enableredraw true
+		exit sub
+	end if
+end if
+
+'Active region
+'Scale acts first, Rotation acts second
+if (DidRequested(Scale,usersays)(0)=true or didRequested(jitter,usersays)(1)(2)) then
+	tempArray= DoScale(usersays(TargetObjects),HandlePt(0),xFormScale(0),array(1,1,1),ThisView)
+end if
+
+if (DidRequested(Rotate,usersays)(0)=true or didRequested(jitter,usersays)(1)(1)) then
+	tempArray= DoRotate(usersays(TargetObjects),HandlePt(0),xFormRotate(0),array(1,1,1),ThisView)
+end if
+
+if (DidRequested(displace,usersays)(0)=true or  DidRequested(align,usersays)(0)=true or DidRequested(Equidist,usersays)(0)=true or _
+	didRequested(jitter,usersays)(1)(0)) then
+	tempArray= DoTranslate(usersays(TargetObjects),HandlePt(0),xFormDisplace(0),array(1,1,1),ThisView)
+	HandlePT(0)=tempArray(0)
+end if
+
+'<--
+
+end sub
+
+
+
+'Receives
+'	-Nothing
+'Returns
+'	a variant array of user inputs (see DoGetDefaults for syntax)
+function DoAskUser (TheView)
+'for UserSays array
+const every		=-1
+const TargetObjects	=0
+const Surface		=1
+const Equidist		=3
+const Align		=4
+const Displace		=5
+const Rotate		=6
+const Scale		=7
+const Jitter		=8
+const Handle		=9
+const SurfaceDatum	=10
+
+const MainMenu		=7
+const SubMenu		=8
+
+const cplanepoints	=1
+
+dim default
+dim temp
+
+dim OneResponse
+dim options
+dim UserSays
+Dim toReturn
+
+toReturn=array(0,0)
+
+'-->Data Harvest Region
+UserSays=DoGetDefaults(every)
+UserSays(TargetObjects)=rhino.getobjects(DoTell(01)(0),0,false,True)
+
+if (isnull (UserSays(TargetObjects))) then
+	toReturn(0)=Null
+	toReturn(1)= DoTell(60)(0)&DoTell(61)(0)
+	DoAskUser=toReturn
+	exit function
+end if
+
+do
+rhino.print DoSummary(UserSays,DoTell(04)(0))(0)
+default=""
+options=DoTell(MainMenu)
+OneResponse=array("","")
+OneResponse(0)=rhino.getstring (DoTell(04)(0),default,options)
+oneResponse(0)=lcase(oneresponse(0))
+
+Select case oneResponse(0)
+	case lcase(DoTell(MainMenu)(0)) 'Equidistant
+		options=DoAppend(DoTell(10)(04),DoTell(09))(0)
+		default=DoSwapEquivalent(usersays(equidist)(0),array(0,1,2,false),options,true)(0)
+		OneResponse(0)=rhino.getstring(DoTell(SubMenu)(0),default,options)
+		temp=DoSwapEquivalent(OneResponse(0),options,options,true)
+		oneresponse=temp
+		if isnull(oneResponse(0)) then exit do
+		oneresponse(0)=DoSwapEquivalent(temp(0),array(0,1,2,false),options,false)(0)
+		usersays(equidist)(0)=oneResponse(0)
+		if (oneResponse(0)<>"" and vartype(oneresponse(0))<>11) then
+			default=DoSwapEquivalent(usersays(equidist)(1),DoTell(11),array(true,false),false)(0)
+			options=DoTell(11)
+			OneResponse(0)=rhino.getstring(DoTell(SubMenu)(1),default,options)
+			temp=DoSwapEquivalent(OneResponse(0),options,options,true)
+			oneresponse=temp
+			if not isnull(oneResponse(0)) then 
+				oneresponse=DoSwapEquivalent(temp(0),DoTell(11),array(true,false),true)
+				usersays(equidist)(1)=oneResponse(0)
+			end if
+		end if
+	case lcase(DoTell(MainMenu)(1)) 'Align
+		options=DoAppend(array(DoTell(10)(5),DoTell(10)(4)),array(DoTell(09)(0),DoTell(09)(1)))(0)
+		default=DoSwapEquivalent(usersays(align)(0),options,array(0,1,3,false),false)(0) 'array[x,y,z,surface,false]
+		oneresponse(0)=rhino.getstring(DoTell(SubMenu)(2),default,options)
+		temp=DoSwapEquivalent(OneResponse(0),options,options,true)
+		oneresponse=temp
+		if isnull(oneResponse(0)) then exit do
+		temp=DoSwapEquivalent(oneresponse(0),options,array(0,1,3,false),true)
+		oneresponse=temp
+		usersays(Align)(0)=oneResponse(0)
+		if (oneResponse(0)<>"" and vartype(oneresponse(0))<>11) then
+			default=userSays(Align)(1)
+			options=""
+			'oneresponse(0)=rhino.getreal(DoTell(submenu)(8),default) 'Ask user for a numeric input
+			oneResponse(0)=rhino.getpoint(DoTell(submenu)(12),,,true) 'returns a 3d point (array)
+			if isnull(oneResponse(0)) then exit do
+			oneResponse(0)=rhino.xformworldtocplane (oneResponse(0),TheView(cplanePoints))
+			temp=oneresponse(0)(abs(usersays(Align)(0)-1)) 'The usersays(Align)(0) is either 0 or 1
+			oneresponse(0)=temp 'assign a single value to oneresponse(0) instead of a 3d point array
+			usersays(Align)(1)=oneresponse(0)
+		end if
+	case lcase(DoTell(MainMenu)(2)) 'Move
+		default=DoSwapEquivalent(usersays(Displace)(3),array(true,false),array(DoTell(10)(2),DoTell(10)(3)),true)(0)
+		default=usersays(Displace)(0)&","&usersays(Displace)(1)&","&usersays(Displace)(2)&","&default
+		'options= ....
+		rhino.print DoTell(06)(1)
+		oneResponse=DoAskQuartet(DoTell(SubMenu)(3),default,usersays(displace),true)
+		if isnull(oneresponse(0)) then exit do
+		usersays(Displace)=oneresponse(0)
+		if usersays(Displace)(3)=true then
+			rhino.print DoTell(06)(5)
+			default=DoSwapEquivalent(usersays(Displace)(4),array(true,false),array(DoTell(10)(2),DoTell(10)(3)),true)(0)
+			options=array(DoTell(10)(2),DoTell(10)(3))
+			oneresponse(0)=rhino.getstring(DoTell(8)(9),default,options)
+			if isnull(oneresponse(0)) then exit do
+			temp=DoSwapEquivalent(OneResponse(0),options,options,true)
+			oneresponse=temp
+			if isnull(oneResponse(0)) then exit do
+			if oneresponse(0)=DoTell(10)(2) then oneresponse(0)=true else oneresponse(0)=false
+			usersays(Displace)(4)=oneresponse(0)
+		end if
+		oneresponse(0)="pass"
+	case lcase(DoTell(MainMenu)(3)) 'Rotate
+		default=DoSwapEquivalent(usersays(Rotate)(3),array(DoTell(10)(2),DoTell(10)(3)),array(true,false),false)(0)
+		default=usersays(Rotate)(0)&","&usersays(Rotate)(1)&","&usersays(Rotate)(2)&","&default
+		'options= ....
+		rhino.print DoTell(06)(2)
+		oneResponse=DoAskQuartet(DoTell(SubMenu)(4),default,usersays(rotate),true)
+		if isnull(oneresponse(0)) then exit do
+		usersays(Rotate)=oneresponse(0)
+		oneresponse(0)="pass"
+	case lcase(DoTell(MainMenu)(4)) 'Scale
+		default=DoSwapEquivalent(usersays(Scale)(3),array(DoTell(10)(2),DoTell(10)(3)),array(true,false),false)(0)
+		default=usersays(Scale)(0)&","&usersays(Scale)(1)&","&usersays(Scale)(2)&","&default
+		'options= ....
+		rhino.print DoTell(06)(3)
+		oneResponse=DoAskQuartet(DoTell(SubMenu)(5),default,usersays(scale),true)
+		if isnull (oneResponse(0)) then exit do
+		usersays(Scale)=oneresponse(0)
+		oneresponse(0)="pass"
+	case lcase(DoTell(MainMenu)(5)) 'Jitter
+		options=DoAppend(DoTell(10)(4),DoTell(18))(0)
+		default=DoSwapEquivalent(usersays(jitter)(3),options,array(0,1,2,3),false)(0)
+		oneResponse(0)=rhino.getstring(DoTell(subMenu)(10),default,options)
+		if vartype(oneResponse(0))>1 then
+			temp=DoSwapEquivalent(OneResponse(0),options,options,true)
+			oneresponse=temp
+			if isnull(oneResponse(0)) then exit do
+			userSays(Jitter)(3)=DoSwapEquivalent(oneresponse(0),options,array(0,1,2,3),true)(0)
+			if usersays(Jitter)(3)<3 then
+				default=DoSwapEquivalent(usersays(Jitter)(userSays(Jitter)(3))(3),array(DoTell(10)(2),DoTell(10)(3)),array(true,false),false)(0)
+				default=usersays(Jitter)(userSays(Jitter)(3))(0)&","&usersays(Jitter)(userSays(Jitter)(3))(1)&","&usersays(Jitter)(userSays(Jitter)(3))(2)&","&default
+				'options= ....
+				rhino.print DoTell(6)(4)
+				oneResponse=DoAskQuartet(DoTell(18)(userSays(Jitter)(3))&DoTell(SubMenu)(6),default,usersays(Jitter)(userSays(Jitter)(3)),true)
+				if isnull (oneResponse(0)) then exit do
+				usersays(Jitter)(userSays(Jitter)(3))=oneresponse(0)
+				if didrequested(jitter,usersays)(1)(userSays(Jitter)(3))=false then usersays(jitter)(3)=3
+			else
+				usersays(jitter)=DoGetDefaults(jitter)
+			end if
+		end if
+		if (not isnull(oneresponse(0))) then oneresponse(0)="pass"
+	case lcase(DoTell(MainMenu)(6)) 'Handle from
+		default=usersays(Handle)(0)&","&usersays(Handle)(1)&","&usersays(Handle)(2)
+		'options= ....
+		rhino.print DoTell(13)(0)
+		oneResponse=DoAskQuartet(DoTell(SubMenu)(7),default,usersays(handle),true)
+		if isnull (oneResponse(0)) then exit do
+		usersays(Handle)=oneresponse(0)
+		oneresponse(0)="pass"
+	case lcase(DoTell(MainMenu)(7)) 'SrfDatum
+		default=userSays(SurfaceDatum)(0)
+		'No constrain for min or max needed
+		rhino.print DoTell(06)(0)
+		oneResponse(0)=Rhino.getReal(DoTell(SubMenu)(11),default)
+		if isnull (oneResponse(0)) then exit do
+		usersays(SurfaceDatum)(0)=oneResponse(0)
+	case else
+end Select
+
+loop while (oneResponse(0)<>"" and (not isnull(oneresponse(0))) )
+
+if (isnull (oneresponse(0))) then
+	toReturn(0)=Null
+	toReturn(1)= DoTell(60)(0)&oneresponse(1)
+	DoAskUser=toReturn
+	exit function
+end if
+
+if DidRequested(surface,usersays)(0) then
+	usersays(Surface)=rhino.GetObject(DoTell(02)(0),8)
+end if
+
+if isnull (usersays(Surface)) then
+	toReturn(0)=Null
+	toReturn(1)= DoTell(20)(0)&DoTell(43)(0)
+	DoAskUser=toReturn
+	exit function
+end if
+
+toReturn(0)=usersays
+
+DoAskUser=toReturn
+end function
+
+
+
+'Receives
+'	-an integer
+'Returns
+'	-an array of strings (main message is at element 0, the others are trailing chunks)
+function DoTell(what)
+
+dim Say
+redim Say(80)
+'Messages
+Say(00)=array("Script completed successfully.")
+Say(01)=array("Select target objects")
+Say(02)=array("Select Control surface")
+Say(03)=array(	"Please wait, while adjusting position on <","> objects.", _
+			"Please wait, while adjusting rotation on <", _
+			"Please wait, while adjusting scale on <", _
+			"Please wait, while calculating surface deltas for <")
+Say(04)=array("Main menu")
+Say(05)=array("Obj","Srf")
+Say(06)=array( "Enter control-surface bounding box height as datum for surface Deltas (Box height range <0.0 to 1.0>, or higher/lower values for datums beyond)", _
+			"Enter displacement values for (Cplane) X-axis, Y-axis, Z-axis, and Yes-No (for control by Surface)", _
+			"Enter rotation values (in degrees) about Cplane X-axis, Y-axis, Z-axis, and Yes-No (for control by Surface)", _
+			"Enter percent to scale by (1.0 = double size; -1.0 = shrink to zero) about Cplane X-axis, Y-axis, Z-axis, and Yes-No (for control by Surface)", _
+			"Enter jitter amount for (Cplane) X-axis, Y-axis, Z-axis, and Yes-No (for control by Surface)", _
+			"If answer is <Yes> then surface-controlled changes will be constrained within the bounds of the furthest object(s)")
+Say(07)=array("Equidistant","Align", "Move", "Rotate", "Scale", "Jitter", "Handle", "Datum")
+Say(08)=array( "Equidistant along (Cplane):","Equidistant from:","Align to:","Move objects:","Rotate Objects:", _
+			"Scale Objects:"," jitter amount:","Bounding Box Handle:", "Align to axis at location:", _
+			"Bound within external objects?", "Jitter type:","Surface datum height:", "Select point to align to" )
+Say(09)=array("Xaxis","Yaxis","Zaxis")
+Say(10)=array("Summary of actions: ","amount","Yes","No","None","Surface","Center","Bound","Free")
+Say(11)=array("Handles","BoxEdges")
+Say(12)=array("BoxAxisX","BoxAxisY","BoxAxisZ")
+Say(13)=array("Select object-handle percentage location in bounding box coordinates. Center is at x=0.5, y=0.5, z=0.5")
+Say(18)=array("Displacement","Rotation","Scale")
+Say(19)=array("Dsp","Rot","Scl")
+
+'Internal Errors (debug session)
+Say(20)=array("Script not successful. ")
+Say(21)=array("Requested error string ("&what&") not found for display. ",1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20)
+Say(22)=array("Internal error (Needed arrays not found for box-handle creation)")
+Say(23)=array("Internal error (Needed arrays not found for object jitter calculation)")
+Say(24)=array("Internal error (Needed arrays not found for object translation)")
+Say(25)=array("Internal error (Needed arrays not found for object rotation)")
+Say(26)=array("Internal error (Needed arrays not found for object sorting)")
+Say(27)=array("Internal error (Needed arrays not found for distance calculations)")
+Say(28)=array("Internal error (Needed arrays not found for surface-delta calculations)")
+Say(29)=array("(Control surface has corners not sufficiently orthogonal)")
+Say(30)=array("(Control surface U-direction is not sufficiently aligned to the X-axis)")
+Say(31)=array("(Control surface object not valid)")
+Say(32)=array("(Control surfaces must be untrimmed)")
+Say(33)=array("(Control surface has no thickness from this view)")
+Say(34)=array("(Control surface Z-deltas cannot be evaluated from this viewport)")
+Say(35)=array("Please update to RhinoScript","or later. ","Version found: ")
+Say(36)=array("(Prerequisites not met for the append function)")
+Say(37)=array("(Prerequisites not met for the interpret function)")
+Say(38)=array("(Requested Vartype to interpret is not supported)")
+Say(39)=array("(Invalid axis input)")
+Say(40)=array("(Prerequisites not met for the SwapEquivalent function)")
+Say(41)=array("(Prerequisites not met for the MatchResponse function)")
+Say(42)=array("(Invalid user input)")
+Say(43)=array("(No Control surface selected)")
+Say(44)=array("(User requested NO action)")
+Say(45)=array("(Prerequisites not met for the Align function)")
+Say(46)=array("(Prerequisites not met for the AskQuartet function)")
+Say(47)=array("(Prerequisites not met for the ManipulateThese function)")
+Say(48)=array("(Prerequisites not met for the Scale function)")
+Say(49)=array("(Prerequisites not met for the Proportionize function)")
+Say(50)=array("(Prerequisites not met for the VectorAngle function)")
+Say(59)=array("Internal Error. ")
+
+'User abort/error
+Say(60)=array("Script aborted. ")
+Say(61)=array("(Target Object selection was empty)")
+Say(62)=array("(Invalid input)")
+
+if (ubound(Say)<what or lbound(Say)>what ) then
+	doTell=Say(21)
+	exit function
+elseif vartype(Say(what))<8000 then
+	doTell=Say(21)
+	exit function
+end if
+
+DoTell=Say(what)
+end function
+
+
+
+'receives
+'	-objectIDs: an array of object identifiers
+'	-a 3D point in bounding box coordinates
+'	-boolean indicating operation in world or Cplane coordinates
+'Returns
+'	-an array of handle points in cplane coordinates
+'	-an array with the XYZ dimentions of the cplane oriented bounding boxes for each object
+'	-a two element array of 3 element arrays with the minimum and maximum coordinate values found for each axis
+'This function always works internally in Cplane coordinates, but returns either Cplane or World
+Function DoBboxHandles(ThisObj,HandlePos,TheView)
+
+const Handlepoints	=0
+const bboxDim		=1
+const minMax		=2
+
+const x	=0
+const y	=1
+const z	=2
+
+const min	=0
+const max	=1
+
+const name		=0
+const cplanepoints	=1
+const useworld		=2
+
+dim toReturn	(2)
+dim sign		(2)
+dim limits	(2)
+dim temp		()
+dim loopOdo
+dim prerequisites
+dim bbox
+
+'->Check prerequisites
+prerequisites=true
+if ((vartype(ThisObj)<8000) or (vartype(handlePos)<8000) or (vartype(theview)<8000)) then
+	prerequisites=false
+elseif (ubound(handlePos)<2) then
+	prerequisites=false
+end if
+
+if prerequisites=false then
+	toReturn(0)=Null
+	toReturn(1)=DoTell(22)(0)
+	DoBboxHandles=toReturn
+	exit function
+end if
+'<--
+
+redim temp(ubound(ThisObj))
+toReturn (Handlepoints)=temp
+toReturn (bboxDim)=temp
+redim temp(1)
+toReturn (MinMax)=temp
+
+For loopOdo=0 to ubound (ThisObj)
+	'TheView(useWorld) is a boolean True or False
+	bbox=rhino.boundingbox (ThisObj(loopOdo),TheView(name),TheView(useWorld))
+	toReturn(bboxDim)(loopOdo)=array(abs(bbox(6)(x)-bbox(0)(x)),abs(bbox(0)(y)-bbox(6)(y)),abs(bbox(6)(z)-bbox(0)(z)))
+	toReturn(handlePoints)(loopOdo)=array(bbox(0)(x)+handlepos(x)*toreturn(bboxDim)(loopOdo)(x),bbox(0)(y)+handlepos(y)*toreturn(bboxDim)(loopOdo)(y),bbox(0)(z)+handlepos(z)*toreturn(bboxDim)(loopOdo)(z))
+	
+	if loopodo=0 then
+		toreturn(minmax)(min)=array(toReturn(handlePoints)(loopOdo)(x),toReturn(handlePoints)(loopOdo)(y),toReturn(handlePoints)(loopOdo)(z))
+		toreturn(minmax)(max)=array(toReturn(handlePoints)(loopOdo)(x),toReturn(handlePoints)(loopOdo)(y),toReturn(handlePoints)(loopOdo)(z))
+	end if
+	'minima
+	if (toreturn(minmax)(min)(x)>toReturn(handlePoints)(loopOdo)(x)) then toreturn(minmax)(min)(x)=toReturn(handlePoints)(loopOdo)(x)
+	if (toreturn(minmax)(min)(y)>toReturn(handlePoints)(loopOdo)(y)) then toreturn(minmax)(min)(y)=toReturn(handlePoints)(loopOdo)(y)
+	if (toreturn(minmax)(min)(z)>toReturn(handlePoints)(loopOdo)(z)) then toreturn(minmax)(min)(z)=toReturn(handlePoints)(loopOdo)(z)
+	'maxima
+	if (toreturn(minmax)(max)(x)<toReturn(handlePoints)(loopOdo)(x)) then toreturn(minmax)(max)(x)=toReturn(handlePoints)(loopOdo)(x)
+	if (toreturn(minmax)(max)(y)<toReturn(handlePoints)(loopOdo)(y)) then toreturn(minmax)(max)(y)=toReturn(handlePoints)(loopOdo)(y)
+	if (toreturn(minmax)(max)(z)<toReturn(handlePoints)(loopOdo)(z)) then toreturn(minmax)(max)(z)=toReturn(handlePoints)(loopOdo)(z)
+next
+
+DoBboxHandles=toReturn
+end function
+
+
+
+'receives
+'	-an integer indicating the size of the zero-based jitter array
+'	-an array of three multiplier values for the amount of jitter on the x,y and z axis (zero turns that axis off)
+'	-boolean to turn jitter on-off (when off it applies a constant delta to all axis, acting as an array filler)
+'	-boolean to use a single random value for all three axis (if true)
+'Returns
+'	-an array of x,y and z random deltas (transformation values)
+function DoJitter(howMany,axis,JitterON,equalXYZ)
+
+const x	=0
+const y	=1
+const z	=2
+
+dim loopOdo
+dim prerequisites
+dim scalar
+dim toReturn	(1)
+dim temp
+
+'->Check prerequisites
+prerequisites=true
+if ((vartype(axis)<8000) or (vartype(howmany)<2 and vartype(howmany)>5) or vartype(JitterON)<>11 or vartype(equalXYZ)<>11) then
+	prerequisites=false
+elseif (ubound(axis)<2) then
+	prerequisites=false
+end if
+
+if prerequisites=false then
+	toReturn(0)=Null
+	toReturn(1)=DoTell(23)(0)
+	DoJitter=toReturn
+	exit function
+end if
+'<--
+
+randomize
+redim temp (howMany)
+toReturn(0)=temp
+
+for loopOdo=0 to howmany
+if (JitterON=true) then
+	scalar=array(rnd*2-1,rnd*2-1,rnd*2-1)
+	if equalXYZ=true then
+		temp=rnd*2-1
+		scalar=array(temp,temp,temp)
+	end if
+	toReturn(0)(loopOdo)=array(axis(x)*(scalar(x)),axis(y)*(scalar(y)),axis(z)*(scalar(z)))
+else
+	toReturn(0)(loopOdo)=array(axis(x),axis(y),axis(z))
+end if
+next
+
+DoJitter=toReturn
+end function
+
+
+
+'Receives
+'	-an array of 3Dpoints
+'	-an array of 3Dpoints
+'	-a string with the operator to use when fusing the two arrays
+'	-an optional (use Null to diactivate) three element array; indicating the new xyz order (ie. array(2,0,1) means swap x:z, y:x and z:y before the operation, array(2,2,2) copies the z axis values to the x and y axis)
+'	-an optional (use Null to diactivate) three element array; indicating the new xyz order (ie. array(2,0,1) means swap x:z, y:x and z:y before the operation)
+'Returns
+'	-the fused array (if succesfull) or -- at(0) Null and at (1) explanation (of error)
+function DoManipulateThese(ThisOne,ThatOne,operator,reorderThis,reorderThat)
+
+const x	=0
+const y	=1
+const z	=2
+
+dim loopOdo
+dim howmany
+dim prerequisites
+dim temp
+dim toReturn	(1)
+
+'-> Check Prerequisites
+prerequisites=true
+if (vartype(ThisOne)<8000 or vartype(operator)<>8) then
+	prerequisites=false 
+elseif vartype(thatone)>=8000 then
+	if (ubound(thisone)<>ubound(thatone)) then
+		prerequisites=false
+	end if
+end if
+
+if prerequisites=false then
+	toReturn(0)=Null
+	toReturn(1)=DoTell(47)(0)
+	DoManipulateThese=toReturn
+	exit function
+end if
+'<--
+
+if (vartype(reorderThis)<8000) then reorderthis=array(0,1,2)
+if (vartype(reorderThat)<8000) then reorderthat=array(0,1,2)
+
+howmany=ubound(ThisOne)
+redim temp (howmany)
+toReturn(0)=temp
+
+for loopOdo=0 to howmany
+toreturn(0)(loopodo)=thisOne(loopodo)
+toreturn(0)(loopodo)(x)=thisOne(loopOdo)(reorderthis(x))
+toreturn(0)(loopodo)(y)=thisOne(loopOdo)(reorderthis(y))
+toreturn(0)(loopodo)(z)=thisOne(loopOdo)(reorderthis(z))
+
+if (isarray(thatOne)) then
+	select case operator
+		case "+"
+			toReturn(0)(loopOdo)(x)=toReturn(0)(loopOdo)(x)+ThatOne(loopOdo)(reorderThat(x))
+			toReturn(0)(loopOdo)(y)=toReturn(0)(loopOdo)(y)+ThatOne(loopOdo)(reorderThat(y))
+			toReturn(0)(loopOdo)(z)=toReturn(0)(loopOdo)(z)+ThatOne(loopOdo)(reorderThat(z))
+		case "*"
+			toReturn(0)(loopOdo)(x)=toReturn(0)(loopOdo)(x)*ThatOne(loopOdo)(reorderThat(x))
+			toReturn(0)(loopOdo)(y)=toReturn(0)(loopOdo)(y)*ThatOne(loopOdo)(reorderThat(y))
+			toReturn(0)(loopOdo)(z)=toReturn(0)(loopOdo)(z)*ThatOne(loopOdo)(reorderThat(z))
+		case else
+	end select
+end if
+
+next
+
+DoManipulateThese=toReturn
+end function
+
+
+
+'Receives
+'	-an array of object IDs
+'	-an array of 3d handle points to move
+'	-an array of deltas
+'	-an array; x,y,z multipliers (zero, turns-off that axis)
+'	-an array containing the view name and cplane orientation(4 points)
+'Returns
+'	-an array the new positions
+function DoTranslate(ThisObj, fromHere, deltas,multiplier,TheView)
+
+const x	=0
+const y	=1
+const z	=2
+
+const name		=0
+const cplanePoints	=1
+const useworld		=2
+
+dim loopOdo
+dim howmany
+dim toHere
+dim epsilon
+dim prerequisites
+dim toReturn(1)
+
+'->Check prerequisites
+prerequisites=true
+if (	(vartype(Thisobj)<8000) or (vartype(fromHere)<8000) or (vartype(deltas(0))<8000) or (vartype(theview)<8000) or _
+	(vartype(multiplier)<8000)) then
+	prerequisites=false
+elseif (ubound(thisObj)<>ubound(fromhere) or ubound(thisObj)<>ubound(deltas) or ubound(multiplier)<2) then
+	prerequisites=false
+end if
+
+if prerequisites=false then
+	toReturn(0)=Null
+	toReturn(1)=DoTell(24)(0)
+	DoTranslate=toReturn
+	exit function
+end if
+'<--
+
+epsilon=Rhino.UnitAbsoluteTolerance
+howmany=ubound(thisobj)
+
+redim toHere (howmany)
+rhino.enableredraw False
+for loopOdo=0 to howmany
+	'Please wait message
+	if (loopodo mod 200)=0 then Rhino.print DoTell(03)(0)&(howmany-loopOdo+1)&DoTell(03)(1)
+
+	if (rhino.currentview<>theview(name)) then rhino.currentview (theView(name))
+	if (abs(deltas(loopodo)(x))>epsilon or abs(deltas(loopodo)(y))>epsilon or abs(deltas(loopodo)(z))>epsilon) then
+		toHere(loopOdo)=array(fromHere(loopOdo)(x)+multiplier(x)*deltas(loopodo)(x),fromHere(loopOdo)(y)+multiplier(y)*deltas(loopodo)(y),fromHere(loopOdo)(z)+multiplier(z)*deltas(loopodo)(z))
+		if theview(UseWorld)=False then
+			fromHere(loopOdo)=rhino.xformcplanetoworld (fromHere(loopOdo),TheView(cplanePoints))
+			toHere(loopOdo)=rhino.xformcplanetoworld (toHere(loopOdo),TheView(cplanePoints))
+		end if
+		rhino.moveobject thisobj(loopOdo), fromHere(loopOdo), toHere(loopOdo)
+	end if
+next
+rhino.enableredraw True
+
+toReturn(0)=toHere
+DoTranslate=toReturn
+
+end function
+
+
+
+'Receives
+'	-an array of ObjectIDs
+'	-an array of bounding box handles
+'	-a three element array;  xyz deltas
+'	-a three element array with multiplier values for the x,y and z axis
+'	-an array of Viewname + Cplane definition points
+'Returns
+'	-True if successful (Null if not)
+'	-adjusts the original ObjectIDs
+function DoRotate(ThisObj,fromHere,angleDeltas,multiplier,TheView)
+
+const x	=0
+const y	=1
+const z	=2
+
+const name		=0
+const cplanePoints	=1
+const useworld		=2
+
+const OriginPoint	=0
+const DirectionPoint=1
+
+dim loopOdo
+dim prerequisites
+dim epsilon
+dim howmany
+dim pi
+dim rotAxis	(1)
+dim axis		(2)
+dim toReturn	(1)
+dim rotAxisVector
+
+'->Check prerequisites
+prerequisites=true
+if (	(vartype(ThisObj)<8000) or (vartype(fromhere)<8000) or (vartype(angledeltas)<8000) or _
+	(vartype(multiplier)<8000) or (vartype(theview)<8000) ) then
+	prerequisites=false
+elseif (Ubound(thisobj)<>ubound(fromhere) or Ubound(thisobj)<>ubound(angledeltas) or ubound(multiplier)<2) then
+	prerequisites=false
+end if
+
+if prerequisites=false then
+	toReturn(0)=Null
+	toReturn(1)=DoTell(25)(0)
+	DoRotate=toReturn
+	exit function
+end if
+'<--
+
+pi=atn(1)*4
+epsilon=Rhino.UnitAbsoluteTolerance*180/pi 'angle in degrees
+howmany=ubound (thisobj)
+
+rhino.enableredraw False
+for loopOdo=0 to howmany
+	'Please wait message
+	if (loopodo mod 200)=0 then Rhino.print DoTell(03)(2)&(howmany-loopOdo+1)&DoTell(03)(1)
+
+	if (rhino.currentview<>theview(name)) then rhino.currentview (theView(name))
+	'rhino.RotateObject requires input in world coordinates for origin
+	rotaxis(originPoint)=rhino.xformcplanetoworld(fromhere(loopOdo),theView(cplanepoints))
+	if abs(angledeltas(loopOdo)(x))>epsilon then
+		rotaxis(DirectionPoint)=array(fromhere(loopOdo)(x)+1,fromhere(loopOdo)(y),fromhere(loopOdo)(z))
+		rotaxis(DirectionPoint)=rhino.xformcplanetoworld(rotaxis(DirectionPoint),theView(cplanepoints))
+		rotAxisVector=Rhino.Vectorcreate(rotaxis(originPoint),rotaxis(DirectionPoint))
+		ThisObj(loopOdo)=rhino.Rotateobject (ThisObj(loopOdo),rotaxis(originpoint),multiplier(x)*angledeltas(loopOdo)(x),rotAxisVector)
+	end if
+	if abs(angledeltas(loopOdo)(y))>epsilon then
+		rotaxis(DirectionPoint)=array(fromhere(loopOdo)(x),fromhere(loopOdo)(y)+1,fromhere(loopOdo)(z))
+		rotaxis(DirectionPoint)=rhino.xformcplanetoworld(rotaxis(DirectionPoint),theView(cplanepoints))
+		rotAxisVector=Rhino.Vectorcreate(rotaxis(originPoint),rotaxis(DirectionPoint))
+		ThisObj(loopOdo)=rhino.Rotateobject (ThisObj(loopOdo),rotaxis(originpoint),multiplier(y)*angledeltas(loopOdo)(y),rotAxisVector)
+	end if
+	if abs(angledeltas(loopOdo)(z))>epsilon then
+		rotaxis(DirectionPoint)=array(fromhere(loopOdo)(x),fromhere(loopOdo)(y),fromhere(loopOdo)(z)+1)
+		rotaxis(DirectionPoint)=rhino.xformcplanetoworld(rotaxis(DirectionPoint),theView(cplanepoints))
+		rotAxisVector=Rhino.Vectorcreate(rotaxis(originPoint),rotaxis(DirectionPoint))
+		ThisObj(loopOdo)=rhino.Rotateobject (ThisObj(loopOdo),rotaxis(originpoint),multiplier(z)*angledeltas(loopOdo)(z),rotAxisVector)
+	end if
+next
+rhino.enableredraw True
+
+toReturn(0)=True
+DoRotate=toReturn
+
+end function
+
+
+
+'sort (using selection-sort algorithm, for now)
+'Receives:
+'	-an array of arrays to synchronize (reflect the new sorting order)
+'	-an array of targets (3D points) to be sorted (bounding box handles)
+'	-an integer from 0 to 2 indicating which axis to sort
+'Returns
+'	-(it rearranges the original arrays)
+'	-returns True if successful (otherwise Null)
+function DoSortPT(ArraySync,ThisPoint,ThisAxis)
+
+const val	=0
+const pos	=1
+
+dim LoopOuter
+dim LoopInner
+dim epsilon
+dim lastObj
+dim prerequisites
+
+dim temp		()
+dim test		(1)
+dim toReturn	(1)
+
+'->Check prerequisites
+prerequisites=true
+if ((vartype(ArraySync)<8000) or (vartype(ThisPoint)<8000) or vartype(ThisAxis)<>2 ) then
+	prerequisites=false
+elseif (ubound(ThisPoint)<1) then
+	prerequisites=false
+end if
+
+if prerequisites=false then
+	toReturn(0)=Null
+	toReturn(1)=DoTell(26)(0)
+	DoSortPT=toReturn
+	exit function
+end if
+'<--
+
+epsilon=rhino.unitabsoluteTolerance
+lastObj=ubound(ThisPoint)
+
+'The <ThisPoint> has at least two elements
+for LoopOuter=0 to lastObj
+	test(val)=ThisPoint(loopOuter)
+	test(pos)=loopOuter
+	for LoopInner=LoopOuter to lastObj
+		if ( (ThisPoint(LoopInner)(ThisAxis)) < test(val)(ThisAxis) ) then
+			test(val)=ThisPoint(LoopInner)
+			test(pos)=LoopInner
+
+		'If the position is identical on thisAxis then sort on the other axis
+		'elseif (abs(ThisPoint(LoopInner)(ThisAxis)-test(val))<epsilon) then
+		' to do
+
+		end if
+	next
+	ThisPoint(test(pos))=ThisPoint(LoopOuter)
+	ThisPoint(LoopOuter)=test(val)
+
+	'Synchronize the rest of the arrays
+	for loopInner=0 to ubound (arraySync)
+		test(val)=ArraySync(loopInner)(test(pos))
+		ArraySync(loopInner)(Test(pos))=ArraySync(loopInner)(LoopOuter)
+		ArraySync(loopInner)(LoopOuter)=test(val)
+	next
+next
+
+toReturn(0)=True
+DoSortPT=toReturn
+
+end function
+
+
+
+'Receives:
+'	-an array of ObjectIDs
+'	-an array of transformation origin 3D points (corresponding to each ObjectID)
+'	-The axis to sort (this is a value 0,1 or 2)
+'	-a boolean (True will space equally by handlePoints, otherwise by the BoxEdges)
+'Returns
+'	-an array of the necessary deltas that when applied to the transformation origin will make the objects equidistant or equispaced
+function DoEquidistant(thisObj,BoxAttrib,ThisAxis,byHandles)
+
+const span	=0
+const delta	=1
+const spacing	=2
+const cummul	=3
+
+const handlePT	=0
+const thick	=1
+
+dim test
+dim loopOdo
+dim LastObj
+dim prerequisites
+
+dim dist		(3)
+dim arraySync	(1)
+dim toReturn	(1)
+dim temp		()
+
+'->Check prerequisites
+prerequisites=true
+if ((vartype(thisObj)<8000) or (vartype(BoxAttrib)<8000) or vartype(thisaxis)<>2 or vartype(byHandles)<>11 ) then
+	prerequisites=false
+end if
+
+if prerequisites=false then
+	toReturn(0)=Null
+	toReturn(1)=DoTell(27)(0)
+	DoEquidistant=toReturn
+	exit function
+end if
+'<--
+
+arraysync(0)=ThisObj
+arraysync(1)=BoxAttrib(thick)
+test=DoSortPT(ArraySync,BoxAttrib(HandlePT),ThisAxis)
+ThisObj=arraysync(0)
+BoxAttrib(thick)=arraysync(1)
+
+if isNull(test(0)) then
+	toReturn(0)=Null
+	toReturn(1)=test(1) 'return the error code of sortPT
+	DoEquidistant=toReturn
+	exit function
+end if
+
+LastObj=ubound(ThisObj)
+dist(span)=abs(BoxAttrib(HandlePT)(0)(ThisAxis)-BoxAttrib(HandlePT)(LastObj)(ThisAxis))
+dist(spacing)=0
+
+if byHandles<>True then 'spacing between bounting box edges instead of objects centers)
+	for loopOdo=0 to lastObj
+		dist(spacing)=dist(spacing)+BoxAttrib(thick)(loopOdo)(thisAxis)
+	next
+	dist(spacing)=dist(spacing)-BoxAttrib(thick)(0)(ThisAxis)/2 - BoxAttrib(thick)(lastObj)(ThisAxis)/2
+end if
+dist(spacing)=(dist(span)-dist(spacing))/lastObj
+dist(cummul)= -1*BoxAttrib(thick)(0)(thisAxis)/2
+
+'lastObj is also the number of segments
+redim temp (LastObj)
+toReturn(0)=temp
+for loopOdo=0 to LastObj
+	if byHandles=True then 'spacing between object transformation points (instead of box edges)
+		dist(delta)=(dist(spacing)*loopOdo+BoxAttrib(HandlePT)(0)(ThisAxis)) - BoxAttrib(HandlePT)(LoopOdo)(ThisAxis)
+	else 'spacing between box edges
+		dist(cummul)=dist(cummul) + BoxAttrib(thick)(loopOdo)(ThisAxis)/2
+		dist(delta)=dist(cummul) + BoxAttrib(HandlePT)(0)(ThisAxis) - BoxAttrib(HandlePT)(LoopOdo)(ThisAxis)
+		dist(cummul)=dist(cummul) + BoxAttrib(thick)(loopOdo)(ThisAxis)/2 + dist(spacing)
+	end if
+	if thisAxis=0 then toreturn(0)(LoopOdo)=array(dist(delta),0,0)
+	if thisAxis=1 then toreturn(0)(LoopOdo)=array(0,dist(delta),0)
+	if thisAxis=2 then toreturn(0)(LoopOdo)=array(0,0,dist(delta))
+next
+
+DoEquidistant=toReturn
+end function
+
+
+
+'Receives
+'	-a string (Control surface ID)
+'	-an array of 3D handle points
+'	-a value 0 to 1 indicating a percentage of height of the surface bounding box that will act as the datum
+'	-a boolean to force boxZ values within the 0-1 range (otherwise datums are allowed to fall outside the surface box)
+'	-an array with view name and view cplane 3Dpoints
+'Returns
+'	-an array of Z-deltas (from the surface-box datum level to the surface itself)
+'	-the sum of all Z-deltas
+'	-an array of distances from each handle point to the surface (ceiling)
+function DoSurfaceDeltas(SurfID,HandlePT,BoxZ,BoxConstrain,TheView)
+
+'make bounding box for SurfID to get max/min coordinates (surface footprint)
+'corrolate the bounding box flat base to the UV space of the surface
+'evaluate only the flux of handle-points that passes through the bounding box base.
+
+const x	=0
+const y	=1
+const z	=2
+
+const U	=0
+const V	=1
+
+const corner		=0
+const horiz		=1
+
+const origin		=0
+const antiOrigin	=1
+const maxU		=2
+const maxV		=3
+const minU		=4
+const minV		=5
+
+const onSurf	=0
+
+const name		=0
+const cplanepoints	=1
+const useworld		=2
+
+const Zdeltas		=0
+const sumDelta		=1
+const ceiling		=2
+
+dim loopOdo
+dim HowMany
+dim prerequisites
+
+dim SurfBox
+dim boxRange
+dim surfPoint	(3)
+dim toReturn	(2)
+dim Point		(0)
+dim surfDomain	(1)
+dim surfParam	(1)
+dim SrfRange	(1)
+dim flip		(2)
+dim angle		(1)
+dim temp
+
+'->Check prerequisites
+prerequisites=true
+if ((vartype(surfID)<>8) or (vartype(HandlePT)<8000) or (vartype(TheView)<8000) or vartype(boxConstrain)<>11 or _
+	vartype(boxZ)<2 or vartype(boxZ)>5) then
+	prerequisites=false
+	toReturn(1)=DoTell(28)(0)
+end if
+
+if not rhino.issurface(surfID) then
+	prerequisites=false
+	toReturn(1)=DoTell(31)(0)
+end if
+
+if rhino.issurfaceTrimmed (surfID) then
+	prerequisites=false
+	toReturn(1)=DoTell(32)(0)
+end if
+
+if prerequisites=false then
+	toReturn(Zdeltas)=Null
+	DoSurfaceDeltas=toReturn
+	exit function
+end if
+'<--
+
+'BoxZ is a percentage of height
+if (boxConstrain=true and boxZ>1) then boxZ=1
+if (boxConstrain=true and boxZ<0) then boxZ=0
+
+SurfBox=rhino.boundingbox (surfID,TheView(name),TheView(UseWorld))
+BoxRange=array(surfbox(6)(x)-surfbox(0)(x),surfbox(6)(y)-surfbox(0)(y),surfbox(6)(z)-surfbox(0)(z))
+
+surfDomain(U)=Rhino.SurfaceDomain(surfID, U)
+surfDomain(V)=Rhino.SurfaceDomain(surfID, V)
+SrfRange(U)=surfdomain(U)(1)-surfdomain(U)(0)
+SrfRange(V)=surfdomain(V)(1)-surfdomain(V)(0)
+
+SurfPoint(origin)=rhino.evaluateSurface (SurfID,array(SurfDomain(U)(0),SurfDomain(V)(0)))
+SurfPoint  (MaxU)=rhino.evaluateSurface (SurfID,array(SurfDomain(U)(1),SurfDomain(V)(0)))
+SurfPoint  (MaxV)=rhino.evaluateSurface (SurfID,array(SurfDomain(U)(0),SurfDomain(V)(1)))
+
+SurfPoint(origin)=rhino.xformworldtocplane(SurfPoint(origin),theview(cplanepoints))
+SurfPoint  (MaxU)=rhino.xformworldtocplane(SurfPoint(MaxU),theview(cplanepoints))
+SurfPoint  (MaxV)=rhino.xformworldtocplane(SurfPoint(MaxV),theview(cplanepoints))
+
+
+angle(corner)=DoVectorAngle(SurfPoint(MaxU),SurfPoint(MaxV),SurfPoint(origin),False,2)
+angle(horiz)=DoVectorAngle(SurfPoint(MaxU),array(SurfPoint(origin)(x)+10,SurfPoint(origin)(y),SurfPoint(origin)(z)),SurfPoint(origin),False,2)
+
+'rhino.addpoint SurfPoint(Origin) 'debug only
+'rhino.print " db corner angle="&(angle(corner)) 'debug only
+'rhino.print " db horiz angle="&(angle(horiz)) 'debug only
+'rhino.print " OrigX="&SurfPoint(origin)(x)&" origY="&SurfPoint(origin)(y) 'debug only
+'rhino.print " MaxX="&SurfPoint(MaxU)(x)&" MaxY="&SurfPoint(MaxV)(y) 'debug only
+'rhino.print " RangeU="&SrfRange(U)&" RangeV="&SrfRange(V) 'debug only
+'rhino.print " DomU max="&surfdomain(U)(1)&" DomU min="&surfdomain(U)(0) 'debug only
+'rhino.print " DomV max="&surfdomain(V)(1)&" DomU min="&surfdomain(V)(0) 'debug only
+
+flip(0)=array(0,0)
+flip(1)=array(0,0)
+flip(2)=array(x,y)
+if (isNull(angle(corner))) then
+	toReturn(Zdeltas)=Null
+	toReturn(1)=DoTell(33)(0)&" <"&theView(name)&">"
+	DoSurfaceDeltas=toReturn
+	exit function
+elseif (isNull(angle(horiz))) then
+	toReturn(Zdeltas)=Null
+	toReturn(1)=DoTell(34)(0)&" <"&theView(name)&">"
+	DoSurfaceDeltas=toReturn
+	exit function
+elseif (abs(angle(corner))<80 or abs(angle(corner))>100) then
+	toReturn(Zdeltas)=Null
+	toReturn(1)=DoTell(29)(0)
+	DoSurfaceDeltas=toReturn
+	exit function
+elseif (abs(angle(horiz) mod 90)>5) then
+	toReturn(Zdeltas)=Null
+	toReturn(1)=DoTell(30)(0)
+	DoSurfaceDeltas=toReturn
+	exit function
+elseif (abs(angle(horiz)>(90-5)) and abs(angle(horiz)<(90+5))) then
+	'if U runs along the y axis then map U-->y and V-->x
+	flip(2)=array(y,x)
+end if
+
+if (SurfPoint(Origin)(flip(2)(x))-SurfPoint(MaxU)(flip(2)(x))<0) then flip(1)(U)=-1 else flip(1)(U)=1 end if
+if (SurfPoint(Origin)(flip(2)(y))-SurfPoint(MaxV)(flip(2)(y))<0) then flip(1)(V)=-1 else flip(1)(V)=1 end if
+flip(0)(U)=(flip(1)(U)+1)/2 'result is either 0 or 1
+flip(0)(V)=(flip(1)(V)+1)/2 'result is either 0 or 1
+
+HowMany=ubound(HandlePT)
+redim temp (HowMany)
+toReturn(Zdeltas)=temp
+toReturn(ceiling)=temp
+toreturn(sumdelta)=array(0)
+toreturn(sumdelta)(0)=array(0,0,0)
+rhino.enableredraw False
+for loopOdo = 0 to HowMany
+	'Please wait message
+	if (loopodo mod 200)=0 then Rhino.print DoTell(03)(4)&(howmany-loopodo+1)&DoTell(03)(01)
+	if (rhino.currentview<>theview(name)) then rhino.currentview (theView(name))
+	'evaluate only points that are within the XY boundaries of the surface bounding box
+	if ((handlePT(loopOdo)(x)>SurfBox(0)(x) and handlePT(loopOdo)(x)<SurfBox(6)(x)) and _
+	    (handlePT(loopOdo)(y)>SurfBox(0)(y) and handlePT(loopOdo)(y)<SurfBox(6)(y))) then
+		surfParam(U)=surfdomain(U)(0)+flip(1)(U)* (flip(0)(U)*SrfRange(U) - SrfRange(U)*(handlePT(loopOdo)(flip(2)(x))-surfbox(0)(flip(2)(x)))/BoxRange(flip(2)(x)))
+		surfParam(V)=surfdomain(V)(0)+flip(1)(V)* (flip(0)(V)*SrfRange(V) - SrfRange(V)*(handlePT(loopOdo)(flip(2)(y))-surfbox(0)(flip(2)(y)))/BoxRange(flip(2)(y)))
+		point(onSurf)=rhino.evaluateSurface (SurfID,SurfParam)
+		'rhino.addpoint (point(onsurf)) 'debug only
+		if Theview(Useworld)=False then point(onSurf)=rhino.xformworldtocplane(point(onSurf),theview(cplanepoints))
+		'Deltas are exclusively on the Z axis (relative to cplane)
+		toReturn(Zdeltas)(loopOdo)=array(0,0,point(onsurf)(z)-surfBox(0)(z)-(BoxZ*(surfBox(6)(z)-surfBox(0)(z))))
+		toReturn(ceiling)(loopOdo)=array(0,0,point(onsurf)(z)-handlePT(loopOdo)(z))
+	else
+		toReturn(Zdeltas)(loopOdo)=array(0,0,0)
+		toReturn(ceiling)(loopOdo)=array(0,0,0)
+	end if
+
+	toreturn(sumdelta)(0)(x)=toreturn(sumdelta)(0)(x)+toReturn(Zdeltas)(loopOdo)(x)
+	toreturn(sumdelta)(0)(y)=toreturn(sumdelta)(0)(y)+toReturn(Zdeltas)(loopOdo)(y)
+	toreturn(sumdelta)(0)(z)=toreturn(sumdelta)(0)(z)+toReturn(Zdeltas)(loopOdo)(z)
+next
+rhino.enableredraw True
+
+DoSurfaceDeltas=toReturn
+end function
+
+
+
+'Receives
+'	-an array of strings (object IDs)
+'	-an array of 3D points (bounding box handles)
+'	-an array of 3D delta values (xyz)
+'	-an array of xyz real numbers as scale multipliers for each axis (array(1,1,1) leaves all axis unchanged)
+'	-an array with view name and view cplane 3Dpoints
+'Returns
+'	-an array of the new (scaled) object IDs
+function DoScale(ThisObj, HandlePT, deltas,axis,theView)
+
+const x	=0
+const y	=1
+const z	=2
+
+const name		=0
+const cplanePoints	=1
+const useworld		=2
+
+dim loopOdo
+dim prerequisites
+dim Howmany
+dim oneDelta
+dim origin
+
+dim toReturn	(1)
+dim temp		()
+
+'->Check prerequisites
+prerequisites=true
+if ((vartype(thisobj)<8000) or (vartype(handlePT)<8000) or (vartype(deltas)<8000) or (vartype(axis)<8000) or (vartype(theview)<8000) ) then
+	prerequisites=false
+elseif (ubound(ThisObj)<>ubound(handlePT) or ubound(ThisObj)<>ubound(deltas) or ubound(axis)<2) then
+	prerequisites=false
+end if
+
+if prerequisites=false then
+	toReturn(0)=Null
+	toReturn(1)=DoTell(48)(0)
+	DoScale=toReturn
+	exit function
+end if
+'<--
+
+Howmany=ubound(handlePT)
+redim temp(Howmany)
+toreturn(0)=temp
+rhino.enableredraw False
+
+for loopOdo=0 to Howmany
+	'Please wait message
+	if (loopodo mod 200)=0 then Rhino.print DoTell(03)(3)&(howmany-loopOdo+1)&DoTell(03)(1)
+
+	if (rhino.currentview<>theview(name)) then rhino.currentview (theView(name))
+	'Scale of "1" implies no-change ( "0" collapses the object)
+	oneDelta=array(deltas(loopOdo)(x)*axis(x)+1,deltas(loopOdo)(y)*axis(y)+1,deltas(loopOdo)(z)*axis(z)+1)
+	'Note: rhino.Scale requires input in world coordinates for origin
+	origin=rhino.xformcplanetoworld (HandlePT(loopOdo),theView(cplanePoints))
+	'Note: rhino.Scale is based on the active contstruction plane
+	toReturn(0)(loopOdo)=rhino.ScaleObject(ThisObj(loopOdo),origin,onedelta)
+next
+rhino.enableredraw True
+
+DoScale=toReturn
+end function
+
+
+
+'Receive
+'	-an array of hadle points
+'	-a three element (xyz) array of two element minmax arrays
+'	-an array holding the individual deltas
+'	-a three element array holding the total sum of all deltas in the x,y and z axis
+'	-a three element array indicating which axis to affect
+'Return
+'	an array of the adjusted deltas
+'	Performs displacement without moving the outer objects
+function DoProportionize(HandlePT,HandlePtMinMax,RawDeltas,SumDeltas,axisMulti)
+
+const x	=0
+const y	=1
+const z	=2
+
+const min	=0
+const max	=1
+
+dim prerequisites
+dim epsilon
+dim loopOdo
+dim howmany
+dim spike
+
+dim from
+dim scalar	(2)
+dim span		(2)
+dim toReturn	(1)
+dim temp		()
+
+'->Check prerequisites
+prerequisites=true
+if ((vartype(HandlePT)<8000) or (vartype(HandlePtMinMax)<8000) or (vartype(rawdeltas)<8000) or (vartype(sumDeltas)<8000) or (vartype(axisMulti)<8000) ) then
+	prerequisites=false
+elseif (ubound(handlePT)<>ubound(rawdeltas) or ubound(axisMulti)<2) then
+	prerequisites=false
+end if
+
+if prerequisites=false then
+	toReturn(0)=Null
+	toReturn(1)=DoTell(49)(0)
+	DoProportionize=toReturn
+	exit function
+end if
+'<--
+
+epsilon=rhino.unitabsoluteTolerance
+
+spike=DoSpikeDeltas(HandlePT,HandlePtMinMax,RawDeltas,SumDeltas,axisMulti)
+'using spans instead of absolute (can't assume that HandlePT is sorted and that the last is the furthest one)
+span(x)=HandlePtMinMax(max)(x)-HandlePtMinMax(min)(x)
+span(y)=HandlePtMinMax(max)(y)-HandlePtMinMax(min)(y)
+span(z)=HandlePtMinMax(max)(z)-HandlePtMinMax(min)(z)
+
+if (abs(span(x)+spike(0)(max)(x)-spike(0)(min)(x))>epsilon) then scalar(x)=span(x)/(span(x)+spike(0)(max)(x)-spike(0)(min)(x)) else scalar(x)=1
+if (abs(span(y)+spike(0)(max)(y)-spike(0)(min)(y))>epsilon) then scalar(y)=span(y)/(span(y)+spike(0)(max)(y)-spike(0)(min)(y)) else scalar(y)=1
+if (abs(span(z)+spike(0)(max)(z)-spike(0)(min)(z))>epsilon) then scalar(z)=span(z)/(span(z)+spike(0)(max)(z)-spike(0)(min)(z)) else scalar(z)=1
+'rhino.print "db span after="&abs(span(x)+spike(0)(max)(x)-spike(0)(min)(x)) 'deb
+'rhino.print "db spike min="&spike(0)(min)(x)&" spike max="&spike(0)(max)(x)
+
+howmany=ubound(handlePt)
+redim temp(howmany)
+toreturn(0)=temp
+from=array(0,0)
+from(min)=array(0,0,0)
+from(max)=array(0,0,0)
+
+for loopOdo=0 to howmany
+from(Min)(x)=(handlePT(loopOdo)(x)-HandlePtMinMax(min)(x))
+from(Min)(y)=(handlePT(loopOdo)(y)-HandlePtMinMax(min)(y))
+from(Min)(z)=(handlePT(loopOdo)(z)-HandlePtMinMax(min)(z))
+toreturn(0)(loopOdo)=array(RawDeltas(loopOdo)(x),RawDeltas(loopOdo)(y),RawDeltas(loopOdo)(z))
+toReturn(0)(loopOdo)(x)=scalar(x)*(from(Min)(x)-spike(0)(min)(x)+axisMulti(x)*rawDeltas(loopOdo)(x))-from(Min)(x)
+toReturn(0)(loopOdo)(y)=scalar(y)*(from(Min)(y)-spike(0)(min)(y)+axisMulti(y)*rawDeltas(loopOdo)(y))-from(Min)(y)
+toReturn(0)(loopOdo)(z)=scalar(z)*(from(Min)(z)-spike(0)(min)(z)+axisMulti(z)*rawDeltas(loopOdo)(z))-from(Min)(z)
+'toReturn(0)(loopOdo)(y)=scalar(y)*(from(Min)(y)+axisMulti(y)*rawDeltas(loopOdo)(y))-from(Min)(y)
+'toReturn(0)(loopOdo)(z)=scalar(z)*(from(Min)(z)+axisMulti(z)*rawDeltas(loopOdo)(z))-from(Min)(z)
+next
+
+DoProportionize=toReturn
+end function
+
+
+
+'Receives
+'	-an array of hadle points
+'	-a three element (xyz) array of two element minmax arrays
+'	-an array holding the individual deltas
+'	-a three element array holding the total sum of all deltas in the x,y and z axis
+'	-a three element array indicating which axis to affect
+'Returns
+'	-a two element array of xyz min-max delta spikes 
+'(if a delta is added to a handlePT how far will it protrude beyond the current boundaries of the cluster)
+function DoSpikeDeltas(HandlePT,HandlePtMinMax,RawDeltas,SumDeltas,axisMulti)
+
+const x	=0
+const y	=1
+const z	=2
+
+const min	=0
+const max	=1
+
+dim howmany
+dim loopOdo
+dim adjustedDelta
+dim from
+
+dim span		(2)
+dim toReturn	(1)
+dim temp		()
+
+'use spans instead of absolute (can't assume that HandlePT is sorted and that the last is the furthest one)
+span(x)=HandlePtMinMax(max)(x)-HandlePtMinMax(min)(x)
+span(y)=HandlePtMinMax(max)(y)-HandlePtMinMax(min)(y)
+span(z)=HandlePtMinMax(max)(z)-HandlePtMinMax(min)(z)
+
+howmany=ubound (HandlePT)
+redim temp(1)
+toReturn(0)=temp
+from=temp
+toReturn(0)(min)=array(abs(sumdeltas(0)(x)),abs(sumdeltas(0)(y)),abs(sumdeltas(0)(z)))
+toReturn(0)(max)=array(-abs(sumdeltas(0)(x)),-abs(sumdeltas(0)(y)),-abs(sumdeltas(0)(z)))
+from(min)=array(0,0,0)
+from(max)=array(span(x),span(y),span(z))
+
+for loopOdo=0 to howmany
+from(Min)(x)=(handlePT(loopOdo)(x)-HandlePtMinMax(min)(x))
+from(Min)(y)=(handlePT(loopOdo)(y)-HandlePtMinMax(min)(y))
+from(Min)(z)=(handlePT(loopOdo)(z)-HandlePtMinMax(min)(z))
+from(Max)(x)=span(x)-from(min)(x)
+from(Max)(y)=span(y)-from(min)(y)
+from(Max)(z)=span(z)-from(min)(z)
+
+adjustedDelta=array(axisMulti(x)*RawDeltas(loopOdo)(x),axisMulti(y)*RawDeltas(loopOdo)(y),axisMulti(z)*RawDeltas(loopOdo)(z))
+'maxima
+if (from(Min)(x)+adjustedDelta(x)>(span(x)+toReturn(0)(max)(x))) then toReturn(0)(max)(x)=from(Min)(x)+adjustedDelta(x)-span(x)
+if (from(Min)(y)+adjustedDelta(y)>(span(y)+toReturn(0)(max)(y))) then toReturn(0)(max)(y)=from(Min)(y)+adjustedDelta(y)-span(y)
+if (from(Min)(z)+adjustedDelta(z)>(span(z)+toReturn(0)(max)(z))) then toReturn(0)(max)(z)=from(Min)(z)+adjustedDelta(z)-span(z)
+'minima
+if (from(Min)(x)+adjustedDelta(x)<(toReturn(0)(min)(x))) then toReturn(0)(min)(x)=from(Min)(x)+adjustedDelta(x)
+if (from(Min)(y)+adjustedDelta(y)<(toReturn(0)(min)(y))) then toReturn(0)(min)(y)=from(Min)(y)+adjustedDelta(y)
+if (from(Min)(z)+adjustedDelta(z)<(toReturn(0)(min)(z))) then toReturn(0)(min)(z)=from(Min)(z)+adjustedDelta(z)
+'rhino.print "db "&from(Min)(x)+adjustedDelta(x)&" >"&span(x)+toReturn(0)(max)(x)
+next
+
+DoSpikeDeltas=toReturn
+end function
+
+
+
+'Dot product
+'requires:
+'	-invcos
+'Receives:
+'	-a 3d point (the tip of the first vector)
+'	-a 3d point (the tip of the second vector)
+'	-a 3d point (the origin of the two vectors)
+'	-a boolean to turn radians on-off
+'	-the axis to project the vectors to (Null turns this option off)
+'Returns:
+'	-the angle between the two vectors
+function DoVectorAngle(a,b,origin,inRad,projectTo)
+const x	=0
+const y	=1
+const z	=2
+
+dim TempA(2),TempB(2),magA,MagB,theProduct,epsilon
+dim prerequisites
+
+'->Check prerequisites
+prerequisites=true
+if ((vartype(a)<8000) or (vartype(b)<8000) or (vartype(origin)<8000) or (vartype(inRad)<>11) ) then
+	prerequisites=false
+elseif (ubound(a)<2 or ubound (b)<2 or ubound(origin)<2) then
+	prerequisites=false
+end if
+
+if prerequisites=false then
+	toReturn(0)=Null
+	toReturn(1)=DoTell(50)(0)
+	DoVectorAngle=toReturn
+	exit function
+end if
+'<--
+
+epsilon=rhino.unitabsoluteTolerance
+
+if (not isnull(projectTo)) then
+if (projectTo>=0 and projectTo<=2) then
+	a(projectTo)=origin(projectTo)
+	b(projectTo)=origin(projectTo)
+end if
+end if
+
+if (isarray(a) and isarray(b) and isarray(origin)) then
+	TempA(x)=a(x)-origin(x)
+	TempA(y)=a(y)-origin(y)
+	TempA(z)=a(z)-origin(z)
+	TempB(x)=b(x)-origin(x)
+	TempB(y)=b(y)-origin(y)
+	TempB(z)=b(z)-origin(z)
+	magA=sqr(TempA(x)^2+TempA(y)^2+TempA(z)^2)
+	magB=sqr(TempB(x)^2+TempB(y)^2+TempB(z)^2)
+	
+	if (magA<epsilon or magB<epsilon) then
+		DoVectorAngle=Null
+		exit function
+	end if
+
+	theProduct=TempA(x)*TempB(x)+TempA(y)*TempB(y)+TempA(z)*TempB(z)
+	DoVectorAngle=DoInvCos((theProduct/(magA*magB)),inRad)
+else
+	DoVectorAngle=Null
+end if
+end function
+
+
+
+'inverse cosine
+'Receives
+'	-the angle (in radians or degrees)
+'	-a boolean to turn radians on-off
+'returns:
+'	-radians if input is radians, returns degrees if input is degrees
+function DoInvCos(x,inRad)
+dim pi
+pi=atn(1)*4
+if (x<>1 and x<>-1) then DoInvCos=Atn(-X / Sqr(-(X^2) + 1)) + 2 * Atn(1)
+if (x=1) then DoInvCos=0
+if (x=-1) then DoInvCos=pi
+if (inRad=False) then DoInvCos=180*DoInvCos/pi
+end function
+
+
+
+'Receives
+'	-Version number to check
+'Returns
+'	-True or False if current version is newer (or the same).
+function DoVersionCheck(desiredVersion)
+If (clng(Rhino.Version) < clng(desiredVersion)) then
+	Rhino.print DoTell(20)(0)&DoTell(35)(0)&" <"&clng(desiredVersion)&"> "&DoTell(35)(1)&"("&DoTell(35)(2)&Rhino.Version&")."
+	DoVersionCheck=false
+else
+	DoVersionCheck=True
+end if
+end function
+
+
+
+'Receives
+'	-Nothing
+'Returns
+'	-the default values for the <UserSays> array
+function DoGetDefaults(choice)
+'ToDo: Save/Restore defaults from document
+const every		=-1
+const TargetObjects	=0
+const Surface		=1
+const NoAction		=2
+const Equidist		=3
+const Align		=4
+const Displace		=5
+const Rotate		=6
+const Scale		=7
+const Jitter		=8
+const Handle		=9
+const SurfaceDatum	=10
+
+dim SuggestDefault(10)
+
+'Defaults
+'[True/False]
+SuggestDefault(NoAction)	=array(true)
+
+'[axis,Handles/Boxedges]
+if (choice=every or choice=equidist) then _
+	SuggestDefault(Equidist)	=array(false,true)
+
+'[alignTo,distance] (alignTo=0,1,2,Surface,False)
+if (choice=every or choice=Align) then _
+	SuggestDefault(Align)	=array(false,0)
+
+'[x,y,z,surf,constrain]
+if (choice=every or choice=Displace) then _
+	SuggestDefault(Displace)	=array(0,0,0,false,false)
+
+'[x,y,z,surf]
+if (choice=every or choice=Rotate) then _
+	SuggestDefault(Rotate)	=array(0,0,0,false)
+
+'[x,y,z,surf]
+if (choice=every or choice=Scale) then _
+	SuggestDefault(Scale)	=array(0,0,0,false)
+
+'[x,y,z,surf][x,y,z,surf][x,y,z,surf],[default (value from 0 to 3)]
+if (choice=every or choice=Jitter) then _
+	SuggestDefault(Jitter)	=array(array(0,0,0,false),array(0,0,0,false),array(0,0,0,false),3)
+
+'[x,y,z]
+if (choice=every or choice=Handle) then _
+	SuggestDefault(Handle)	=array(0.5,0.5,0.5)
+	
+if (choice=every or choice=SurfaceDatum) then _
+	SuggestDefault(SurfaceDatum)=array(0)
+
+if (choice=every) then DoGetDefaults=SuggestDefault else DoGetDefaults=SuggestDefault(choice)
+
+end function
+
+
+
+'Receives
+'	-The current state of the userSays array
+'	-a string indicating the summary format/style to use
+'Returns
+'	-a string for display of only the active features selected by the user
+function DoSummary(userSays,SummaryType)
+
+const Surface		=1
+const NoAction		=2
+const Equidist		=3
+const Align		=4
+const Displace		=5
+const Rotate		=6
+const Scale		=7
+const Jitter		=8
+const Handle		=9
+const SurfaceDatum	=10
+
+const x	=0
+const y	=1
+const z	=2
+
+const MainMenu		=7
+const SubMenu		=8
+
+dim act
+dim TempString
+dim toReturn (1)
+
+if not isarray(usersays) then
+	toReturn(0)=null
+	toReturn(1)=""
+	DoSummary=toReturn
+	exit function
+end if
+
+act=0 'counts the requested actions
+
+Select case SummaryType
+
+	case DoTell(04)(0) 'Main Menu
+		toReturn(0)=DoTell(10)(0)
+		if DidRequested(Equidist,usersays)(0) then
+			tempString=DoSwapEquivalent(usersays(Equidist)(0),array(0,1,2),DoTell(09),true)(0)
+			toReturn(0)=toReturn(0)&" ["&DoTell(MainMenu)(0)&"="&tempString&","
+			tempstring=DoSwapEquivalent(usersays(equidist)(1),DoTell(11),array(true,false),false)(0)
+			toReturn(0)=toReturn(0)&tempstring&"]"
+			act=act+1
+		end if
+		if DidRequested(Align,usersays)(0) then
+			tempString=DoSwapEquivalent(usersays(align)(0),DoAppend(array(DoTell(10)(5),DoTell(10)(4)),DoTell(09))(0),array(0,1,2,3,false),false)(0)
+			toReturn(0)=toReturn(0)&" ["&DoTell(MainMenu)(1)&"="&tempString
+			if usersays(Align)(0)<>3 then toReturn(0)=toReturn(0)&","&userSays(align)(1)
+			toReturn(0)=toReturn(0)&"] "
+			act=act+1
+		end if
+		if DidRequested(Displace,usersays)(0) then
+			toReturn(0)=toReturn(0)&" ["&DoTell(MainMenu)(2)&"="&usersays(Displace)(x)&","&usersays(Displace)(y)&","&usersays(Displace)(z)&","
+			if usersays(Displace)(3)=false then toReturn(0)=toReturn(0)&DoTell(10)(3) else toReturn(0)=toReturn(0)&DoTell(10)(2)
+			if usersays(Displace)(3)=true and usersays(Displace)(4)=false then toReturn(0)=toReturn(0)&","&DoTell(10)(8)
+			if usersays(Displace)(3)=true and usersays(Displace)(4)=true then toReturn(0)=toReturn(0)&","&DoTell(10)(7)
+			toReturn(0)=toReturn(0)&"] "
+			act=act+1
+		end if
+		if DidRequested(Rotate,usersays)(0) then
+			toReturn(0)=toReturn(0)&" ["&DoTell(MainMenu)(3)&"="&userSays(Rotate)(x)&","&userSays(Rotate)(y)&","&userSays(Rotate)(z)&","
+			if usersays(Rotate)(3)=false then toReturn(0)=toReturn(0)&DoTell(10)(3) else toReturn(0)=toReturn(0)&DoTell(10)(2)
+			toReturn(0)=toReturn(0)&"] "
+			act=act+1
+		end if
+		if DidRequested(Scale,usersays)(0) then
+			toReturn(0)=toReturn(0)&" ["&DoTell(MainMenu)(4)&"="&userSays(Scale)(x)&","&userSays(Scale)(y)&","&userSays(Scale)(z)&","
+			if usersays(Scale)(3)=false then toReturn(0)=toReturn(0)&DoTell(10)(3) else toReturn(0)=toReturn(0)&DoTell(10)(2)
+			toReturn(0)=toReturn(0)&"] "
+			act=act+1
+		end if
+		if DidRequested(Jitter,usersays)(0) then
+			toReturn(0)=toReturn(0)&" ["&DoTell(7)(5)
+			if DidRequested(Jitter,usersays)(1)(0) then toReturn(0)=toReturn(0)&" "&DoTell(19)(0)&"="&userSays(Jitter)(0)(x)& _
+			","&userSays(Jitter)(0)(y)&","&userSays(Jitter)(0)(z)&","&DoSwapEquivalent(usersays(Jitter)(0)(3), _
+			array(true,false),array(DoTell(10)(2),DoTell(10)(3)),true)(0)
+
+			if DidRequested(Jitter,usersays)(1)(1) then toReturn(0)=toReturn(0)&" "&DoTell(19)(1)&"="&userSays(Jitter)(1)(x)& _
+			","&userSays(Jitter)(1)(y)&","&userSays(Jitter)(1)(z)&","&DoSwapEquivalent(usersays(Jitter)(1)(3), _
+			array(true,false),array(DoTell(10)(2),DoTell(10)(3)),true)(0)
+			
+
+			if DidRequested(Jitter,usersays)(1)(2) then toReturn(0)=toReturn(0)&" "&DoTell(19)(2)&"="&userSays(Jitter)(2)(x)& _
+			","&userSays(Jitter)(2)(y)&","&userSays(Jitter)(1)(z)&","&DoSwapEquivalent(usersays(Jitter)(2)(3), _
+			array(true,false),array(DoTell(10)(2),DoTell(10)(3)),true)(0)
+
+			toReturn(0)=toReturn(0)&"] "
+			act=act+1
+		end if
+		if (act=0) then
+			toReturn(0)=toReturn(0)& DoTell(10)(4)
+			usersays(NoAction)(0)=true
+		else
+			usersays(NoAction)(0)=false
+			if (userSays(Handle)(x)=0.5 and userSays(Handle)(y)=0.5 and userSays(Handle)(z)=0.5) then
+				toReturn(0)=toReturn(0)&" ["&DoTell(05)(0)&DoTell(MainMenu)(6)&"="&DoTell(10)(6)&"]"
+			else
+				toReturn(0)=toReturn(0)&" ["&DoTell(MainMenu)(6)&"="&userSays(Handle)(x)&","&userSays(Handle)(y)&","&userSays(Handle)(z)&"]"
+			end if
+			if (didrequested(surface,usersays)(0)=true) _
+			then toReturn(0)=toReturn(0)&" ["&DoTell(05)(1)&DoTell(MainMenu)(7)&"="&userSays(SurfaceDatum)(0)&"]"
+		end if
+	case else
+end select
+
+DoSummary=toReturn
+end function
+
+
+
+'Receives
+'	a variant (or array) to be appended at the end of the base
+'	a variant (or array) to act as base
+'Returns
+'	an array conatingin the elements of both input
+'ToDo: Merge this function into the "ManipulateThese" function (using an "append" operator)
+function DoAppend(ThisThing,ToThatThing)
+dim loopodo
+dim thisOne,ToThisOne
+dim howmany(1)
+dim toReturn(1)
+dim temp
+
+if (vartype(thisthing)<2 or vartype(toThatThing)<2) then
+	toReturn(0)=null
+	toReturn(1)=DoTell(59)(0)&DoTell(36)(0)
+	DoAppend=toReturn
+	exit function
+end if
+
+if vartype(thisthing)<8000 then thisOne=array(thisthing) else thisOne=thisthing
+if vartype(tothatThing)<8000 then ToThisOne=array(toThatThing) else ToThisOne=toThatThing
+
+howmany(0)=ubound(thisOne)
+howmany(1)=ubound(toThisOne)
+
+temp=ToThisOne
+redim preserve temp(howmany(1)+howmany(0)+1)
+toReturn(0)=temp
+for loopOdo=0 to howmany(0)
+	toReturn(0)(loopOdo+howmany(1)+1)=thisOne(loopOdo)
+next
+
+DoAppend=toReturn
+end function
+
+
+
+'Receives
+'	-a srting
+'	-a delimiter character
+'	-a default array (to use as vartype template)
+'Returns
+'	-an array of the original values converted into 'double' (or null if error)
+function DoSplit(ThisString,delimiter,default)
+on error resume next
+err.clear
+
+dim howmany
+dim loopOdo
+
+dim toReturn(1)
+dim temp
+
+if (vartype(default)<8000 or vartype(ThisString)<>8 or vartype(delimiter)<>8) then
+	toReturn(0)=null
+	toReturn(1)=DoTell(59)(0)&DoTell(37)(0)
+	DoSplit=toReturn
+	exit function
+end if
+
+toReturn(0)=split(ThisString,delimiter)
+toReturn(1)=""
+howmany=array(ubound(default),ubound(toReturn(0)))
+
+if (howmany(0)>howmany(1)) then
+	temp=toreturn(0)
+	redim preserve temp (howmany(0))
+	toReturn(0)=temp
+elseif (howmany(0)<howmany(1)) then
+	toReturn(0)=null
+	toReturn(1)=DoTell(39)(0)
+	DoSplit=toReturn
+	exit function
+end if
+
+for loopOdo=0 to howmany(0)
+	if loopodo<=howmany(1) then
+		select case vartype(default(loopodo))
+		case 2,3,4,5,6,7,8,12,14
+			toreturn(0)(loopodo)=cdbl(toreturn(0)(loopodo))
+		case else
+			'...leave it alone
+		end select
+	else
+		toReturn(0)(loopOdo)=default(loopodo)
+	end if
+next
+
+if err.number<>0 then
+	toReturn(0)=null
+	toReturn(1)=DoTell(39)(0)
+	err.clear
+end if
+
+DoSplit=toReturn
+end function
+
+
+
+'Receives
+'	-a string to check
+'	-an array of strings with sample 'truth' strings (ie "Yes", "Indeed", "Valid", "Pass", etc)
+'Returns
+'	-if any of the 'truth' strings is found is replaced with True otherwise false
+function DoSwapEquivalent(thisString,FirstList,SecondList,LeftToRight)
+dim loopOdo
+dim prerequisites
+dim howmany	(1)
+dim toReturn	(1)
+dim list		(1)
+
+'->Check prerequisites
+prerequisites=true
+if (vartype(thisString)<2 or vartype(FirstList)<8000 or vartype(SecondList)<8000 or vartype(lefttoRight)<>11) then
+	prerequisites=false
+elseif (ubound(firstlist)<>ubound(secondlist)) then
+	prerequisites=false
+end if
+
+if prerequisites=false then
+	toReturn(0)=null
+	toReturn(1)=DoTell(40)(0)
+	DoSwapEquivalent=toReturn
+	exit function
+end if
+'<--
+
+if leftToRight=true then
+	list(0)=FirstList
+	List(1)=SecondList
+else
+	List(0)=SecondList
+	List(1)=FirstList
+end if
+
+howmany(0)=ubound(List(0))
+
+toReturn(0)=null
+toReturn(1)=DoTell(62)(0)
+
+for loopodo=0 to howmany(0)
+	if not isNull(List(0)(loopOdo)) then
+		if lcase(thisstring)=lcase(List(0)(loopOdo)) or lcase(left(thisstring,1))=lcase(left(list(0)(loopOdo),1)) then
+			if (not isnull(list(1)(loopOdo)) ) then
+				toReturn(0)=list(1)(loopOdo)
+				toReturn(1)=""
+			end if
+		end if
+	end if
+next
+
+DoSwapEquivalent=toReturn
+end function
+
+
+
+'Receives
+'	-an index (for the usersays array)
+'	-the usersays array
+'Returns
+'	-returns true or false depending on the user input
+function DidRequested(whichOne,usersays)
+const Surface		=1
+const NoAction		=2
+const Equidist		=3
+const Align		=4
+const Displace		=5
+const Rotate		=6
+const Scale		=7
+const Jitter		=8
+const Handle		=9
+const SurfaceDatum	=10
+
+const x	=0
+const y	=1
+const z	=2
+
+dim toReturn(1)
+toReturn(1)=""
+select case whichOne
+	case NoAction 'The usersays(NoAction) value is set during summary
+		if usersays(NoAction)(0)=true then toReturn(0)=true else toReturn(0)=false
+	case equidist	'Equidist
+		if vartype(usersays(Equidist)(0))<>11 then toReturn(0)=True else toReturn(0)=false
+	case align	'Align
+		if vartype(usersays(Align)(0))<>11 then toReturn(0)=True else toReturn(0)=false
+	case Displace	'Displace
+		if (usersays(Displace)(x)<>0 or usersays(Displace)(y)<>0 or _
+		usersays(Displace)(z)<>0) then toReturn(0)=True else toReturn(0)=false
+	case Rotate	'Rotate
+		if (usersays(Rotate)(x)<>0 or usersays(Rotate)(y)<>0 or _
+		usersays(Rotate)(z)<>0) then toReturn(0)=True else toReturn(0)=false
+	case Scale	'Scale
+		if (usersays(Scale)(x)<>0 or usersays(Scale)(y)<>0 or _
+		usersays(Scale)(z)<>0) then toReturn(0)=True else toReturn(0)=false
+	case Jitter	'Jitter
+		toReturn(1)=array(false,false,false)
+		if (usersays(Jitter)(3)<>3) then toReturn(0)=True else toReturn(0)=false
+		if (usersays(jitter)(0)(x)<>0 or usersays(jitter)(0)(y)<>0 or _
+		usersays(jitter)(0)(z)<>0) then toReturn(1)(0)=True else toReturn(1)(0)=false
+		if (usersays(jitter)(1)(x)<>0 or usersays(jitter)(1)(y)<>0 or _
+		usersays(jitter)(1)(z)<>0) then toReturn(1)(1)=True else toReturn(1)(1)=false
+		if (usersays(jitter)(2)(x)<>0 or usersays(jitter)(2)(y)<>0 or _
+		usersays(jitter)(2)(z)<>0) then toReturn(1)(2)=True else toReturn(1)(2)=false
+	case Surface
+		if (usersays(align)(0)=3 or _
+		(usersays(displace)(3)=true and (usersays(displace)(x)<>0 or usersays(displace)(y)<>0 or usersays(displace)(z)<>0)) or _
+		(usersays(rotate)(3)=true and (usersays(rotate)(x)<>0 or usersays(rotate)(y)<>0 or usersays(rotate)(z)<>0)) or _
+		(usersays(scale)(3)=true and (usersays(scale)(x)<>0 or usersays(scale)(y)<>0 or usersays(scale)(z)<>0)) or _
+		(usersays(jitter)(0)(3)=true and (usersays(jitter)(0)(x)<>0 or usersays(jitter)(0)(y)<>0 or usersays(jitter)(0)(z)<>0)) or _
+		(usersays(jitter)(1)(3)=true and (usersays(jitter)(1)(x)<>0 or usersays(jitter)(1)(y)<>0 or usersays(jitter)(1)(z)<>0)) or _
+		(usersays(jitter)(2)(3)=true and (usersays(jitter)(2)(x)<>0 or usersays(jitter)(2)(y)<>0 or usersays(jitter)(2)(z)<>0))) _
+		then toReturn(0)=True else toReturn(0)=false
+ case else
+		toReturn(0)=vbnull
+end select
+
+DidRequested=toReturn
+end function
+
+
+
+'Receives
+'	-The ask string to display
+'	-a default value (or string)
+'	-an array of options
+'	-a boolean indicating whether to keep asking (or exit) if the answer in indecipherable.
+'Returns
+'Asks user for input (will loop instead of aborting on invalid input)
+function DoAskQuartet(ThisQuestion,default,template,LoopIfInvalid)
+dim temp
+dim ready
+dim last
+dim toReturn
+
+if (vartype(ThisQuestion)<>8 or vartype(default)<>8 or vartype(template)<8000 or vartype(LoopifInvalid)<>11) then
+	toReturn(0)=null
+	toReturn(1)=tell(46)(0)
+	DoAskQuartet=toReturn
+	exit function
+end if
+
+ready=false
+last=3
+toReturn=array(0,0)
+
+do
+toReturn(0)=rhino.getstring(ThisQuestion,default)
+
+if isnull(toReturn(0)) then
+	ready=true
+else
+	temp=DoSplit(toReturn(0),",",template)
+	toReturn=temp
+	if ((not isnull(toReturn(0))) and vartype(toReturn(0))>8000) then
+		if (ubound(toReturn(0))>=3) then
+			if (toReturn(0)(last)=False) then toReturn(0)(last)=DoTell(10)(3)
+			if (toReturn(0)(last)=True) then toReturn(0)(last)=DoTell(10)(2)
+			temp=DoSwapEquivalent(toReturn(0)(last),array(DoTell(10)(2),DoTell(10)(3)),array(true,false),true)
+			if (isnull(temp(0)) and LoopifInvalid=true) then
+				ready=false
+				rhino.print temp(1)
+			elseif (isnull(temp(0)) and LoopifInvalid=false) then
+				toReturn(0)=null
+				toReturn(1)=temp(1)
+				ready=true
+			else
+				toReturn(0)(last)=temp(0)
+				ready=true
+			end if
+		else
+			ready=true
+		end if
+	elseif (LoopifInvalid=true) then
+		ready=false
+		rhino.print toReturn(1)
+	elseif (LoopifInvalid=false) then
+		ready=true
+	end if
+end if
+loop while (ready=false)
+
+DoAskQuartet=toReturn
+end function
+
+
+
+'Receives
+'	-an array of 3D handle points
+'	-an integer (the axis to use for alignment)
+'	-the offset distance
+'Returns
+'	-a three element delta array (xyz) indicating distance to "SoFar" to the "Axis"
+function DoAlign(HandlePT,Axis,SoFar)
+
+const x	=0
+const y	=1
+const z	=2
+
+dim loopOdo
+dim howmany
+
+dim temp
+dim toReturn (1)
+
+if (vartype(handlePT)<8000 or vartype(axis)<2 or vartype(SoFar)<2) then
+	toReturn(0)=null
+	toReturn(1)=DoTell(40)(0)
+	DoAlign=toReturn
+	exit function
+end if
+
+howmany=ubound(HandlePT)
+redim temp(howmany)
+toReturn(0)=temp
+
+for loopOdo=0 to howmany
+select case axis
+	case x
+		toReturn(0)(loopOdo)=array(0,SoFar-HandlePT(loopOdo)(y),0)
+	case y
+		toReturn(0)(loopOdo)=array(SoFar-HandlePT(loopOdo)(x),0,0)
+	case z
+		toReturn(0)(loopOdo)=array(0,0,SoFar-HandlePT(loopOdo)(z))
+	case else
+		'should return Null
+end select
+next
+
+DoAlign=toReturn
+end function

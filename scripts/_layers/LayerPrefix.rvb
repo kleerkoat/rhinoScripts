@@ -1,0 +1,28 @@
+Option Explicit
+
+'Call LayerPrefix()
+
+Sub LayerPrefix()
+
+Dim arrAllLayers, arrSelLayers, strLayer, strPrefix, strSuffix
+	
+arrAllLayers = Rhino.LayerNames
+arrSelLayers = Rhino.MultiListBox(arrAllLayers,"Select layers to rename:","Rename Layers")
+if isnull(arrSelLayers) then Exit Sub
+strPrefix = Rhino.GetString("Prefix? (ENTER to skip)")
+if isnull(strPrefix) then Exit Sub
+strSuffix = Rhino.GetString("Suffix? (ENTER to skip)")
+if isnull(strSuffix) then Exit Sub
+
+if strPrefix="" and strSuffix="" then Exit Sub
+
+for each strLayer in arrSelLayers
+	if not Rhino.IsLayer(strPrefix & strLayer & strSuffix) then 
+	Call Rhino.RenameLayer(strLayer, strPrefix & strLayer & strSuffix)
+	end if 
+Next
+
+	
+End Sub
+
+

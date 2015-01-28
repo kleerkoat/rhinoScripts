@@ -1,0 +1,186 @@
+Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version Friday, August 27, 2010
+
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "SectionRadial","_-Runscript (SectionRadial)"
+'Rhino.AddAlias "SectionPath","_-Runscript (SectionPath)"
+
+
+Private oldStep, oldSpace
+
+If isEmpty(oldStep) Then
+	oldStep = 30
+End If
+
+If isEmpty(oldSpace) Then
+	oldSpace = 10
+End If
+
+'Call SectionRadial()
+'call SectionPath()
+
+Sub SectionPath()
+	
+	Dim aObj: aObj = Rhino.GetObjects("Select objects to section",4+8+16,,True,False)
+	If Not isArray(aObj) Then Exit Sub
+	
+	Dim sPath: sPath = Rhino.GetObject("Select path curve for sections",4)
+	If isNull(sPath) Then Exit Sub
+	
+	Dim dblSpace: dblSpace = rhino.GetReal("Spacing",oldSpace,Rhino.UnitAbsoluteTolerance()*10)
+	If Not isNumeric(dblSpace) Then Exit Sub
+	OldSpace = dblSpace
+	
+	Dim aDiv: aDiv = Rhino.DivideCurveLength(spath,dblSpace)
+	If Not isArray(aDiv) Then Exit Sub
+	
+	
+	Rhino.EnableRedraw(false)
+	
+	'add a point object and get the bounding box diagonal for the
+	'objects and the point together
+	Dim sPt: sPt = Rhino.AddPoint(Rhino.CurveStartPoint(spath))
+	Dim atemp : atemp = Rhino.JoinArrays(aObj, array(spt))
+	Dim dblScale: dblScale = bbDiag(aTemp)
+	Rhino.DeleteObject sPt
+	
+	'calculate two vectors to generate a cutting plane big enough to cut through all of the objects 
+	'at the start point of the curve
+	Dim VecX: vecX = Rhino.VectorScale(Rhino.VectorRotate(Rhino.CurveTangent(spath,Rhino.CurveDomain(sPath)(0)),90,Rhino.ViewCPlane()(3)),dblScale)
+	Dim VecY : VecY = Rhino.VectorScale(Rhino.ViewCPlane()(3),dblScale)
+	Dim aBase: aBase = Rhino.CurveStartPoint(spath)
+	Dim aPlane: aPlane = Rhino.PlaneFromFrame(aBase,VecX,VecY)
+	Dim sPlane: sPlane = Rhino.AddPlaneSurface(aPlane,dblScale,dblScale*2)
+	Rhino.MoveObject sPlane, Rhino.EvaluateSurface(sPLane,MidParam(sPLane)),aBase
+	
+		'set a base plane in the same location as a cutting plane
+		Dim baseplane: basePlane = Rhino.PlaneFromNormal (Rhino.CurveStartPoint(sPath), Rhino.CurveTangent(spath,Rhino.CurveDomain(sPath)(0)))	
+	Dim tempPlane, tempPlaneObj, aXform, j, sObj,i, n, aint, allInt
+	Dim Bound: Bound = Ubound(aDiv)
+	
+	
+	'at each curve division point calculate a plane from the curve tangent vector at that point
+	'Transform a copy of the cutting plane from the base plane to the plane calculated at the
+	'division point and intersect the plane with all of the objects, then delete the copied plane
+	for j = 0 to bound
+		
+		tempPlane = Rhino.PlaneFromNormal(aDiv(j),Rhino.CurveTangent(spath,Rhino.CurveClosestPoint(sPath, aDiv(j))))
+		
+		aXform = Rhino.XformRotation(BasePlane,tempPlane)
+		
+		tempPlaneObj = Rhino.TransformObject(splane,aXform,true)
+		
+		IntersectObjectsWithSrf aObj, tempPlaneObj
+	
+		Rhino.DeleteObject tempPlaneObj
+		
+	Next
+	
+	Rhino.DeleteObject sPlane
+	Rhino.EnableRedraw(true)
+End Sub
+
+Function MidParam(sSrf)
+	'find the midlle parameter pair of a surface
+	Dim uDom,VDom
+	
+	UDom = Rhino.SurfaceDomain(sSrf,0)
+	VDom = Rhino.SurfaceDomain(sSrf,1)
+	
+	Dim Umid, VMid
+	
+	UMid = UDom(0) + (0.5*(UDom(1)-Udom(0)))
+	
+	VMid =  VDom(0)+ (0.5*(VDom(1)-Vdom(0)))
+	
+	MidParam = array(UMid,Vmid)
+	
+End Function
+
+
+Sub SectionRadial()
+	Dim aObj: aObj = Rhino.GetObjects("Select objects to section",4+8+16,,true,false)
+	If not isArray(aObj) then exit sub
+	
+	
+	Dim aCen: aCen = Rhino.GetPoints(true,true,"Center point", "Direction",2)
+	If not isArray(aCen) then exit sub
+	If Ubound(aCen) <> 1 then exit sub
+	
+	Dim dblDeg: dblDeg = Rhino.GetReal("Step angle",oldStep,-180,180)
+	If not isNumeric(dblDeg) then exit sub	
+	OldStep = dblDeg
+	
+	Rhino.EnableRedraw(false)
+	dim sPt: sPt = Rhino.AddPoint(aCen(0))
+	Dim atemp : atemp = Rhino.JoinArrays(aObj, array(spt))
+	
+	Dim dblScale: dblScale = bbDiag(aTemp)
+	
+	Rhino.DeleteObject sPt
+	
+	Dim VecX: vecX = Rhino.VectorScale(Rhino.VectorUnitize(Rhino.VectorCreate(aCen(1), aCen(0))),dblScale)
+	Dim VecY : VecY = Rhino.VectorScale(Rhino.ViewCPlane()(3),dblScale)
+	Dim aBase: aBase = Rhino.PointAdd(aCen(0), Rhino.VectorReverse(VecY))
+	Dim aPlane: aPlane = Rhino.PlaneFromFrame(aBase,VecX,VecY)
+	Dim sPlane: sPlane = Rhino.AddPlaneSurface(aPlane,dblScale,dblScale*2)
+	
+	Dim aInt,sobj, allInt, temp, i,n
+	
+	dim degCount: degCount  = 0
+	
+	Do
+	
+		IntersectObjectsWithSrf aObj, sPlane
+	
+		Rhino.RotateObject sPlane,abase,dblDeg,Rhino.ViewCPlane()(3),false
+		degCount = degCount + dblDeg
+		
+	loop while degCount < 360
+	
+	Rhino.DeleteObject sPlane
+	Rhino.EnableRedraw(True)
+	
+End Sub
+
+
+Sub IntersectObjectsWithSrf(aObj, sSrf)
+	
+	Dim sobj, i,n, allInt, aInt, temp()
+	
+	For each sObj in aObj
+		redim temp(0)
+		n = 0
+		
+		If Rhino.IsSurface(sObj) or Rhino.IsBrep(sObj) then	
+			aInt = Rhino.IntersectBreps(sSrf,sObj)
+		ElseIf Rhino.IsCurve(sObj) then
+			allint = Rhino.CurveSurfaceIntersection(sobj,sSrf)
+			If isArray(allInt) then
+				For i = 0 to uBound(allInt,1)
+					If allint(i,0) = 1 then
+						Redim Preserve temp(n)
+						temp(n) = Rhino.AddPoint(allInt(i,1))
+						n = n + 1
+					End If
+				Next
+				aInt = temp
+			End If
+		End If
+			
+		If isArray(aInt) Then	Rhino.SelectObjects aInt
+	Next
+	
+	
+End Sub
+
+Function bbDiag(aObj)
+	
+	dim aBB: aBB = Rhino.BoundingBox(aObj)
+	
+	BbDiag = Rhino.Distance (aBB(0),aBB(6))
+	
+End Function

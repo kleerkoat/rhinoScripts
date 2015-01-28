@@ -1,0 +1,57 @@
+Option Explicit
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "OffsetSub","noEcho _-Runscript (OffsetSub)"
+
+'Call OffSetSub()
+Sub OffsetCrvSegment()
+
+	dim SCrv: sCrv = Rhino.GetObject("Select curve",4,true,false)
+	If IsNull(sCrv) then exit sub
+	
+	Dim sCop: sCop = Rhino.CopyObject(sCrv)
+	Rhino.UnselectAllObjects
+	Rhino.SelectObject sCop
+	 
+	Rhino.Command "_ExtractSubCrv _Outputlayer=_Current _Join=_Yes _Copy=_Yes"
+	
+	If Rhino.LastCommandResult = 0 then
+		Dim aLast: aLast = Rhino.LastCreatedObjects()
+		
+		If IsNull(alast) then exit sub
+		Else 
+			Rhino.DeleteObject sCop
+		exit sub
+		
+	End If
+
+	dim sLast 	
+	
+	For each slast in alast
+
+		Rhino.UnselectAllObjects
+		Rhino.SelectObject sLast
+	 
+		Rhino.Command "_Offset"
+	
+		If Rhino.LastCommandResult = 0 then
+			Dim aOff: aOff = Rhino.LastCreatedObjects()
+			Rhino.DeleteObject sLast
+			
+			If not isArray(aOff) then
+				Rhino.DeleteObject slast
+				Exit Sub
+			End if
+		
+		Else 
+			
+			Rhino.DeleteObject slast
+			Exit Sub
+		
+		End If	
+	
+	Next
+	
+	Rhino.DeleteObject sCop
+	
+End Sub

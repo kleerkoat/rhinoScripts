@@ -1,0 +1,44 @@
+Option Explicit
+'Script written by Pascal
+'Script version Sunday, April 04, 2010
+
+'Rhino.AddStartUpScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "GumbyExtrude", "_NoEcho _-RunScript (GumbyExtrude)"
+
+'Call GumbyExtrude()
+
+Sub GumbyExtrude()
+	Dim sCrv: sCrv = Rhino.GetObject("Select curve",4,true)
+	if isNull(sCrv) then exit sub
+	
+	dim plane
+	If Rhino.IsCurvePlanar(sCrv) then
+		Plane = Rhino.CurvePlane(sCrv)
+	else
+		Plane = Rhino.ViewCPlane(Rhino.CurrentView)
+	End If
+	
+	Rhino.EnableRedraw(false)
+	Rhino.ViewCPlane ,Plane
+	Rhino.Command "_GumballSettings _AutoGumball=_On _SnappyGumball=_On _Enter"
+	Rhino.EnableHistoryRecording(true)
+	
+	Dim sMove: sMove = Rhino.CopyObject(sCrv,Plane(0),Rhino.PointAdd(Plane(0),Rhino.VectorScale(Plane(3), .01)))
+	
+	Rhino.UnselectAllObjects
+	Rhino.SelectObjects array(sCrv, sMove)
+	Rhino.Command "_-Loft _Natural _Enter _Type=_Straight _Closed=No _Enter"
+	
+	If Rhino.LastCommandResult = 0 then
+		sLoft = Rhino.LastCreatedObjects()(0)
+	End If
+	Dim sLoft': sLoft = Rhino.addLoftSrf(array(scrv,sMove),,,2)
+	
+	Rhino.UnselectAllObjects
+	Rhino.SelectObject sMove
+		
+	Rhino.EnableRedraw(true)
+	
+	
+	
+End Sub

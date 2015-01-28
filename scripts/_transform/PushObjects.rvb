@@ -1,0 +1,390 @@
+Option Explicit
+'Script written and copyrighted by Jarek Bieda
+'Script version Thursday, November 22, 2007 7:47:32 PM
+
+'Call PushObjects()
+Sub PushObjects()
+
+Dim arrPushed,idPushed
+Dim arrTargets
+Dim arrS,arrE,vDir
+
+'getting objects to push
+arrPushed = Rhino.GetObjects("Select objects to push",4+8+16,True)
+if isnull(arrPushed) then Exit Sub
+Call Rhino.LockObjects(arrPushed)
+'getting boundary (target) objects
+arrTargets = Rhino.GetObjects("Select boundary/target surfaces",8+16,true)
+if isnull(arrTargets) then : Call Rhino.UnlockObjects(arrPushed) : Exit Sub : End If
+Call Rhino.UnlockObjects(arrPushed)
+
+Do 'getting direction
+	arrS = Rhino.GetPoint("Direction START (press ENTER to use 'down' - reversed World Z)")
+	if not isNull(arrS) then
+		arrE = Rhino.GetPoint("Direction END (press ENTER to use 'down' - reversed World Z)",arrS)
+		if not isnull(arrE) then
+			if not Rhino.PointCompare(arrS,arrE) then 
+				vDir=Rhino.VectorCreate(arrE,arrS)
+				Exit Do
+			Else 
+				Call Rhino.Print("Invalid input. Unable to use two identical points. Try again.")
+			End If
+		End If
+	Else
+		vDir=Rhino.VectorCreate(Rhino.XformCPlaneToWorld(array(0,0,-1),Rhino.WorldXYPlane),Rhino.XformCPlaneToWorld(array(0,0,0),Rhino.WorldXYPlane))
+		Exit Do
+	End if
+Loop
+'-------------------------------------------------------------------------
+'getting default settings:
+Dim dblTol : dblTol=Rhino.GetSettings(Rhino.InstallFolder & "Jarek.ini","PushObjects","Tol")
+if isnull(dblTol) then dblTol=Rhino.UnitAbsoluteTolerance() Else dblTol=Cdbl(dblTol)
+Dim strCopy : strCopy=Rhino.GetSettings(Rhino.InstallFolder & "Jarek.ini","PushObjects","Copy")
+if isnull(strCopy) then strCopy="No"
+Dim strAnim : strAnim=Rhino.GetSettings(Rhino.InstallFolder & "Jarek.ini","PushObjects","Anim")
+if isnull(strAnim) then strAnim="Yes"
+Dim strOutline : strOutline=Rhino.GetSettings(Rhino.InstallFolder & "Jarek.ini","PushObjects","Outline")
+if isnull(strOutline) then strOutline="Silhouette"
+'-------------------------------------------------------------------------
+'options
+Dim arrOptions(4)
+Dim strResult
+
+Do
+	arrOptions(0)="Copy_" & strCopy
+	if dblTol=Rhino.UnitAbsoluteTolerance then arrOptions(1)="Tolerance_UseDocument" Else arrOptions(1)="Tolerance_Custom"  
+	arrOptions(2)="DetectMethod_"&strOutline
+	arrOptions(3)="VisualFeedback_" & strAnim
+	arrOptions(4)="PUSH"
+	
+	strResult=Rhino.GetString("Options","PUSH",arrOptions)
+	if isnull(strResult) then Exit Sub
+	
+	Select Case Left(Ucase(strResult),3)
+	'------------------------------------------
+	Case "TOL"
+		dblTol=Rhino.GetReal("Tolerance",dblTol,0.00000001)
+		if isnull(dblTol) then dblTol=Rhino.UnitAbsoluteTolerance()
+		Call Rhino.SaveSettings(Rhino.InstallFolder & "Jarek.ini","PushObjects","Tol",Cstr(dblTol))
+	'-----------------------------------------
+	Case "COP"
+		if strCopy="Yes" then
+			strCopy="No"
+			Call Rhino.Print("Copy objects disabled")
+		Else
+			strCopy="Yes"
+			Call Rhino.Print("Copy objects enabled")
+		End If
+		Call Rhino.SaveSettings(Rhino.InstallFolder & "Jarek.ini","PushObjects","Copy",strCopy)
+	'------------------------------------------
+	Case "DET"
+		if strOutline="Silhouette" then
+			strOutline="MeshOutline"
+			Call Rhino.Print("Detection method set to MeshOutline (faster/less precise).")
+		Else
+			strOutline="Silhouette"
+			Call Rhino.Print("Detection method set to Silhouette (slower/more precise).")
+		End If
+		Call Rhino.SaveSettings(Rhino.InstallFolder & "Jarek.ini","PushObjects","Outline",strOutline)
+	'------------------------------------------
+	Case "VIS"
+		if strAnim="Yes" then
+			strAnim="No"
+			Call Rhino.Print("Visual feedback disabled.")
+		Else
+			strAnim="Yes"
+			Call Rhino.Print("Visual feedback enabled")
+		End If
+		Call Rhino.SaveSettings(Rhino.InstallFolder & "Jarek.ini","PushObjects","Anim",strAnim)
+	'------------------------------------------
+	Case "PUS" Exit Do
+	'--------------------
+	End Select
+
+Loop
+
+'generating initial targets silhouette/outline:
+Call Rhino.EnableRedraw(False)
+'saving current view
+Dim strCurrentView : strCurrentView=Rhino.CurrentView()
+Call Rhino.AddNamedView("__TempView", strCurrentView)
+'---------------------------------------
+'setting ortho view based on direction
+Call Rhino.ViewProjection(,1) : Call Rhino.ViewCameraTarget(,array(0,0,0),vDir)
+Call Rhino.SelectObjects(arrTargets) 
+Call Rhino.ZoomSelected : Call Rhino.UnselectAllObjects
+'---------------------------------------
+Dim arrTarOutlines, arrObjToLock
+Call Rhino.SelectObjects(Rhino.AllObjects) : arrObjToLock = Rhino.SelectedObjects
+Call Rhino.UnselectAllObjects
+Call Rhino.SelectObjects(arrTargets)
+'two methods of getting the outline
+if strOutline="Silhouette" then	Call Rhino.Command("_NoEcho _Silhouette _NoEcho",False) Else Call Rhino.Command("_NoEcho _MeshOutline _NoEcho",False)
+Call Rhino.LockObjects(arrObjToLock)
+Call Rhino.SelectObjects(Rhino.AllObjects)
+arrTarOutlines=Rhino.SelectedObjects
+if not isnull(arrTarOutlines) then Call Rhino.HideObjects(arrTarOutlines)
+Call Rhino.UnlockObjects(arrObjToLock)
+'---------------------------------------
+Call Rhino.RestoreNamedView("__TempView",strCurrentView)
+Call Rhino.DeleteNamedView("__TempView")
+Call Rhino.RenameView("__TempView",strCurrentView)
+Call Rhino.EnableRedraw(True)
+'---------------------------------------
+
+'pushing objects to the boundaries
+Dim blnAnim, idPushed2, intCount,c
+c=0 'succesfuly processed objects counter
+if strAnim="Yes" then blnAnim=True
+intCount=1 'iterations counter
+		
+'pushing
+for each idPushed in arrPushed
+	Call Rhino.EnableRedraw(False)
+	if strCopy="Yes" then idPushed2=Rhino.CopyObject(idPushed) Else idPushed2=idPushed
+	If not PushObject(idPushed2,arrTargets,vDir,dblTol,blnAnim,intCount,Ubound(arrPushed)+1,strOutline,arrTarOutlines) then
+		if strCopy="Yes" then Call Rhino.DeleteObject(idPushed2) 
+	Else 
+		c=c+1
+	End If
+	intCount=intCount+1
+next
+
+'printing push summary
+Dim strSummary : strSummary = "Processing completed: "&Cstr(c)&" objects pushed."
+if c<Ubound(arrPushed)+1 then strSummary=strSummary&" "&Cstr(Ubound(arrPushed)+1-c)&" object(s) missed or failed." 
+Call Rhino.Print(strSummary)
+'deleting target silhouettes/outlines
+If not isnull(arrTarOutlines) then
+	Call Rhino.EnableRedraw(False)		
+	Call Rhino.ShowObjects(arrTarOutlines)
+	Call Rhino.DeleteObjects(arrTarOutlines)
+End If
+Call Rhino.EnableRedraw(True)
+
+End Sub
+
+
+Function PushObject(ByRef idPushed,arrTargets,vDir,dblTol,blnAnim,intCount,intRange,strOutline,arrTarOutlines)
+PushObject=False
+
+Dim intersectResult
+Dim idTarget
+
+'testing initial intersection
+Call Rhino.Prompt("Processing "&Cstr(intCount)&"/"&Cstr(intRange)&"...")
+if Rhino.ObjectType(idPushed)=4 then
+	for each idTarget in arrTargets
+		intersectResult=Rhino.CurveBrepIntersect(idPushed,idTarget)
+		if not isnull(intersectResult) then
+			Call Rhino.DeleteObjects(intersectResult)
+			if blnAnim=True then Call Warning(idPushed,"!Intersect")
+			Exit Function
+		End If
+	next
+Else
+	for each idTarget in arrTargets
+		intersectResult=Rhino.IntersectBreps(idPushed,idTarget)
+		if not isnull(intersectResult) then
+			Call Rhino.DeleteObjects(intersectResult)
+			if blnAnim=True then Call Warning(idPushed,"!Intersect")
+			Exit Function
+		End If
+	next
+End If
+'---------------------------------
+'saving current view
+Dim strCurrentView : strCurrentView=Rhino.CurrentView()
+Call Rhino.AddNamedView("__TempView", strCurrentView)
+'---------------------------------------
+'setting ortho view based on direction
+Call Rhino.ViewProjection(,1)
+Call Rhino.ViewCameraTarget(,array(0,0,0),vDir)
+Call Rhino.SelectObjects(arrTargets)
+Call Rhino.SelectObject(idPushed)
+Call Rhino.ZoomSelected
+Call Rhino.UnselectAllObjects
+'---------------------------------------
+Dim arrOutlines
+if Rhino.ObjectType(idPushed) <> 4 then
+	'getting silhouette
+	Dim arrObjToLock
+	Call Rhino.SelectObjects(Rhino.AllObjects)
+	arrObjToLock = Rhino.SelectedObjects
+	Call Rhino.LockObjects(arrObjToLock) 
+	Call Rhino.UnlockObject(idPushed)
+	Call Rhino.SelectObject(idPushed)
+	'two methods of getting the outline
+	if strOutline="Silhouette" then
+		Call Rhino.Command("_NoEcho _Silhouette _NoEcho",False)
+	Else
+		Call Rhino.Command("_NoEcho _MeshOutline _NoEcho",False)
+	End If
+	Call Rhino.Prompt("Processing "&Cstr(intCount)&"/"&Cstr(intRange)&"...")
+	Call Rhino.LockObject(idPushed)
+	Call Rhino.SelectObjects(Rhino.AllObjects)
+	arrOutlines=Rhino.SelectedObjects
+	Call Rhino.UnlockObjects(arrObjToLock)
+		if isnull(arrOutlines) then 'exiting function if by some reason the outline wasn't created 
+			'restoring current view
+			Call Rhino.RestoreNamedView("__TempView",strCurrentView)
+			Call Rhino.DeleteNamedView("__TempView")
+			Call Rhino.RenameView("__TempView",strCurrentView)
+			if blnAnim=True then Call Warning(idPushed,"!Failed")
+			Exit Function
+		End if
+Else 'if object is a curve :
+	Redim arrOutlines(2)
+	arrOutlines(0)=idPushed
+	arrOutlines(1)=Rhino.AddPoint(Rhino.CurveStartPoint(idPushed))
+	arrOutlines(2)=Rhino.AddPoint(Rhino.CurveEndPoint(idPushed))
+End if
+'---------------------------------------------------------------
+Call Rhino.UnselectAllObjects()
+'Projecting outline to targets
+Dim arrVPlane : arrVPlane=Rhino.ViewCameraPlane()
+Dim arrOrigCPlane : arrOrigCplane=Rhino.ViewCPlane()
+Call Rhino.ViewCPlane(,arrVPlane)
+Call Rhino.SelectObjects(arrTargets)
+Call Rhino.SelectObjects(arrOutlines)
+Call Rhino.Command("_NoEcho _Project D No",False)
+Call Rhino.Prompt("Processing "&Cstr(intCount)&"/"&Cstr(intRange)&"...")
+'restoring current view
+Call Rhino.RestoreNamedView("__TempView",strCurrentView)
+Call Rhino.DeleteNamedView("__TempView")
+Call Rhino.RenameView("__TempView",strCurrentView)
+Call Rhino.ViewCPlane(,arrOrigCPlane)
+'deleting outlines
+if Rhino.ObjectType(idPushed)<>4 then Rhino.DeleteObjects(arrOutlines) Else Rhino.DeleteObjects(array(arrOutlines(1),arrOutlines(2)))
+arrOutlines=Rhino.SelectedObjects
+
+if isnull(arrOutlines) then
+	'projecting targets to pushed:
+	'******** jesli pushed type <> 4 then project arrTarOutlines na pushed - pomyslec co z bboxem...
+	'objects don't intersect in the selected direction
+	if blnAnim=True then Call Warning(idPushed,"!Missed") 
+	Exit Function
+End If
+'-------------------------------------------
+'gathering viewplane-based bbox information
+Dim arrBbox1, arrBbox2
+arrBbox1=Rhino.BoundingBox(idPushed,Rhino.CurrentView)
+arrBbox2=Rhino.BoundingBox(arrOutlines,Rhino.CurrentView)
+Call Rhino.DeleteObjects(arrOutlines)
+Call Rhino.ViewCPlane(,arrOrigCPlane)
+'----------------------------------
+'checking if object is pushed in the right direction and will intersect
+Dim arrP1 : arrP1=Rhino.XformWorldToCPlane(arrBbox1(7),arrVPlane)
+Dim arrP2 : arrP2=Rhino.XformWorldToCPlane(arrBbox2(0),arrVPlane)
+if arrP1(2) < arrP2(2) then	
+	if blnAnim=True then Call Warning(idPushed,"!Missed")
+	Exit Function
+End If
+
+'------------------------------------
+'------------------------------------
+'------------------------------------
+
+'moving object to boundary
+Dim arrLocus1, arrLocus2, arrMagnet, arrVect, idPoint, tsIntersect
+Call Rhino.SelectObject(idPushed)
+idPoint=AddPoint(arrBbox1(7))
+Call Rhino.HideObject(idPoint)
+arrLocus1=arrBbox1(7)
+arrVect=Rhino.VectorUnitize(vDir)
+arrVect=Rhino.VectorScale(arrVect,Abs(arrP2(2))-Abs(arrP1(2)))
+arrMagnet=Rhino.PointAdd(arrLocus1,arrVect)
+
+'adding dir arrow
+if blnAnim=True then
+	Dim idArrow : idArrow=Rhino.AddLine(arrLocus1,arrMagnet)
+	Call Rhino.ObjectColor(idArrow,vbRed)
+	Call Rhino.CurveArrows(idArrow,2)
+	if Rhino.ObjectType(idPushed)=4 then
+		Call Rhino.MoveObject(idArrow,arrLocus1,Rhino.CurveMidPoint(idPushed))
+	Else
+		Call Rhino.MoveObject(idArrow,arrLocus1,Rhino.SurfaceAreaCentroid(idPushed)(0))
+	End If
+End if
+'----------------------------------
+'showing animation:
+if blnAnim=True then Call Rhino.EnableRedraw(True)
+'----------------------------------
+'binary search for object position...
+Dim counter : counter=0
+Do
+	'checking intersection
+	if Rhino.ObjectType(idPushed)=4 then
+		for each idTarget in arrTargets
+			tsIntersect=Rhino.CurveBrepIntersect(idPushed,idTarget,dblTol)
+			if not isnull(tsIntersect) then
+				Call Rhino.DeleteObjects(tsIntersect)
+				Exit For
+			End If
+		next
+	Else
+		for each idTarget in arrTargets
+			tsIntersect=Rhino.IntersectBreps(idPushed,idTarget,dblTol)
+			if not isnull(tsIntersect) then
+				Call Rhino.DeleteObjects(tsIntersect)
+				Exit For
+			End If
+		next
+	End If
+	'-----------------------
+	if isnull(tsIntersect) then
+		arrLocus1=Rhino.PointCoordinates(idPoint)
+		if isArray(arrLocus2) then 
+			arrVect=Rhino.VectorCreate(arrLocus1,arrLocus2)
+		Else 
+			arrVect=Rhino.VectorCreate(arrLocus1,arrMagnet)
+		End If
+		arrVect=Rhino.VectorScale(arrVect,-0.5)
+		idPushed=Rhino.MoveObject(idPushed,arrLocus1,Rhino.PointAdd(arrLocus1,arrVect))
+		if isnull(idPushed) then Exit Do
+		idPoint=Rhino.MoveObject(idPoint,arrLocus1,Rhino.PointAdd(arrLocus1,arrVect))
+	Else
+		arrLocus2=Rhino.PointCoordinates(idPoint)
+		arrVect=Rhino.VectorCreate(arrLocus2,arrLocus1)
+		if Rhino.VectorLength(arrVect)<dblTol then Exit Do 'tolerance detection
+		arrVect=Rhino.VectorScale(arrVect,-0.5)
+		idPushed=Rhino.MoveObject(idPushed,arrLocus2,Rhino.PointAdd(arrLocus2,arrVect))
+		if isnull(idPushed) then Exit Do
+		idPoint=Rhino.MoveObject(idPoint,arrLocus2,Rhino.PointAdd(arrLocus2,arrVect))
+	End If
+	counter=counter+1
+	if counter>75 then Exit Do
+Loop
+
+if blnAnim=True then Call Rhino.DeleteObject(idArrow)
+Call Rhino.EnableRedraw(False)
+Call Rhino.ShowObject(idPoint)
+Call Rhino.DeleteObject(idPoint)
+Call Rhino.UnselectAllObjects
+Call Rhino.EnableRedraw(True)
+
+PushObject=True
+
+End Function
+
+Function Warning(byref idObject,byref strText)
+	Dim idDot, i
+	Warning=False
+	if Rhino.ObjectType(idObject)=4 then
+		idDot=Rhino.AddTextDot(strText,Rhino.CurveMidPoint(idObject))
+	Else
+		idDot=Rhino.AddTextDot(strText,Rhino.SurfaceAreaCentroid(idObject)(0))
+	End If
+	'blinking dot
+	Call Rhino.ObjectColor(idDot,vbRed)
+	Call Rhino.EnableRedraw(True)
+	for i=0 to 3
+		Call Rhino.HideObject(idDot)
+		Call Rhino.Sleep(15)
+		Call Rhino.ShowObject(idDot)
+		Call Rhino.Sleep(85)
+	next
+	Call Rhino.DeleteObject(idDot)
+	Call Rhino.EnableRedraw(False)
+	Warning=True
+End Function

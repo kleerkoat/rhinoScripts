@@ -1,0 +1,215 @@
+Option Explicit
+'Script written by Pascal
+'Script version Monday, March 09, 2009
+
+
+
+'/////////////////////////////////////////////////////////////////////////////
+'Scales objects in 2d but only by scaling the spacing, objects are not scaled.
+'/////////////////////////////////////////////////////////////////////////////
+
+
+'Rhino.AddStartUpScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "ScaleCenters","_NoEcho _-RunScript (ScaleCenters)"
+
+Private oldSScale
+If isEmpty (oldSScale) Then
+	oldSScale = "3D"
+End If
+
+Sub ScaleCenters
+	
+	Dim aScale: aScale = array("OneD","Two2D","3D")
+	Dim sScale: sScale = Rhino.getString("Scale type",OldSScale,aScale)
+	Dim intScale
+	
+	If Not isnull(sScale) Then
+		
+		intScale = StringInArray(sScale,aScale,0)
+		If intScale<>-1 Then
+			OldsScale = aScale(intScale)
+		Else Exit Sub
+		End If
+		
+	End If
+	
+	ScaleFromCenters(intScale)
+		
+
+End Sub
+
+
+Sub ScaleFromCenters(intScale)
+	
+	'have the user select the objects. The 'True' argument
+	'allows for pre-selected obhects.
+	Dim aObj: aObj = Rhino.GetObjects("Select objects",,,True)
+	
+	'This is an escape hatch. If the user canels or otherwise 
+	'does not select objects, we need to be able to get out
+	'of the script.
+	If Not IsArray(aObj) Then Exit Sub
+	
+	'Declare an array into which we will dump
+	'point objects at the centers of the object bounding boxes.
+	Dim aCentPt()
+	
+	'redimension the array to have the same number of objects as
+	'the users selection.
+	ReDim aCentpt(Ubound(aObj))
+	
+	'Declare an array of the point locations (centers of the
+	'bounding box. note this is the xyz location and not
+	'the UUID of the point objects
+	Dim aCent()
+	ReDim aCent(Ubound(aObj))
+	
+	Dim i
+	
+	'Find the centers and place points at the centers.
+	'keeping each it its own array.
+	For i = 0 To Ubound(aObj)
+		
+		Dim aBB: aBB = Rhino.BoundingBox(aObj(i),Rhino.CurrentView)
+		aCent(i) = AveragePoints(array(aBB(0), aBB(6)))
+		aCentPt(i) = Rhino.AddPoint (aCent(i))
+		
+	Next
+	
+	'make sure the array has been filled in
+	If isUpperBound(aCent) Then
+		Rhino.UnselectAllObjects
+		
+		'select only the point objects. These are what we will scale
+		'initially because they will provide the preview and 
+		'the final object locations
+		Rhino.SelectObjects(aCentPt)	
+	End If
+	
+	'get Rhino to do the scaling. This is only used because that
+	'way we can use Rhino's UI for dynamic scaling
+	'and drawing the scale preview- this is not possible in
+	'vb script, though the scaling itself is.
+	
+	If intScale = 0 Then
+		Rhino.Command "_Scale1d"
+	ElseIf intScale = 1 Then
+		Rhino.Command "_Scale2d"
+	Else
+		Rhino.Command "_Scale"
+	End If
+	
+	'make sure the command completed, and if not, clean up
+	'and exit the script.
+	If Rhino.LastCommandResult <> 0 Then
+		Rhino.DeleteObjects(aCent)
+		Exit Sub
+	End If
+	
+	'decalre the 'apt' varible
+	Dim apt
+	
+	'Turn off redraw (faster)
+	Rhino.EnableRedraw(False)
+	
+	
+	'Now, go through each object in the user's selection
+	'and harvest corresponding scaled point's location. Move the
+	'object to that location
+	For i = 0 To Ubound(aObj)
+		
+		aPt = Rhino.PointCoordinates(aCentPt(i))
+		
+		Rhino.MoveObject aObj(i),aCent(i), apt
+
+	Next
+	
+	'delete the point objects
+	Rhino.DeleteObjects aCentPt
+	
+	'turn redraw back on
+	Rhino.EnableRedraw(True)
+	
+End Sub
+
+
+Function StringInArray(item, arr, intCase)
+	'Non case-sensitive= 0, case-sensitive = 1
+	'returns -1 if the string does not appear in the array
+	'else it returns the position of the string in the array
+
+	Dim intMax: intMax = Ubound(arr)
+	
+	Dim result :  Result = -1
+	Dim n
+	
+		
+	If intCase = 0 Then
+		For n = 0 To uBound(arr) 
+			If LCase(arr(n)) = LCase(Item) Then
+				Result = n
+				Exit For
+			End If
+		Next
+	Else
+		For n = 0 To uBound(arr) 
+			If arr(n) = Item Then
+				Result = n
+				Exit For
+			End If
+		Next	
+	End If
+		
+
+	
+	StringInArray = Result
+	
+End Function
+
+'this function checks to make sure an array is filled in.
+
+Function IsUpperBound(ByRef arr)
+
+	IsUpperBound = False
+
+	If IsArray(arr) Then
+
+		On Error Resume Next
+
+		UBound arr
+
+		If Err.Number = 0 Then IsUpperBound = True
+
+	End If
+
+End Function
+
+Function AveragePoints(arrPts)
+	'Finds the average location of an array
+	'of points.
+
+	Dim X, Y, Z
+	Dim i
+	
+	X = 0
+	Y = 0
+	Z = 0
+
+	For i=0 To UBound (arrPts)
+			
+		'add all the X values
+		X = X+arrPts(i)(0)
+	
+		'add all th Y values
+		Y = Y+arrPts(i)(1)			
+	
+		'add all the Z values
+		Z = Z+arrpts(i)(2)
+	Next
+	
+	'Divide by the number of points to
+	'get the average  for each
+	'create the output array from the 3 averages
+	AveragePoints  = array(X/(UBound(arrPts)+1), Y/(UBound(arrPts)+1), Z/(UBound(arrPts)+1))
+
+End Function

@@ -1,0 +1,33 @@
+Sub TextifyDot
+  Dim arrDot, arrbln, dblHeight, strDelete
+  
+  arrDot = Rhino.ObjectsByType(8192)
+  arrBln = array("Yes", "No")
+
+  
+  If Not IsArray(arrDot) Then
+   MsgBox "No Dots are in the file"
+   Exit Sub
+  
+   Else
+     dblHeight = Rhino.GetReal("Text height:", 1)
+    strDelete = Rhino.GetString("Delete Dots?", "Yes", arrBln) 
+    For Each strDot In arrDot
+      strText= Rhino.TextDotText(strDot)
+      If IsEmpty(strText) Then
+         Exit For
+          End If
+      arrPt = Rhino.TextDotPoint(strDot)
+      Rhino.AddText strText,arrPt,dblHeight
+      If StrDelete = "Yes" Then
+
+        Rhino.DeleteObject(strDot)
+      End If
+    Next
+      
+  End If
+  
+  
+End Sub
+
+  'TextifyDot

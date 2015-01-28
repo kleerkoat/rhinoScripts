@@ -1,0 +1,110 @@
+﻿Option Explicit
+'Script by Mitch Heynick
+'Version Sunday, 08 August, 2010
+
+Private oldOff,oldTrans
+If IsEmpty(oldOff) Then oldOff=1
+If IsEmpty(oldTrans) Then oldTrans="Sharp"
+
+
+Call BooleanOffsetCPC()
+Sub BooleanOffsetCPC()
+
+	
+	Dim strMsg1,arrCrvs,dblOdist,strTrans,dblTol,arrTChoice,intStyle
+	strMsg1="Select closed planar curves to create combined offset outline"
+	dblTol=Rhino.UnitAbsoluteTolerance
+	arrTChoice=Array("Sharp","Round","Smooth","Chamfer")
+	
+	arrCrvs=Rhino.GetObjects(strMsg1,4,,True)
+	If Not IsArray(arrCrvs) Then Exit Sub
+
+	dblODist=Rhino.GetReal("Offset distance?",oldOff,dblTol)
+	If IsNull(dblODist) Then Exit Sub
+	oldOff=dblODist
+	
+	strTrans=Rhino.GetString("Corner Style?",oldTrans,arrTChoice)
+	If IsNull(strTrans) Then Exit Sub
+	oldTrans=strTrans
+	
+	Select Case strTrans
+		Case "Sharp" : intStyle=1
+		Case "Round" : intStyle=2
+		Case "Smooth" : intStyle=3
+		Case "Chamfer" : intStyle=4
+		Case Else : Exit Sub
+	End Select
+	
+	Dim arrOffsets(),strOffset,strCrv,i
+	Redim arrOffsets (Ubound(arrCrvs))
+	i=-1
+	Call Rhino.EnableRedraw(False)
+	For each strCrv in arrCrvs
+		If Rhino.IsCurveClosed(strCrv) and Rhino.IsCurvePlanar(strCrv) Then
+			strOffset=OffsetCrvOutside(strCrv,dblODist,intStyle)
+			If not IsNull(strOffset) Then
+				i=i+1
+				arrOffsets(i)=strOffset				
+			End If		
+		End If
+		
+	Next
+		
+	If i>-1 Then 
+		Dim strComm,CBPoint
+		Redim Preserve arrOffsets(i)
+		strComm="_CurveBoolean DeleteInput=All CombineRegions=Yes "				
+		CBPoint=OffsetBoundingBoxPoint(arrOffsets)
+		
+		If Not IsNull(CBPoint) Then
+			Dim strPt
+			strPt=Rhino.Pt2Str(CBPoint)			
+			Call Rhino.UnselectAllObjects
+			Call Rhino.SelectObjects(arrOffsets)
+			Call Rhino.Command(strComm&strPt&" _Enter",False)		
+		End If	
+	Else		
+		Call Rhino.Print("No valid closed offsets found")
+	End If
+	
+	Call Rhino.EnableRedraw(True)
+End Sub
+
+Function OffsetCrvOutside(crv,dist,intStyle)
+	OffsetCrvOutside=Null
+	
+	Dim OPoint,arrOffset
+	
+	'This method of determining outer offset may be unreliable
+	OPoint=OffsetBoundingBoxPoint(crv)
+	If IsNull(OPoint) Then Exit Function
+	
+	arrOffset=Rhino.OffsetCurve(crv,OPoint,dist,,intStyle)	
+	If not IsArray(arrOffset) Then Exit Function
+	
+	If Ubound(arrOffset)<0 Then 
+		Exit Function
+	ElseIf Ubound(arrOffset)>0 Then
+		Call Rhino.DeleteObjects(arrOffset)
+		Exit Function		
+	End If
+	
+	If Rhino.IsCurveClosed(arrOffset(0)) Then
+		OffsetCrvOutside=arrOffset(0)
+	Else
+		Call Rhino.DeleteObject(arrOffset(0))
+	End If
+	
+End Function
+
+Function OffsetBoundingBoxPoint (objs)
+	OffsetBoundingBoxPoint=Null
+	
+	Dim arrBB,PlusPoint
+	arrBB=Rhino.BoundingBox(objs)
+	If Not IsArray(arrBB) Then Exit Function	
+	PlusPoint=arrBB(2)
+	PlusPoint(0)=PlusPoint(0)+1
+	PlusPoint(1)=PlusPoint(1)+1
+	OffsetBoundingBoxPoint=PlusPoint
+End Function

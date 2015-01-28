@@ -1,0 +1,110 @@
+Option Explicit
+'Script written by Pascal
+'RMA
+'Script version Wednesday, December 11, 2008
+
+'Rhino.AddStartupScript Rhino.lastloadedScriptFile
+'Rhino.AddAlias "GroupCrvsInCrv", "_NoEcho _-Runscript GroupCrvsInCrv"
+
+Sub GroupCrvsInCrv()
+
+	Dim aCrvs: aCrvs = Rhino.ObjectsbyType (4)
+	If Not isArray(aCrvs) Then
+		msgBox "No curves found."
+		Exit Sub
+	End If
+	
+	Dim aBound: aBound = Rhino.GetObjects("Select boundary curves",4,True,True)
+	If Not IsArray(aBound) Then Exit Sub
+	
+	Dim sBound, aBounded(),n, sCrv
+	
+	For Each sBound In aBound
+		n = 0
+
+	If Not Rhino.IsCurveClosed(sBound) Then
+		MsgBox "The boundary curve must be planar and closed."
+		Exit Sub
+	End If
+	
+	If Not Rhino.IsCurvePlanar(sBound) Then
+		MsgBox "The boundary curve must be planar and closed."
+		Exit Sub
+	End If
+	
+	Rhino.UnselectAllObjects
+	
+	Dim Plane: Plane = Rhino.CurvePlane(sBound)
+	
+	
+	n = 0
+
+	For Each sCrv In aCrvs
+		
+		If Rhino.IsCurveClosed(sCrv) Then
+			If Rhino.PlanarClosedCurveContainment(sBound, sCrv, plane) = 3 Then
+				ReDim Preserve aBounded(n)
+				aBounded(n) = sCrv
+				n = n +1
+			End If
+			
+		Else
+			
+			If 	CheckCurveContainment(sCrv,sBound, Plane) Then
+				ReDim Preserve aBounded(n)
+				aBounded(n) = sCrv
+				n = n +1
+			End If
+			
+		End If
+		
+	Next
+	
+	If isUpperBound(aBounded) Then
+		Dim sgrp: sGrp = Rhino.addGroup
+			Rhino.AddObjectsToGroup aBounded, sgrp
+			Rhino.AddObjectToGroup sBound,sGrp
+			Rhino.Print UBound(aBounded) +2 & " objects grouped."
+			'	Rhino.SelectObjects aBounded
+	Else
+		Rhino.Print "No objects found inside the bounding curve."
+		End If
+	
+	Next
+	
+End Sub
+
+Function CheckCurveContainment(sCrv,sBound, Plane)
+	
+	CheckCurveContainment = True
+	
+	Dim apts: aPts = Rhino.DivideCurve(sCrv,16, False)
+	
+	If isArray(aPts) Then
+		Dim Pt
+		For Each Pt In aPts
+			If  Not Rhino.PointInPlanarClosedCurve(Pt,sBound, Plane) = 1 Then
+				CheckCurveContainment = False
+			End If
+			Exit For
+		Next
+	End If
+
+
+End Function
+
+Function IsUpperBound(ByRef arr)
+
+	IsUpperBound = False
+
+	If IsArray(arr) Then
+
+		On Error Resume Next
+
+		UBound arr
+
+		If Err.Number = 0 Then IsUpperBound = True
+
+	End If
+
+End Function

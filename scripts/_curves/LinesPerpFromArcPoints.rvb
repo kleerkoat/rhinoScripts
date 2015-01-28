@@ -1,0 +1,125 @@
+' ****************************** RhinoScript.org ******************************
+'
+'   Indication on Arches, version 1
+'
+'   by Felipe Pecegueiro do Amaral Curado, published Jan 24, 2011
+'
+'
+'   This script draws lines perpendicular to the tangent on the start and endpoints of arcs and in the center. A layer will be created to place the new lines and the lines will be grouped by arc.
+'
+'
+'
+'
+'   This RhinoScript Tool has been downloaded from RhinoScript.org.
+'
+'   Rhino versions: Rhino 4
+'
+'   LICENSE INFORMATION:
+'   This script is published under the GNU General Public License, version 3
+'   or any later version, and thus comes WITHOUT ANY WARRANTY. You can get
+'   the complete license text here: www.rhinoscript.org/gpl
+'
+' ****************************** RhinoScript.org ******************************
+
+
+
+Option Explicit
+'Script written by <Felipe Pecegueiro do Amaral Curado>
+'Script copyrighted by <FPAC>
+'Script version Tuesday, October 05, 2010 9:27:27 PM
+
+'This script draws indications on multiple arcs centerpoints, start points and end points. 
+'In case of doubts, contact felipe.pecegueiro@gmail.com
+
+'Call LinesPerpFromArcPoints()
+Sub LinesPerpFromArcPoints()
+	
+	Dim arrArc, arrline1, arrline2, plane1
+	Dim i, j, k, l, m
+	Dim cen, ptEnd, ptSt, rad, circ1
+	Dim strCirObja, strCirObjb, strCirObjc
+	Dim strCircles1, strCircles2, strCircles3
+	Dim intPoint, arrCCX, arrCCX2, arrCCX3, arrCCX4
+	Dim arrPt, arrPtb, arrPt2, arrPtb2, arrPt3, arrPtb3, arrPt4, arrPtb4
+	Dim arrLn1, arrLn2, arrLn3, arrLn4
+	Dim strGroup, arrGroups
+	
+	arrArc = Rhino.GetObjects("Select all the Arcs")
+	rad = Rhino.GetReal("Indication size in the document unity", 1, 0.1, 1000.0)
+	Call Rhino.EnableRedraw(False)
+	Call Rhino.AddLayer("Arc Ind",RGB(0,0,255))
+	
+	For i = 0 To Ubound(arrArc)
+		
+		cen = Rhino.ArcCenterPoint(arrArc(i))
+		ptEnd = Rhino.CurveEndPoint(arrArc(i))
+		ptSt = Rhino.CurveStartPoint(arrArc(i))
+		strGroup = Rhino.AddGroup()
+		arrGroups = Rhino.GroupNames()
+
+		arrLine1 = Rhino.AddLine(cen, ptEnd)
+		arrLine2 = Rhino.AddLine(cen, ptSt)
+		
+		strCirObja = Rhino.AddCircle(Rhino.WorldXYPlane, rad)
+		strCirObjb = Rhino.AddCircle(Rhino.WorldXYPlane, rad)
+		strCirObjc = Rhino.AddCircle(Rhino.WorldXYPlane, rad)
+		strCircles1 = Rhino.MoveObject(strCirObja, array(0,0,0), cen)
+		strCircles2 = Rhino.MoveObject(strCirObjb, array(0,0,0), ptSt)
+		strCircles3 = Rhino.MoveObject(strCirObjc, array(0,0,0), ptEnd)
+
+		arrCCX = Rhino.CurveCurveIntersection(strCirObja, arrLine1)
+		For j = 0 To UBound(arrCCX)
+			arrPt = Rhino.AddPoint(arrCCX(j,1))
+			arrPtb = Rhino.PointCoordinates(arrPt)
+			arrLn1 = Rhino.AddLine(arrPtb, cen)
+			Call Rhino.ObjectLayer(arrLn1,"Arc Ind")
+			strGroup = Rhino.AddObjectToGroup(arrLn1, arrGroups(i))
+			Call Rhino.DeleteObject(arrPt)
+			
+			arrCCX2 = Rhino.CurveCurveIntersection(strCirObja, arrLine2)
+			For k = 0 To UBound(arrCCX2)
+				arrPt2 = Rhino.AddPoint(arrCCX2(k,1))
+				arrPtb2 = Rhino.PointCoordinates(arrPt2)
+				arrLn2 = Rhino.AddLine(arrPtb2, cen)
+				Call Rhino.ObjectLayer(arrLn2,"Arc Ind")
+				strGroup = Rhino.AddObjectToGroup(arrLn2, arrGroups(i))
+				Call Rhino.DeleteObject(arrPt2)
+			
+				arrCCX3 = Rhino.CurveCurveIntersection(strCirObjb, arrLine2)
+				For l = 0 To UBound(arrCCX2)
+					arrPt3 = Rhino.AddPoint(arrCCX3(l,1))
+					arrPtb3 = Rhino.PointCoordinates(arrPt3)
+					arrLn3 = Rhino.AddLine(arrPtb3, ptSt)
+					Call Rhino.ObjectLayer(arrLn3,"Arc Ind")
+					strGroup = Rhino.AddObjectToGroup(arrLn3, arrGroups(i))
+					Call Rhino.DeleteObject(arrPt3)
+					Call Rhino.DeleteObject(ArrLine2)
+					
+					arrCCX4 = Rhino.CurveCurveIntersection(strCirObjc, arrLine1)
+					For m = 0 To UBound(arrCCX2)
+						arrPt4 = Rhino.AddPoint(arrCCX4(m,1))
+						arrPtb4 = Rhino.PointCoordinates(arrPt4)
+						arrLn4 = Rhino.AddLine(arrPtb4, ptEnd)
+						Call Rhino.ObjectLayer(arrLn4,"Arc Ind")
+						strGroup = Rhino.AddObjectToGroup(arrLn4, arrGroups(i))
+						Call Rhino.DeleteObject(arrPt4)
+						Call Rhino.DeleteObject(arrLine1)
+						Call Rhino.DeleteObject(strCircles1)
+						Call Rhino.DeleteObject(strCircles2)
+						Call Rhino.DeleteObject(strCircles3)
+					
+					Next
+				Next
+				
+			Next
+			
+		Next
+		
+		Next
+		
+	
+
+		
+	Call Rhino.EnableRedraw(True)
+
+End Sub

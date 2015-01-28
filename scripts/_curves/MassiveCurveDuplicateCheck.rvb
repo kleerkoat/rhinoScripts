@@ -1,0 +1,93 @@
+Option Explicit
+'Script copyrighted by Robert McNeel & Associates
+
+'Call MassiveCurveDuplicateCheck()
+Sub MassiveCurveDuplicateCheck()
+	Dim idCurves : idCurves = Rhino.GetObjects("Select curves to check", 4, False, True, True)
+	If IsNull(idCurves) Then Exit Sub
+
+	Call Rhino.UnselectAllObjects()
+	
+	Dim N : N = 0
+
+	Dim dblTol : dblTol = Rhino.UnitAbsoluteTolerance 
+
+	Dim i, j
+	For i = 0 To UBound(idCurves)
+		For j = 0 To UBound(idCurves)
+			If i <> j Then
+				If CompareCurves(idCurves(j), idCurves(i), dblTol) Then
+					N = N+1
+					Rhino.SelectObject(idCurves(i))
+					Exit For
+				End If
+			End If
+		Next
+	Next
+End Sub
+
+Function CompareCurves(strBaseID, strCheckID, dblTol)
+	CompareCurves = False
+	
+	If Not CompareBBox(strBaseID, strCheckID) Then Exit Function
+	If Not CompareCurveEnds(strBaseID, strCheckID, dblTol) Then Exit Function
+	If Not CompareCurveSplines(strBaseID, strCheckID, dblTol) Then Exit Function
+
+	CompareCurves = True 
+End Function
+
+Function CompareBBox(strBaseID, strCheckID)
+	CompareBBox = False
+	
+	Dim boxA : boxA = Rhino.BoundingBox(strBaseID)
+	Dim boxB : boxB = Rhino.BoundingBox(strCheckID)
+	Dim i
+	
+	For i = 0 To 2
+		If boxB(0)(i) < boxA(0)(i) Then Exit Function
+		If boxB(6)(i) > boxB(6)(i) Then Exit Function	
+	Next
+	
+	CompareBBox = True
+End Function
+
+Function CompareCurveEnds(strBaseID, strCheckID, dblTol)
+	CompareCurveEnds = False
+
+	Dim A : A = Rhino.CurveStartPoint(strCheckID)
+	Dim B : B = Rhino.CurveEndPoint(strCheckID)
+
+	Dim pA : pA = Rhino.EvaluateCurve(strBaseID, Rhino.CurveClosestPoint(strBaseID, A))
+	Dim pB : pB = Rhino.EvaluateCurve(strBaseID, Rhino.CurveClosestPoint(strBaseID, B))
+
+	If SquareDistance(A, pA) > dblTol Then Exit Function
+	If SquareDistance(B, pB) > dblTol Then Exit Function
+
+	CompareCurveEnds = True
+End Function
+
+Function CompareCurveSplines(strBaseID, strCheckID, dblTol)
+	CompareCurveSplines = False
+
+	Dim A, pA
+	Dim t
+	Dim tMin : tMin = Rhino.CurveDomain(strCheckID)(0)
+	Dim tMax : tMax = Rhino.CurveDomain(strCheckID)(1)
+	Dim tStep : tStep = (tMax - tMin) / (4 * Rhino.CurvePointCount(strCheckID)) 
+
+	For t = (tMin + tStep) To (tMax - tStep) Step tStep
+		A = Rhino.EvaluateCurve(strCheckID, t)
+		pA = Rhino.EvaluateCurve(strBaseID, Rhino.CurveClosestPoint(strBaseID, A))
+
+		If SquareDistance(A, pA) > dblTol Then Exit Function
+	Next
+
+	CompareCurveSplines = True
+End Function
+
+Function SquareDistance(ByRef A, ByRef B)
+	SquareDistance = _
+	(A(0) - B(0)) * (A(0) - B(0)) + _
+	(A(1) - B(1)) * (A(1) - B(1)) + _
+	(A(2) - B(2)) * (A(2) - B(2))
+End Function

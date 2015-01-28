@@ -1,0 +1,37 @@
+Option Explicit
+Sub MakeRectangle
+
+	Dim dblWidth, dblLength, dblFillet
+
+	dblLength = Rhino.GetReal("Length of rectangle",1)
+	If IsNull (dblLength) Then Exit Sub
+		 
+	dblWidth = Rhino.GetReal("Width of rectangle",1)
+	If IsNull (dblWidth) Then Exit Sub
+	
+'	dblFillet = Rhino.GetReal("Corner radii",0.5)	
+'	If IsNull (dblFillet) Then Exit Sub
+	
+	'	Dim strLayer
+	'	strLayer = Rhino.CurrentLayer
+	'	strLayer = Rhino.GetString("Layer to set current", strLayer)
+	'	If Not IsNull(strLayer) Then
+	'		Rhino.CurrentLayer strLayer
+	'	End If
+	'	Dim arrNames(2), strName
+	'	arrNames(0) = "RedLayer"
+	'	arrNames(1) = "GreenLayer"
+	'	arrNames(2) = "BlueLayer"
+	'	strName = Rhino.GetString("New layer name", , arrNames)
+	'	If Not IsNull(strColor) Then
+	'		Rhino.AddLayer strName
+	'	End If
+	
+
+	Rhino.Command "Rectangle Pause " &dblLength &" " &dblWidth &" " &dblFillet 
+	Rhino.Command "_SelLast"
+	Rhino.Command "_FilletCorners Pause"
+	Rhino.Command "_CrvSeam"
+	
+End Sub
+MakeRectangle

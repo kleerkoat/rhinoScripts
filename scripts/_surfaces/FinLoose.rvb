@@ -1,0 +1,258 @@
+﻿Option Explicit
+
+'Script written by Pascal
+
+'Script version Friday, July 11, 2008
+
+Private dblOldOffset, sOldFinStyle
+
+If isEmpty(sOldFinStyle) Then
+	sOldFinStyle = "OneSide"
+End If
+
+If isEmpty(dblOldOffset) Then
+	dblOldOffset = 1.0
+End If
+
+Sub FinLoose()
+
+	Dim All: All = Rhino.NormalObjects
+	Dim sAll, i, aOn()
+	i = 0
+	
+	Dim temp: temp = Rhino.GetObject("Select curve to Fin", 4,True)
+	If isNull(temp) Then Exit Sub
+
+	Dim sBase: sBase = Rhino.GetObject("Select base surface",8)
+	If IsNull(sbase) Then Exit Sub
+	
+	Dim dblOffset: dblOffset = Rhino.GetReal("Fin height", dblOldOffset)
+	If Not isNumeric(dblOffset) Then Exit Sub
+	
+	dblOldOffset = dblOffset
+	
+	Dim aFinStyle, strFin
+
+	If sOldFinStyle = "BothSides" Then
+		aFinStyle = array("OneSide")
+		strFin = "Current Fin style is both sides"
+	ElseIf sOldFinStyle = "OneSide" Then
+		aFinStyle = array("BothSides")
+		strFin = "Current Fin style is one side"
+	End If
+	'		
+	Dim sBoth: sBoth = Rhino.GetString(strFin,sOldFinStyle,aFinstyle)
+	If isNull(sBoth) Then Exit Sub
+	
+	Dim Both
+	If lcase(sBoth) = "bothsides" Then
+		Both = True
+		sOldFinstyle = "BothSides"
+	Else
+		sOldFinStyle = "OneSide"
+	End If
+	
+	For Each sAll In All
+		
+		If Rhino.ObjectGripsOn(sAll) Then
+			ReDim Preserve aOn(i)
+			aOn(i) = sAll
+			i = i + 1
+			Rhino.EnableObjectGrips sAll,False
+		End If
+		
+	Next
+	
+	If Not isUpperBound(aOn) Then
+		ReDim aOn(0)
+		aOn(0) = "None"
+	End If
+	
+	Dim aLock: aLock = Rhino.ObjectsByType(1)
+	
+	If isArray(aLock) Then
+		Rhino.LockObjects(aLock)
+	Else
+		aLock = array("None")
+	End If
+	
+	Rhino.EnableRedraw(False)
+	Dim intLoop: intLoop = 0
+
+	Dim  sFlip, aSrf, sCrv, temp2, sCrv3
+
+	Do
+		sCrv = Rhino.CopyObject(temp)
+		Rhino.EnableRedraw(False)
+		
+		PullbackLoose  0, sCrv, sBase
+		
+		If intLoop = 1 Then
+			dblOffset = -dblOffset
+		End If
+		
+		sCrv3 =	OffsetCrvNormal(Rhino.CopyObject(scrv), sBase, dblOffset, aLock, aOn)
+			
+		If Both = True Then
+			
+			Dim sCrv2: sCrv2 = Rhino.CopyObject (Scrv)
+			OffsetCrvNormal sCrv2,sBase,- dblOffset, aLock, aOn
+			
+		End If
+		
+		If Both = False Then
+			Rhino.UnselectAllObjects
+			aSrf =	Rhino.AddLoftSrf (array(sCrv, sCrv3))
+			Rhino.DeleteObjects array(sCrv,sCrv3)
+			rhino.EnableRedraw
+			sFlip = Rhino.GetString ("Press Enter to accept",, array("Flip"))
+			If lcase(sFlip) = "flip" Then
+				Rhino.EnableRedraw(False)
+				rhino.DeleteObjects aSrf
+				intloop =  1
+			Else intLoop = 0
+			End If
+		Else	
+			Rhino.AddLoftSrf  array(sCrv3, sCrv2)
+			Rhino.DeleteObjects array(sCrv2, sCrv3, sCrv)
+		End If
+			
+	Loop While intLoop > 0
+	Rhino.UnselectAllObjects
+	
+	Cleanup aLock, aOn, sCrv
+	
+	Rhino.Redraw
+	
+End Sub
+
+Rhino.AddStartUpScript Rhino.LastLoadedScriptFile
+Rhino.AddAlias "FinLoose", "_NoEcho _-RunScript (FinLoose)"
+
+Function OffsetCrvNormal(sCrv, sBase, dblOffset, aLock, aOn)
+	
+	Dim aResult, sTarg, aGrips
+	
+	Rhino.UnselectAllObjects
+	Rhino.SelectObject sBase
+	
+	Rhino.Command "_OffsetSrf " &dblOffset &" "
+	
+	If Rhino.LastCommandResult = 0 Then
+		aResult = Rhino.LastCreatedObjects
+		sTarg = aresult(0)
+	End If
+
+	PullBackLoose 0, sCrv, sTarg
+	Rhino.DeleteObject starg
+	OffsetCrvNormal = sCrv
+	
+End Function
+
+Function IsUpperBound(ByRef arr)
+
+	IsUpperBound = False
+
+	If IsArray(arr) Then
+
+		On Error Resume Next
+
+		UBound arr
+
+		If Err.Number = 0 Then IsUpperBound = True
+
+	End If
+
+End Function
+
+Sub Cleanup(aLock, aOn, sCrv)
+	'    Cleanup aLock, aOn, sCrv	
+	Rhino.Command "_PointsOff "	, False
+	
+	If isArray(aLock) Then
+		If aLock(0) <> "None" Then
+			Rhino.UnlockObjects aLock
+		End If
+	End If
+	
+	Dim sOn
+	
+	If isUpperBound(aOn) Then
+		If aOn(0) <> "None" Then
+			For Each sOn In aOn
+				Rhino.EnableObjectgrips sOn,True
+			Next
+		End If
+		
+	End If
+	
+	Rhino.DeleteObject sCrv
+	Rhino.EnableRedraw
+	
+End Sub
+
+Sub PullbackLoose(Style, sCrv, sTarg)
+	
+	Dim all: all = Rhino.NormalObjects
+	Dim sAll, i, aOn()
+	i = 0
+	
+	For Each sAll In All
+		
+		If Rhino.ObjectGripsOn(sAll) Then
+			ReDim Preserve aOn(i)
+			aOn(i) = sAll
+			i = i + 1
+			Rhino.EnableObjectGrips sAll,False
+		End If
+		
+	Next
+	
+	Dim aLock: aLock = Rhino.ObjectsByType(1)
+	
+	If isArray(aLock) Then
+		Rhino.LockObjects(aLock)
+	End If
+	
+	Rhino.SelectObject sCrv
+	
+	Rhino.Command "_EditPtOn ", False
+		
+	Rhino.Command "_SelPt ", False
+	
+	Dim aGrips:aGrips = Rhino.SelectedObjectGrips(sCrv)
+	
+	If Not isArray(aGrips) Then
+		
+		Cleanup aLock, aOn, sCrv
+		Exit Sub
+		
+	End If
+	
+	Dim aDir: aDir = Rhino.ViewCPlane(Rhino.CurrentView)(3)
+	Dim Grip, aPt, aTarg(), n, temp
+	n = 0
+	
+	For Each Grip In aGrips
+		
+		Apt = Rhino.ObjectGripLocation(sCrv,Grip)
+		temp = Rhino.PullPoints(sTarg,array(aPt))
+		If Not isNull(temp) Then
+			ReDim Preserve aTarg(n)
+			aTarg(n) = temp
+			n = n +1
+		End If
+
+	Next
+	
+	If n-1 = uBound(aGrips) Then
+		
+		For i= 0 To UBound(aGrips)
+			Rhino.ObjectGripLocation sCrv, agrips(i), aTarg(i)(0)
+		Next
+		
+	End If
+	
+	Rhino.Command "_PointsOff "	, False
+
+End Sub

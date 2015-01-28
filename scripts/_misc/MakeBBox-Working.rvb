@@ -1,0 +1,21 @@
+Option Explicit
+
+Call MakeBBox()
+Sub MakeBBox
+
+	Dim dblOffsetDist, arrOffsetObjects, strObj
+
+	dblOffSetDist = Rhino.GetReal("Offset Distance",1)
+	strObj = Rhino.GetObjects ("Select Curves to Make Offset Bounding Box", 4, True, False, False)
+	
+	If IsArray(strObj) Then
+
+		Rhino.OffsetCurve strObj, Array(1,0,0), dblOffsetDist, 1
+		
+	End If
+	
+End Sub
+	
+	
+
+

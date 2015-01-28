@@ -1,0 +1,50 @@
+
+Option Explicit
+
+Sub HowMany
+
+	Dim arrObjects, U, strResult
+	arrObjects=Rhino.SelectedObjects
+
+	If IsArray(arrObjects) Then
+		U = UBound(arrObjects)
+		If U > 0 Then
+			strResult = U + 1 &" objects are selected. "
+		Else 
+			strResult = "1 object is selected"
+		End If
+	Else 
+		strResult = "No objects are selected"
+	End If
+	Rhino.Print strResult
+	MsgBox strResult, 64
+End Sub
+
+'/////////////////////////////////////
+'\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+
+Sub HowManyScene
+
+	Dim arrObjects, U, strResult
+	arrObjects=Rhino.AllObjects
+  
+	If IsArray(arrObjects) Then
+		U = UBound(arrObjects)
+		If U > 0 Then
+			strResult = U + 1 &" objects found in the file. "
+		Else 
+			strResult = "1 object found in the file."
+		End If
+	Else 
+		strResult = "No objects found in the file."
+	End If
+	Rhino.Print strResult
+	MsgBox strResult, 64
+     
+End Sub
+
+'/////////////////////////////////////
+'\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+'Rhino.AddStartUpScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "HowMany", "! _-Runscript HowMany"
+'Rhino.AddAlias "HowManyScene", "! _-Runscript HowManyScene"

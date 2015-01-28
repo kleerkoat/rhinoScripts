@@ -1,0 +1,85 @@
+'Script written by Marco Vanuci modified by Rodrigo Medina
+'To see the original version go to http://www.opensysdesign.com/
+'Script version Thursday, 05 November 2009 18:10:48
+
+Option Explicit
+
+'Call RecursiveTessalation()
+Sub RecursiveTessalation()
+	Dim idSrf : idSrf = Rhino.GetObject("Surface to recurse", 8, True, True)
+	If IsNull(idSrf) Then Exit Sub
+
+	Dim uDomain : uDomain = Rhino.SurfaceDomain(idSrf, 0)
+	Dim vDomain : vDomain = Rhino.SurfaceDomain(idSrf, 1)
+
+	Call RecurseSurface(idSrf, uDomain(0), uDomain(1), vDomain(0), vDomain(1))
+End Sub
+
+Function RecurseSurface(ByVal idSrf, ByVal u0, ByVal u1, ByVal v0, ByVal v1)
+	Dim um : um = u0 + 0.5 * (u1-u0)
+	Dim vm : vm = v0 + 0.5 * (v1-v0)
+
+	Dim A : A = Rhino.EvaluateSurface(idSrf, Array(u0, v0))
+	Dim B : B = Rhino.EvaluateSurface(idSrf, Array(u1, v0))
+	Dim C : C = Rhino.EvaluateSurface(idSrf, Array(u1, v1))
+	Dim D : D = Rhino.EvaluateSurface(idSrf, Array(u0, v1))
+	Dim E : E = Rhino.EvaluateSurface(idSrf, Array(um, vm))
+	Dim M(2)
+	m(0) = (A(0) + C(0))/2
+	m(1) = (A(1) + C(1))/2
+	m(2) = (A(2) + C(2))/2
+	Dim N(2)
+	n(0) = (D(0) + B(0))/2
+	n(1) = (D(1) + B(1))/2
+	n(2) = (D(2) + B(2))/2
+
+	If (rhino.Distance(E, M) < 0.5) And (rhino.Distance(E, N) < 0.5) Then
+		Call ExtrudeDomain (idSrf, u0, u1, v0, v1)
+	Else
+		Call RecurseSurface(idSrf, u0, um, v0, vm)
+		Call RecurseSurface(idSrf, um, u1, v0, vm)
+		Call RecurseSurface(idSrf, u0, um, vm, v1)
+		Call RecurseSurface(idSrf, um, u1, vm, v1)
+	End If
+End Function
+
+Sub ExtrudeDomain(ByVal idSrf, ByVal u0, ByVal u1, ByVal v0, ByVal v1)
+	Dim A : A = Rhino.EvaluateSurface(idSrf, Array(u0, v0))
+	Dim B : B = Rhino.EvaluateSurface(idSrf, Array(u1, v0))
+	Dim C : C = Rhino.EvaluateSurface(idSrf, Array(u1, v1))
+	Dim D : D = Rhino.EvaluateSurface(idSrf, Array(u0, v1))
+
+	Dim Na : Na = Rhino.SurfaceNormal(idSrf, Array(u0, v0))
+	Dim Nb : Nb = Rhino.SurfaceNormal(idSrf, Array(u1, v0))
+	Dim Nc : Nc = Rhino.SurfaceNormal(idSrf, Array(u1, v1))
+	Dim Nd : Nd = Rhino.SurfaceNormal(idSrf, Array(u0, v1))
+
+	Dim E : E = Rhino.vectoradd(A, Na)
+	Dim F : F = Rhino.vectoradd(B, Nb)
+	Dim G : G = Rhino.vectoradd(C, Nc)
+	Dim H : H = Rhino.vectoradd(D, Nd)
+
+	Dim line, line2,line3,line4,line5,line6
+	Dim pipeRadius:pipeRadius =1
+	Dim strcmd
+	
+	line=Rhino.AddLine(A,B)
+	strcmd ="! _-Pipe _SelID " & line & " " & pipeRadius/2 & " _Enter _Enter"
+	Call rhino.command(strcmd)
+	line2 =Rhino.AddLine(B,D)
+	strcmd ="! _Pipe _SelID " &line2 & " " & pipeRadius/2 & " _Enter _Enter"
+	Call rhino.command(strcmd)
+	line3=Rhino.addLine(D,C)
+	strcmd ="! _Pipe _SelID " &line3 & " " & pipeRadius/2 & " _Enter _Enter"
+	Call rhino.command(strcmd)
+	line4=Rhino.addLine(C,A)
+	strcmd ="! _Pipe _SelID " &line4 & " " & pipeRadius/2 & " _Enter _Enter"
+	Call rhino.command(strcmd)
+	line5=rhino.AddLine(A,D)
+	strcmd ="! _Pipe _SelID " &line5 & " " & pipeRadius/2 & " _Enter _Enter"
+	Call rhino.command(strcmd)
+	line6=rhino.AddLine(B,C)
+	strcmd ="! _Pipe _SelID " &line6 & " " & pipeRadius/2 & " _Enter _Enter"
+	Call rhino.command(strcmd)
+
+End Sub

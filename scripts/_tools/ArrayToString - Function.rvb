@@ -1,0 +1,20 @@
+Function ArrayToString(arrItems,strDelimiter)
+
+  'When not passing a custom string a strDelimiter but rather Null
+  'the default delimiter is  ","
+  If isNull (strDelimiter) Then strDelimiter=","
+
+  Dim i, str
+
+    For i=0 to Ubound(arrItems)
+     If i=0 then
+      str=Cstr(arrItems(i))
+     Else
+      str=str&","&Cstr(arrItems(i)) 'for a comma separated string
+     EndIf
+    Next
+
+
+  ArrayToString = str
+
+End Function 

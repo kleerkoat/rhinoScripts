@@ -1,0 +1,23 @@
+Option Explicit
+
+'Script written by Davide del Giudice
+'Script copyrighted by Co-de-iT www.co-de-it.com
+'Script version Friday, 26 February 2010 11:40:04
+
+Call GradientDots()
+Sub GradientDots()
+
+Dim arrobjects,count,strobjects,arrpt
+Dim strDot
+arrobjects=rhino.GetObjects("select points",1)
+
+For Each strobjects In arrobjects
+
+arrPt = rhino.pointCoordinates(strobjects)
+count=count+1
+
+strDot=Rhino.AddTextDot ("p."& count, arrPt)
+Call Rhino.ObjectColor(strDot, RGB(count/5,count/10,count+5))
+Next
+
+End Sub

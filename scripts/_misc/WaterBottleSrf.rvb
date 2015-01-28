@@ -1,0 +1,47 @@
+﻿Option Explicit
+'Script written by Rodrigo Medina
+'Script copyrighted by designplaygrounds.com
+'This script is Protected under a Creative Commons 2.5 Licence
+'If you are going to use it for comercial purposes please notify to rodrigo_medina23@hotmail.com
+'Script version thursday , 11 -04-08
+Call BottleSurface()
+Sub BottleSurface()
+	Dim i, IntUpper : IntUpper =18
+	Dim arrMajorPointb()
+	Dim arrMajorPointc()
+	Dim arrMajorPointd()
+	Dim arrMajorPointe()
+	Dim arrMajorPointf()
+	Dim arrMajorCross()
+	For i = 0 To IntUpper
+		ReDim Preserve arrMajorPointa(IntUpper)
+		ReDim Preserve arrMajorPointb(IntUpper)
+		ReDim Preserve arrMajorPointc(IntUpper)
+		ReDim Preserve arrMajorPointd(IntUpper)
+		ReDim Preserve arrMajorPointe(IntUpper)
+		ReDim Preserve arrMajorPointf(IntUpper)
+		ReDim Preserve arrMajorPointg(IntUpper)
+		ReDim Preserve arrMajorPointh(IntUpper)
+		ReDim Preserve arrMajorPointi(IntUpper)
+		ReDim Preserve arrMajorPointj(IntUpper)
+		ReDim Preserve arrMajorPointk(IntUpper)
+		ReDim Preserve arrMajorPointl(IntUpper)
+		ReDim Preserve arrMajorCross(IntUpper)
+		arrMajorPointa(i) = Rhino.PointCoordinates (Rhino.AddPoint(array (cos(i),sin(i),i)))
+		arrMajorPointb(i) = Rhino.PointCoordinates (Rhino.AddPoint (array(2,5,i)))
+		arrMajorPointc(i) = Rhino.PointCoordinates (Rhino.AddPoint (array(3,1.5,i)))
+		arrMajorPointd(i) = Rhino.PointCoordinates (Rhino.AddPoint (array(5,-sin(i),i)))
+		arrMajorPointe(i) = Rhino.PointCoordinates (Rhino.AddPoint (array(3,-1.5,i)))
+		arrMajorPointf(i) = Rhino.PointCoordinates (Rhino.AddPoint (array(3,-4,i)))
+		arrMajorPointg(i) = Rhino.PointCoordinates (Rhino.AddPoint (array(sin(i),-cos(i),i)))
+		arrMajorPointh(i) = Rhino.PointCoordinates (Rhino.AddPoint (array(-3,-4,i)))
+		arrMajorPointi(i) = Rhino.PointCoordinates (Rhino.AddPoint (array(-3,-1.5,i)))
+		arrMajorPointj(i) = Rhino.PointCoordinates (Rhino.AddPoint (array(-5,cos(i),i)))
+		arrMajorPointk(i) = Rhino.PointCoordinates (Rhino.AddPoint (array(-3,1.5,i)))
+		arrMajorPointl(i) = Rhino.PointCoordinates (Rhino.AddPoint (array(-3,4,i)))
+		arrMajorCross(i) = Rhino.AddCurve (Array(arrMajorPointa(i),arrMajorPointb(i),arrMajorPointc(i),arrMajorPointd(i),arrMajorPointe(i),arrMajorPointf(i),arrMajorPointg(i),arrMajorPointh(i),arrMajorPointi(i),arrMajorPointj(i),arrMajorPointk(i),arrMajorPointl(i),arrMajorPointa(i)),3)
+
+		Call Rhino.RotateObject(arrMajorCross(i),array(0,0,i),4*sin(i))
+	Next
+	Call Rhino.AddLoftSrf (arrMajorCross)
+End Sub

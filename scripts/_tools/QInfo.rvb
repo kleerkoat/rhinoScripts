@@ -1,0 +1,193 @@
+Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version Tuesday, November 01, 2011 7:50:55 AM
+'Rhino.AddStartUpScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "QInfo", "_NoEcho _-Runscript (QInfo)"
+
+'Call QInfo()
+Sub QInfo()
+
+	
+	Dim aObj: aObj = Rhino.SelectedObjects()
+	If not isArray(aObj) then exit sub
+	dim sObj
+	dim c,s,p,m
+	c = 0
+	s = 0
+	p = 0
+	m = 0
+	
+	dim aCrv(), aSrf(), aPOly(), aMesh()
+	for each sObj in aObj
+		If Rhino.IsCurve(sObj) Then
+			redim preserve aCrv(c) 
+			aCrv(c) = sObj
+			c = c +1
+			
+		ElseIf Rhino.IsSurface(sObj) then
+			redim preserve aSrf(s)
+			aSrf(s) = sObj
+			s = s + 1
+			
+		elseif Rhino.IsPolysurface(sObj) then
+			Redim Preserve aPoly(p)
+			aPoly(p) = sObj
+			p = p + 1
+			
+		elseIf Rhino.IsMesh(sObj) then
+			redim preserve aMesh(m)
+			aMesh(m) = sObj
+			m = M + 1
+		End If
+		
+	Next
+	
+	dim sClosed, intDeg, intPt, intPoly, temp, n
+	
+	if c > 0 then
+		n = 0
+		dim aCrvInfo()
+		for each sObj in aCrv
+			sClosed = "Open "
+	
+			If Rhino.IsCurveClosed(sObj) then	sClosed = "Closed "
+			intPt = Rhino.CurvePointCount(sObj)
+			intDeg = Rhino.CurveDegree(sObj)
+			
+			redim preserve aCrvInfo(n)
+			aCrvInfo(n) = sClosed & "curve, Degree = " & intDeg & ";" & chr(9) & chr(9) & "Points = " & intPt & "."
+			n = n + 1
+		Next
+	End If
+	
+		
+	if s > 0 then
+		n = 0
+		dim intPtU, intPtV, intDegU, intDegV
+		dim aSrfInfo()
+		for each sObj in aSrf
+			sClosed = "Open "
+
+			if Rhino.isSurfaceClosed(sObj,0) then 
+
+				if Rhino.isSurfaceClosed(sObj,1) then
+
+					sClosed = "Closed "
+				end if
+			end if
+			
+			intDegU = Rhino.SurfaceDegree(sObj, 0)
+			intDegV = Rhino.SurfaceDegree(sObj, 1)
+			temp = Rhino.SurfacePointCount(sObj)
+			intPtU = temp(0)
+			intPtV = temp(1)
+		
+			temp =  sClosed & " surface." & vbNewLine & chr(9) & chr(9) &"U Degree = "  & intDegU & vbNewLine  & chr(9) & chr(9)  & "U Points =  "& intPtU 
+			temp = temp & vbNewLine  & chr(9) &  chr(9) &"V Degree = "  & intDegV &  vbNewLine & chr(9) &chr(9) & "V Points =  "& intPtV 
+			redim preserve aSrfInfo(n) 
+			aSrfInfo(n) = temp
+			n = n + 1
+		Next
+		
+	End If
+	
+	
+	if p > 0 then
+		n = 0
+		dim aPolyInfo()
+		for each sObj in aPoly
+			sClosed = "Open "
+	
+			If Rhino.IsPolySurfaceClosed(sObj) then	sClosed = "Closed "
+			redim preserve aPolyInfo(n)
+			aPolyInfo(n) = sClosed & "polysurface."
+			n = n + 1
+		Next
+	End If
+	
+	
+	if m > 0 then
+		n = 0
+		
+		dim aMeshInfo(), intMeshPt, intFace
+		for each sObj in aMesh
+			If Rhino.IsMeshClosed(sObj) then	sClosed = "Closed "
+			intMeshPt = Rhino.meshVertexCount(sObj)
+			intFace = Rhino.MeshFaceCount(sobj)
+			
+			redim preserve aMeshinfo(n)
+			aMeshinfo(n) = sClosed & " mesh with " & IntFace & " faces, " & intMeshPt &" vertices."
+			n = n + 1
+		next
+	End If
+	
+	if n = 0 then exit sub
+	
+	dim Num: Num = Ubound(aObj) + 1
+	dim intDif: intDif = num - (c + s + p + m)
+	
+	dim str : str = cstr(Num) & " objects selected."
+	dim sDivider: sDivider = vbNewLine & "***************" & vbNewLine
+	dim item
+	if c> 0 then
+		dim sCrv: sCrv = " curves:"
+		if c = 1 then sCrv = " curve:"
+		
+		str = str &  sDivider & c & sCrv & vbNewline
+		for each item in aCrvInfo
+			
+			str = str & vbNewLine & item 
+		Next
+			
+		str = str & vbNewLine 
+	End If
+	
+	if s > 0 then
+		
+		dim sSrf: sSrf = " surfaces:"
+		if s = 1 then sSrf = " surface:"
+		str = str  &  sDivider & s & sSrf & vbNewline
+		
+		for each item in aSrfInfo
+			
+			str = str & vbNewLine & item 
+		Next
+		
+		str = str & vbNewLine
+	End If
+	
+	if  p > 0 then
+		dim sPOly: sPoly = " polysurfaces:"
+		if p = 1 then sPOly = " polysurface:"
+		str = str &  sDivider & p & sPoly & vbNewline
+		
+		for each item in aPolyInfo
+			
+			str = str & vbNewLine & item
+		Next
+			
+		str = str & vbNewLine
+	End If
+	
+	if  m > 0 then
+		dim sMesh: sMesh = " meshes:"
+		if m = 1 then smesh = " mesh:"
+		str = str &  sDivider & m & smesh & vbNewline
+		for each item in aMeshInfo
+			
+			str = str & vbNewLine & item
+		Next
+			
+		str = str & vbNewLine
+	End If
+	
+	dim sOther: sOther = " other object."
+	if intDif <> 1 then sOther = " other objects."
+	str = str & sDivider & intDif & sOther
+	
+	'	If S > 1 Then	Rhino.Command "_Dir"
+	Rhino.TextOut str
+	
+	
+End Sub

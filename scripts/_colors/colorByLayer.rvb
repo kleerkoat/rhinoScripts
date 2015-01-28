@@ -1,0 +1,21 @@
+Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version Wednesday, September 01, 2010 10:33:38 AM
+
+'Call colorByLayer()
+Sub colorByLayer()
+
+	Dim arrObjects, strObject
+	
+	arrObjects = Rhino.GetObjects("Select objects", 0, True, True)
+	If IsArray(arrObjects) Then
+		Rhino.EnableRedraw False
+		For Each strObject In arrObjects
+			Rhino.ObjectColorSource strObject, 0
+		Next
+		Rhino.EnableRedraw True
+		Erase arrObjects
+	End If
+
+End Sub

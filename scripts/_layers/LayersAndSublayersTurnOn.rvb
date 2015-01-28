@@ -1,0 +1,35 @@
+Option Explicit
+'Script written by Mitch Heynick
+'Script version Wednesday, March 16, 2011
+'V4 or V5
+
+'Call LayersAndSublayersTurnOn()
+Sub LayersAndSublayersTurnOn()
+
+	Dim arrLayers,strLayer
+	If Rhino.ExeVersion()=5 Then
+		arrLayers=Rhino.GetLayers("Select layers to turn on")
+		If Not IsArray(arrLayers) Then Exit Sub
+		For Each strLayer In arrLayers
+			Call Rhino.LayerVisible(strLayer,True)
+			TurnOnChildLayers(strLayer)
+		Next
+	Else
+		strLayer=Rhino.GetLayer("Select layer to turn on")
+		If IsNull(strLayer) Then Exit Sub
+		Call Rhino.LayerVisible(strLayer,True)
+		Call TurnOnChildLayers(strLayer)			
+	End If	
+End Sub
+
+Function TurnOnChildLayers(Layer)
+	Dim arrChildren,strChild
+	arrChildren=Rhino.LayerChildren(Layer)
+	If IsArray(arrChildren) Then
+		For Each strChild In arrChildren
+			Call Rhino.LayerVisible(strChild,True)
+			Call TurnOnChildLayers(strChild)			
+		Next
+	End If
+End Function
+

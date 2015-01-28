@@ -1,0 +1,96 @@
+' Script for Rhinoceros 3.0 Sr3
+' add single RiBlobby 1001 object to render with RiBlobby Exporter
+' © 2004 Clement Greiner
+
+' 12.05.2005 // fixed bug  with float error from user data
+' 12.05.2005 // fixed bug with 2 pick points at same location
+
+Option Explicit
+Sub AddSingleSegment
+Dim Ready, dblRadius, IntRiInfluence, StrRiInfluence
+Dim arrStart, arrEnd, StrSegment
+
+' search for a default radius in this document, define
+	dblRadius = Rhino.GetDocumentData("RandomBubbles", "Radius")
+	If IsNull(dblRadius) Then dblRadius = 1 Else dblRadius = CDbl(dblRadius)
+' search for a default RiBlobby influence in this document, define
+	intRiInfluence = Rhino.GetDocumentData("RandomBubbles", "RiInfluence")
+	If IsNull(intRiInfluence) Then intRiInfluence = 1
+' define radius for the segments to add
+	dblRadius = Rhino.GetReal("Enter Segment Radius",dblRadius, CDbl(Rhino.UnitAbsoluteTolerance))
+	If IsNull(dblRadius) Then Exit Sub
+	' store
+	Rhino.SetDocumentData "RandomBubbles", "Radius", dblRadius
+' define influence
+	If intRiInfluence = 1 Then StrRiInfluence = "Positive" Else StrRiInfluence = "Negative"
+	StrRiInfluence = Rhino.GetString("Choose RiBlobby Influence mode", StrRiInfluence, Array("Positive","Negative"))
+	If IsNull(StrRiInfluence) Then Exit Sub
+	If StrRiInfluence = "Positive" Then IntRiInfluence = 1 Else IntRiInfluence = -1
+	' store
+	Rhino.SetDocumentData "RandomBubbles", "RiInfluence", intRiInfluence
+
+' draw blobby segments from these values
+Do
+	arrStart = Rhino.GetPoint("Start point of segment blob")
+	If Not IsArray(arrStart) Then Exit Do
+	arrEnd = Rhino.GetPoint("End point of segment blob", arrStart)
+	If Not IsArray(arrEnd) Then Exit Do
+	' create segment geometry if both points are not equal
+	If PtComp(arrStart,arrEnd) = 1 Then
+		StrSegment = ADD_Segment(arrStart,arrEnd,dblRadius)
+		' assign Ri user data to segment
+		ADD_SegmentUserData StrSegment, arrStart, arrEnd, dblRadius, intRiInfluence
+	End If
+Loop
+
+End Sub
+
+' function to create a revolved segment blob from 2 points and radius
+Private Function ADD_Segment(arrStartPt,arrEndPt,dblnRadius)
+Dim arrTemp, arrSegStart,arrSegEnd, arrPoleStart, arrPoleEnd, arrPtOnArcStart, arrPtOnArcEnd
+Dim dblValue, StrSeg, StrStartArc, StrEndArc, arrResult
+arrTemp = Array(Rnd(10),Rnd(10),0)
+arrSegStart = Rhino.XFormCPlaneToWorld(Array(0,0,dblnRadius), Array(arrStartPt,arrEndPt,arrTemp))
+arrSegEnd = Rhino.XFormCPlaneToWorld(Array(0,0,-dblnRadius), Array(arrEndPt,arrStartPt,arrTemp))
+arrPoleStart = Rhino.XFormCPlaneToWorld(Array(-dblnRadius,0,0), Array(arrStartPt,arrEndPt,arrTemp))
+arrPoleEnd = Rhino.XFormCPlaneToWorld(Array(-dblnRadius,0,0), Array(arrEndPt,arrStartPt,arrTemp))
+dblValue = 0.5 * Sqr((dblnRadius^2)+(dblnRadius^2))
+arrPtOnArcStart = Rhino.XFormCPlaneToWorld(Array(dblValue,dblValue,0), Array(arrStartPt,arrSegStart,arrPoleStart))
+arrPtOnArcEnd = Rhino.XFormCPlaneToWorld(Array(dblValue,dblValue,0), Array(arrEndPt,arrSegEnd,arrPoleEnd))
+Rhino.EnableRedraw(vbFalse)
+StrSeg = Rhino.AddLine (arrSegStart, arrSegEnd)
+StrStartArc = Rhino.AddArc3Pt(arrSegStart,arrPoleStart,arrPtOnArcStart)
+StrEndArc = Rhino.AddArc3Pt(arrSegEnd,arrPoleEnd,arrPtOnArcEnd)
+arrResult = Rhino.JoinCurves(Array(StrSeg,StrStartArc,StrEndArc),vbTrue)
+Rhino.SelectObject arrResult(0)
+Rhino.Command "_-Revolve w" & Pt2Str(arrPoleStart) & " w" & Pt2Str(arrPoleEnd) & " _StartAngle=0 _EndAngle=360  _DeleteInput=_Yes _Enter", vbFalse
+ADD_Segment = Rhino.LastObject
+Rhino.EnableRedraw(vbTrue)
+End Function
+
+' Function to add 1002 user data to segment
+Private Function ADD_SegmentUserData(StrSegment,arrStart,arrEnd,dblRadius,intRiInfluence)
+Dim StrInfluence
+' store the "Opcode" to include this object as 1001 (ellipsoid) = spherical
+Rhino.SetObjectData StrSegment, "RandomBubbles", "RiOpcode", 1002
+Rhino.SetObjectData StrSegment, "RandomBubbles", "StartPoint", Pt2Str(arrStart)
+Rhino.SetObjectData StrSegment, "RandomBubbles", "EndPoint", Pt2Str(arrEnd)
+Rhino.SetObjectData StrSegment, "RandomBubbles", "Radius", CStr(dblRadius)
+Rhino.SetObjectData StrSegment, "RandomBubbles", "RiInfluence", intRiInfluence
+' display the data values to assign
+If intRiInfluence = -1 Then StrInfluence = "Negative" Else StrInfluence = "Positive"
+Rhino.Print "RiOpcode: " & 1002 & "  StartPt: " & Pt2Str(arrStart,3) & "  EndPt: " & Pt2Str(arrEnd,3) & "  Radius: " & dblRadius & "  RiInfluence: " & StrInfluence
+End Function
+
+' function to compare 2 pts, returns 0 if points are equal, otherwise returns 1
+Private Function PtComp(ByVal arrA, ByVal arrB)
+If StrComp(arrA(0),arrB(0)) = 0 And StrComp(arrA(1),arrB(1)) = 0 And StrComp(arrA(2),arrB(2)) = 0 Then
+		PtComp = 0
+		Exit Function
+Else
+	PtComp = 1
+End If
+End Function
+
+
+AddSingleSegment

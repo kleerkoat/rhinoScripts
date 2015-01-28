@@ -1,0 +1,24 @@
+Private oldLen, oldAng
+
+If isEmpty(oldlen) Then
+	OldLen = 1
+End If
+
+
+If isEmpty(oldang) Then
+	OldAng = 10
+End If
+
+
+Call.....
+Sub.....
+
+	Dim dblAng, dblLen
+	
+	dblAng = Rhino.getreal("Fin angle.", oldAng, 0, 90)
+	If isNull(dblANg) Then Exit Sub
+	OldAng = dblAng
+	
+	dbllen = Rhino.getreal("Fin depth.", oldlen, 10 * Rhino.UnitAbsoluteTolerance())
+	If isNull(dblLen) Then Exit Sub
+	OldLen = dblLen

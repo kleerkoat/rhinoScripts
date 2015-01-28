@@ -1,0 +1,91 @@
+Option Explicit
+'Original Script  written by roland snooks  |  kokkugia.com  | 2008
+'modified by Rodrigo Medina / designplaygrounds.com 16/01/2010
+'Use only for research purposes 
+
+'Call recursiveAggregation()
+
+Sub recursiveAggregation()
+
+	Dim objArr(12), gens
+
+	gens = Rhino.GetReal("num of generations", 5)
+	
+	objArr(0) = Rhino.GetObject("base object")
+	
+	objArr(1) = Rhino.GetObject("select r1", 1)
+	objArr(2) = Rhino.GetObject("select r 2", 1)
+	objArr(3) = Rhino.GetObject("select r 3", 1)
+	
+	objArr(4) = Rhino.GetObject("select t1,1", 1)
+	objArr(5) = Rhino.GetObject("select t1,2", 1)
+	objArr(6) = Rhino.GetObject("select t1,3", 1)
+	objArr(7) = Rhino.GetObject("select t2,1", 1)
+	objArr(8) = Rhino.GetObject("select t2,2", 1)
+	objArr(9) = Rhino.GetObject("select t2,3", 1)
+	objArr(10) = Rhino.GetObject("select t3,1", 1)
+	objArr(11) = Rhino.GetObject("select t3,2", 1)
+	objArr(12) = Rhino.GetObject("select t3,3", 1)
+	
+
+	
+	aggregate objArr, gens
+	
+
+	
+End Sub
+
+
+Function aggregate(objArr, gens)
+
+	Dim count, i, baseArrPts(), tarArrPts1(), tarArrPts2(),tarArrPts3(), objArr1, objArr2,objArr3
+	
+	If gens > 0 Then
+	
+		' get locations of base points
+		count = 0 
+		For i = 1 To 3
+			ReDim Preserve baseArrPts(count)
+			baseArrPts(count) = Rhino.PointCoordinates(objArr(i))			
+			count = count +1
+		Next
+
+		' get locations of target1 points
+		count = 0
+		For i = 4 To 6
+			ReDim Preserve tarArrPts1(count)
+			tarArrPts1(count) = Rhino.PointCoordinates(objArr(i))
+			count = count +1
+		Next
+		
+		' get locations of target2 points
+		count = 0
+		For i = 7 To 9
+			ReDim Preserve tarArrPts2(count)
+			tarArrPts2(count) = Rhino.PointCoordinates(objArr(i))
+			count = count +1
+		Next
+		
+		' get locations of target3 points
+		count = 0
+		For i = 10 To 12
+			ReDim Preserve tarArrPts3(count)
+			tarArrPts3(count) = Rhino.PointCoordinates(objArr(i))
+			count = count +1
+		Next
+		
+		
+		' orient objects 
+		objArr1 = Rhino.OrientObjects(objArr, baseArrPts, tarArrPts1, 1)
+		objArr2 = Rhino.OrientObjects(objArr, baseArrPts, tarArrPts2, 1)
+		objArr3 = Rhino.OrientObjects(objArr, baseArrPts, tarArrPts3, 1)
+		
+		' call recursive function
+		aggregate objArr1, gens - 1
+		aggregate objArr2, gens - 1
+		aggregate objArr3, gens - 1
+		
+				
+	End If
+	
+End Function

@@ -1,0 +1,77 @@
+Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version Friday, May 20, 2011 22:00:23
+
+Call Main()
+Sub Main()
+
+	
+	
+	
+	
+	
+	Dim strSVGFile
+	strSVGFile = Rhino.OpenFileName("Select SVG file to import via Inkscape PDF", ".svg |*.svg")
+	If (IsNull(strSVGFile)) Then
+		Exit Sub
+	End If
+	
+	
+	
+	
+	Dim strInkscapeEXE 'path and file
+	strInkscapeEXE = _
+   "C:\Program Files (x86)\Inkscape\inkscape.exe"'SETUP MARKER: Inkscape Executable
+	
+	
+	
+	Dim fso
+	Set fso = CreateObject("Scripting.FileSystemObject")
+	
+	
+	'check if EXE file exists
+	If Not fso.FileExists(strInkscapeEXE) Then
+		strInkscapeEXE = Rhino.OpenFileName ("Get Inkscape executable" , "Inkscape executable (.exe)|*.exe")
+	End If 
+	
+	
+	If isNull(strInkscapeEXE) Then 
+		Set fso = Nothing
+		Exit Sub
+	End If
+	
+	
+	Dim strPDFfile
+	strPDFfile = left(strSVGFile,(len(strSVGFile)-3))  &  "pdf"
+	
+	
+	'inkscape commandline svg to pdf conversion
+	Dim strSVGtoPDF
+	strSVGtoPDF = strInkscapeEXE&" "&Chr(34)&strSVGFile&Chr(34)&" --export-pdf="&Chr(34)&strPDFfile&Chr(34)
+	
+	
+	'run inkscape from commandline to convert SVG to PDF
+	Dim shell
+	Set shell = CreateObject("WScript.Shell")
+	'run inkscape and wait for it to be finished
+	shell.Run  strSVGtoPDF, 1, true
+	
+	
+	'Here the pdf should be imported
+	Call Rhino.Command ("!_-Import "&Chr(34)&strPDFfile&Chr(34)&" ")
+		
+	
+	'Delete SVG file
+	If fso.FileExists(strPDFfile) Then
+		fso.DeleteFile strPDFfile
+	End If 
+	
+	
+	
+	Set shell = Nothing
+	Set fso = Nothing
+	
+	
+	
+End Sub

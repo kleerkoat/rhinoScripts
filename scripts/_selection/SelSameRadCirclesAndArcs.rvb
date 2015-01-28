@@ -1,0 +1,32 @@
+Option Explicit
+'Script written by Mitch
+'Script version Monday, October 25, 2010
+
+'Call SelSameRadCirclesAndArcs()
+Sub SelSameRadCirclesAndArcs()
+
+	Dim strCirc,dblRad,arrAllCrvs,strCrv,dblTol
+	strCirc=Rhino.GetObject("Select circle to match radius",4,True)
+	If IsNull(strCirc) Then Exit Sub
+	dblTol=Rhino.UnitAbsoluteTolerance
+	
+	If Rhino.IsCircle(strCirc) Then
+		dblRad=Rhino.CircleRadius(strCirc)
+	ElseIf Rhino.IsArc(strCirc) Then
+		dblRad=Rhino.ArcRadius(strCirc)
+	Else 
+		Exit Sub
+	End If	
+	arrAllCrvs=Rhino.ObjectsByType(4)
+	For Each strCrv In arrAllCrvs
+		If Rhino.IsCircle(strCrv) Then
+			If Abs(Rhino.CircleRadius(strCrv)-dblRad)<dbltol Then
+				Call Rhino.SelectObject(strCrv)
+			End If
+		ElseIf Rhino.IsArc(strCrv) Then
+			If Abs(Rhino.ArcRadius(strCrv)-dblRad)<dbltol Then
+				Call Rhino.SelectObject(strCrv)
+			End If
+		End If
+	Next		
+End Sub

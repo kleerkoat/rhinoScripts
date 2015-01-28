@@ -1,0 +1,65 @@
+Option Explicit
+'Script written by Pascal
+'RMA
+'Script version Wednesday, January 09, 2008
+
+'Select lines parallel to a selected line
+'Call SelParallel
+
+Sub SelParallelCrvs()
+	
+	Dim aLines(), i
+	Dim sObj
+	
+	Dim aObj: aObj = Rhino.ObjectsBytype(4)
+	
+	
+	Dim sLine: sLine = Rhino.GetObject ("Select line",4,True,True)
+	If Not Rhino.isLine(sLine) Then Exit Sub
+	For Each sObj In aObj
+		If Rhino.IsLine(sObj) And Rhino.IsObjectSelectable(sObj) Then
+		ReDim Preserve aLines(i)
+			aLines(i) = SObj
+			i = i + 1
+		End If
+	Next
+	
+	If Not isUpperBound(aLines) Then
+		msgBox "No other lines found."
+		Exit Sub
+	End If
+	
+	Dim aStart: aStart = Rhino.CurveStartPoint(sline)
+	Dim aEnd: aEnd = Rhino.CurveEndPoint(sLine)
+	
+	Dim vec1: vec1 = Rhino.VectorCreate(aEnd, aStart)
+	Dim Line, temp1, temp2,tempVec, X
+	
+	X = 0
+	
+	Rhino.EnableRedraw(False)
+	For Each Line In aLines
+		If Line <> sLine Then
+		temp1 = Rhino.CurveStartPoint(Line)
+		temp2 = Rhino.CurveEndPoint(Line)
+		tempVec = Rhino.VectorCreate(temp2, temp1)
+		
+		If Rhino.IsVectorParallelTo(Vec1,tempVec)<>0 Then
+			Rhino.SelectObject Line
+			X = X +1
+		End If
+		End If
+		
+	Next
+	Rhino.EnableRedraw(True)
+	
+	If X = 0 Then 
+		Rhino.Print "No parallel lines found."
+	Else Rhino.Print X & " lines added to the selection."
+		
+	End If
+	
+End Sub
+
+'Rhino.AddAlias "SelParallel", "_noEcho _-Runscript SelParallel"
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile

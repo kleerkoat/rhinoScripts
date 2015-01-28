@@ -1,0 +1,23 @@
+﻿
+Option Explicit
+
+Call SeadekViewportSample()
+Sub SeadekViewportSample()
+	Dim RhPicture
+	Set RhPicture = Rhino.GetPluginObject("RhPicture")
+	
+	If Not RhPicture.LoadImageFromViewport(, 1491, 841) Then Exit Sub
+		
+	Dim yOffset : yOffset = RhPicture.Height() - 20
+	Call RhPicture.FillRectangle(Array(0, yOffset), RhPicture.Width, 20, Array(255, 255, 255, 128))
+	Call RhPicture.DrawLine(Array(0, yOffset), Array(RhPicture.Width, yOffset), vbBlack, 1)
+	
+	Dim RhinoFont : Set RhinoFont = RhPicture.CreateFont("Arial", 14, True, False)
+	'Dim CerosFont : Set CerosFont = RhPicture.CreateFont("Arial", 12, True, True)
+	
+	Call RhPicture.DrawString("SEADEK - FOR REFERENCE ONLY", Array(1150, yOffset), RhinoFont, vbRed) 
+	'Call RhPicture.DrawString("FOR REFERENCE ONLY", Array(48, yOffset), CerosFont, vbRed) 
+	
+	Call RhPicture.ShowImage()
+End Sub
+

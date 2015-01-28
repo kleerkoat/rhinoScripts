@@ -1,0 +1,77 @@
+﻿
+'Tools for selecting hatches, hatches by color, 
+'and block instances by name by selection or list.
+Option explicit
+
+Sub SelHatch
+	Dim arrObj
+	arrObj = Rhino.ObjectsByType(65536)
+	If IsArray (arrObj) Then
+		Rhino.SelectObjects(arrObj)
+	End If
+End Sub
+
+'/////////////////////////////////
+'/////////////////////////////////
+
+Sub SelHatchByColor
+  
+	Dim arrSel, arrTemp(), arrHatch, arrColor
+	Dim strHatch, strColor, i
+	i = 0
+  
+	arrSel = Rhino.getobjects("Select objects",65536,True,True)
+	If IsArray(arrSel) Then
+		For Each strSel In ArrSel
+			ReDim Preserve arrTemp(i)
+			arrTemp(i) = Rhino.ObjectColor(strSel)
+				i = i + 1
+		Next
+	End If
+    
+	If IsUpperBound(arrtemp) Then
+		arrColor = Rhino.CullDuplicateNumbers(arrTemp)
+			Else Exit Sub
+	End If
+    
+	ArrHatch = Rhino.ObjectsByType(65536)
+	If IsArray(arrHatch) Then
+		For Each strHatch In arrHatch
+			For Each strColor In arrColor
+				If Rhino.ObjectColor(strHatch) = strColor Then
+					Rhino.Selectobject strHatch
+				End If
+			Next
+		Next
+	End If
+    
+End Sub  
+    
+'/////////////////////////////////////
+'/////////////////////////////////////
+
+
+Function IsUpperBound(ByRef arr)
+
+	IsUpperBound = False
+
+	If IsArray(arr) Then
+
+		On Error Resume Next
+
+		UBound arr
+
+		If Err.Number = 0 Then IsUpperBound = True
+
+	End If
+
+End Function
+
+
+'///////////////////////////////
+'///////////////////////////////
+
+Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+
+Rhino.AddAlias "SelHatch", "_-Runscript Selhatch"
+Rhino.AddAlias "SelHatchbyColor", "_-Runscript SelHatchbyColor"

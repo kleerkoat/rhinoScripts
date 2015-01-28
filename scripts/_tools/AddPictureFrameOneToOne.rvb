@@ -1,0 +1,37 @@
+Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version Friday, 10 June 2011 10:30:09
+
+'Call AddPictureFrameOneToOne()
+Sub AddPictureFrameOneToOne()
+	Dim bmp, info, pl
+	Dim pw, ph, px, py
+	Dim us, uw, uh
+ 
+	bmp = Rhino.OpenFileName("Open", "All Files (*.*)|*.*||")
+	If IsNull(bmp) Then Exit Sub
+  
+	info = Rhino.ImageInfo(bmp)
+	If IsNull(info) Then Exit Sub
+ 
+	pw = info(0) ' width in pixels
+	ph = info(1) ' height in pixels
+	px = info(2) ' horizontal pixels per inch
+	py = info(3) ' vertical pixels per inch
+ 
+	us = Rhino.UnitScale(8) ' unit scale factor
+	uw = pw / (us * px)     ' scaled width
+	uh = ph / (us * py)     ' scaled height
+ 
+	
+	pl = Rhino.WorldXYPlane
+	Call Rhino.AddPictureFrame(pl, bmp, uw, uh)
+	
+
+
+End Sub
+
+'add a startup script and make a command alias to run the script
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.addAlias "AddPictureFrameOneToOne", "! _-NoEcho _-Runscript AddPictureFrameOneToOne"

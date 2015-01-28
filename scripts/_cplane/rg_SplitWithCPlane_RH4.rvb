@@ -1,0 +1,55 @@
+' Script for Rhinoceros 3.0 Sr3 and higher - Split objects with current CPlane
+' © Clement Greiner, CG3D 2003
+
+Option Explicit
+Call SplitWithCPlane()
+Sub SplitWithCPlane()
+
+Dim arrObjects, arrBox, dblDimension, arrMidPoint, strSplitPlane, strCMD
+' get objs to split
+arrObjects = Rhino.GetObjects("Select objects to split with current CPlane", 4+8+16 , vbTrue, vbTrue, vbTrue)
+If Not IsArray(arrObjects) Then ExitMsg : Exit Sub
+
+' define the dimension of the cutting plane
+arrBox = Rhino.BoundingBox(arrObjects, CStr(Rhino.CurrentView), vbFalse)
+If Not IsArray(arrBox) Then ExitMsg : ExitSub
+dblDimension = Rhino.Distance(arrBox(0),arrBox(6)) / 2
+
+' get the cutting plane center point
+arrMidPoint = GET_MidPtFromPts(arrBox(0),arrBox(6))
+If Not IsArray(arrMidPoint) Then ExitMsg : Exit Sub
+
+Rhino.EnableRedraw(vbFalse)
+
+' create cutplane
+Rhino.Command "_Plane _Center " & arrMidPoint(0) & "," & arrMidPoint(1) & " r" & dblDimension & "," & dblDimension, vbFalse
+strSplitPlane = Rhino.LastCreatedObjects()(0)
+If IsNull (strSplitPlane) Then Print "Error - no Splitplane created !" : Exit Sub
+If Not Rhino.IsSurface Then Exit Sub
+
+' split with cut plane
+strCMD = "_Split _SelID " & strSplitPlane & " Enter"
+Rhino.Command strCMD, vbFalse
+Rhino.DeleteObject strSplitPlane
+
+Rhino.EnableRedraw(vbTrue)
+
+End Sub
+
+Public Function ExitMsg
+Rhino.Print "Command canceled."
+End Function
+
+Private Function GET_MidPtFromPts (ByRef FirstPt, ByRef SecondPt)
+Dim X,Y,Z
+If IsArray(FirstPt) And IsArray(SecondPt) Then
+X = (FirstPt(0) + SecondPt(0)) / 2
+Y = (FirstPt(1) + SecondPt(1)) / 2
+Z = (FirstPt(2) + SecondPt(2)) / 2
+GET_MidPtFromPts = Str2Pt (X & "," & Y & "," & Z)
+Else
+	GetMidPtFromPts = -1
+End If
+End Function
+
+SplitWithCPlane

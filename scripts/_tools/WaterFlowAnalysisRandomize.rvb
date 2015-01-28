@@ -1,0 +1,154 @@
+'WaterFlow analysis v1,26 - distributed rain, JoinedCurves, terminate ends
+'by Jørgen Holo 
+
+'Todo:
+'Don't continue the edgecurves
+'Draw edgecurves to Z=0 ?
+
+'Call WaterFlowAnalysisRandomize()
+Sub WaterFlowAnalysisRandomize()
+	Dim heightcurves()
+	
+	arrObjects=rhino.getobjects("get objects for water analysis",8+16,,True)
+	If Isarray(arrObjects) Then
+		
+		rhino.enableredraw False
+		
+		time1=timer
+		strDensity=5
+		'strDensity=rhino.GetInteger("Choose density (in meters)",1)
+		strZdistance=1
+
+		strInitLayer=Rhino.CurrentLayer
+		
+		strLayer2="Water_Flow"
+		If rhino.islayer(strLayer2) Then
+			If Not Rhino.IsLayerEmpty (strLayer2) Then Rhino.PurgeLayer (strLayer2)
+		End If
+		Rhino.AddLayer strLayer2, rgb(0,50,80)
+		
+		strLayer="Water_Heightcurves"
+		If rhino.islayer(strLayer) Then
+			If Not Rhino.IsLayerEmpty (strLayer) Then Rhino.PurgeLayer (strLayer)
+		End If
+		Rhino.AddLayer strLayer, rgb(100,100,100),,,strLayer2
+		
+		Rhino.CurrentLayer (strLayer)
+
+
+		arrBox=Rhino.boundingbox(arrObjects) 
+		strCurve=Rhino.AddCurve(array(arrBox(4),arrBox(5))) 
+		Rhino.moveobject strCurve, arrBox(4), array(arrBox(4)(0),arrBox(4)(1),(round(arrBox(4)(2),0))) 
+		nrOfHeights=round(Rhino.distance(arrbox(0), arrbox(4)),0)/strZdistance
+		For i=0 To nrOfHeights
+			ReDim Preserve heightcurves(i)
+			heightcurves(i)= Rhino.ProjectCurveToSurface(strCurve, arrObjects, Array(0,1,0))
+			Rhino.moveobject strCurve, array(0,0,0), array(0,0,-strZdistance) 
+			Rhino.prompt"Calculated "&round(i/nrOfHeights*100,0)&" persent of heights"
+		Next
+		Rhino.deleteobject strCurve
+		rhino.enableredraw True
+	End If
+	
+	rhino.enableredraw False
+	
+	'-------------------------------- Adding and projecting data
+	
+	dblX=Round(Rhino.Distance (arrBox(0), arrBox(1)),0)/strDensity
+	dblY=Round(Rhino.Distance (arrBox(0), arrBox(3)),0)/strDensity
+	
+	Dim ArrPoints()
+	n=0
+	For x=0 To dblX
+		For y=0 To dblY
+			Randomize
+			ReDim Preserve arrPoints(n)
+			arrPoints(n) = array((arrbox(0)(0)+x*strDensity)+(rnd*strDensity),(arrbox(0)(1)+y*strDensity)+(rnd*strDensity),(arrbox(7)(2)+10))
+			n=n+1
+		Next
+	Next
+	arrResults = Rhino.ProjectPointToSurface(arrPoints, arrObjects, Array(0,0,-1))
+	' ------------------------------- Flow projected data over surface
+
+	Rhino.CurrentLayer (strLayer2)
+	Rhino.LayerVisible strLayer ,False
+
+	err2=0
+	nr=0
+	For Each strPoint In arrResults
+		Rhino.Prompt"Calculated "&round(nr/ubound(arrResults)*100,0)&" percent of water trails"
+		nr=nr+1
+		strEndpoint=False
+		ReDim  arrdblParam(0)    
+		ReDim  arrstrParam(0)  
+		ReDim  arrdblDist(0) 
+		ReDim  arrLine(0) 
+		arrLine(0)=strPoint
+		q=1
+		'q=0
+		
+		strHeight = (arrbox(4)(2))-strPoint(2)
+		strStartheight = round(strHeight,0)'*strMultiplier
+		'If strStartheight>strHeight Then strStartheight=strStartheight-1
+		'strStartheight =round(strPoint(2)+(heightcurves(0)(2)),0) 
+		LastCurves=ubound(heightcurves)
+		For p=strStartheight To LastCurves
+			'rhino.enableredraw False
+			'------------------
+			If isarray(heightcurves(p)) Then 
+				arrObjects1 = heightcurves(p) 
+				If isarray(strEndpoint) Then strPoint=strEndpoint
+
+				n=False
+						
+				For i=0 To ubound(arrobjects1) 
+					If isarray(arrObjects1) Then 
+						
+						ReDim Preserve arrdblParam(i)   
+						arrdblParam(i) = Rhino.CurveClosestPoint(arrobjects1(i), strPoint)   
+						ReDim Preserve arrstrParam(i)  
+						arrstrParam(i) = Rhino.EvaluateCurve (arrobjects1(i), arrdblParam(i))  
+						ReDim Preserve arrdblDist(i)  
+						arrdblDist(i)= Rhino.Distance (strPoint, arrstrParam(i))  
+						If n=False Then n=0   
+						If arrdblDist(i) < arrdblDist(n) Then n = i  
+					Else
+						Rhino.Print "Error 3"
+					End If							
+				Next  	
+				
+				If Rhino.VectorCompare(arrstrParam(n),Rhino.CurveStartPoint(arrObjects1(n)))=0 Then p=LastCurves 
+				If Rhino.VectorCompare(arrstrParam(n),Rhino.CurveEndPoint(arrObjects1(n)))=0 Then p=LastCurves
+				If p>0 Then  
+					ReDim Preserve arrLine(q)  
+					strEndpoint=arrstrParam(n)  
+					arrLine(q)=(arrstrParam(n)) 
+					q=q+1
+				End If  
+				
+			Else
+				err2=err2+1
+			End If			
+			'----------------------------------
+		Next 
+		'rhino.enableredraw True
+		If isarray(ArrLine)Then 
+			If ubound(ArrLine)>0 Then
+				
+			strTrail=Rhino.AddPolyline(ArrLine)
+			Rhino.addpoint(Rhino.Curveendpoint (strTrail))
+			End If
+		End If
+	Next
+	'rhino.deleteobjects heightcurves(p)
+	'rhino.enableredraw True
+	'If isarray(heightcurves(ubound(heightcurves))) Then rhino.deleteobjects heightcurves(ubound(heightcurves))
+	If err2>0 then 
+		errReport="   ( Bugtrack: Error 2: "&err2&"  )"
+	Else
+		errReport="."
+	End If
+	Rhino.CurrentLayer strInitLayer
+	rhino.enableredraw True
+	Rhino.print"Analyzis took "&round(timer-time1,2)&" sec"&errReport
+End Sub

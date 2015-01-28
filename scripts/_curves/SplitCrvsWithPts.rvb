@@ -1,0 +1,37 @@
+Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version Friday, October 01, 2010 12:50:16 PM
+
+'Call SplitCrvsWithPts()
+Sub SplitCrvsWithPts()
+	
+	Dim arrCurve,arrIdPoints,arrPoints,str,el
+
+	arrCurve=rhino.getobjects("select curves to split",,,True)
+  
+
+If Rhino.IsCurve(arrCurve) Then
+
+Rhino.Print "The object is a curve."
+
+
+
+
+	arrPoints=rhino.getPoints(,,"put Points on curves")
+	rhino.enableRedraw vbfalse
+	str=""
+	For Each el In arrcurve
+		str=str&"selid "&el&" "
+	Next
+	arrIdPoints=rhino.addpoints (arrpoints)
+
+
+	rhino.command("_split "&str&" enter selpt _enter")
+	rhino.deleteObjects arrIdPoints
+	rhino.enableredraw vbtrue
+	
+end sub
+
+'Rhino.AddStartUpScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "SplitCrvsWithPts", "_-Runscript SplitCrvsWithPts"

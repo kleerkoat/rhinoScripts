@@ -1,0 +1,41 @@
+Option Explicit
+'Script written by Pascal
+'Script version Wednesday, October 21, 2009 
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "DekinkCrv", "_NoEcho _-Runscript (DekinkCrv)"
+
+'Call DekinkCrv()
+
+Sub DekinkCrv()
+	Dim aCrvs: aCrvs = Rhino.GetObjects("Select kinky curves",4,,True)
+	Dim sCrv
+	
+	
+	If Not isArray(aCrvs) Then Exit Sub
+	Dim aPt, aDisc
+	
+	Rhino.EnableRedraw(False)
+	
+	For Each sCrv In aCrvs
+		
+		aDisc = Rhino.CurveDiscontinuity(sCrv,3)
+		If Not isArray(aDisc) Then 
+			Rhino.EnableRedraw(True)
+			Exit Sub
+		End If
+	
+
+		If Rhino.IsPolyline(sCrv) Or Rhino.CurveDegree(sCrv) = 1 Then
+			Rhino.Command "_ChangeDegree 3 ", False
+		End If
+	
+		For Each aPt In aDisc
+			Rhino.RemoveCurveKnot sCrv, Rhino.CurveClosestPoint(sCrv,apt)
+		Next
+
+	Next
+	
+	Rhino.EnableRedraw(True)
+	
+End Sub

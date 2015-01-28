@@ -1,0 +1,63 @@
+Option Explicit
+'Script written by Mitch Heynick
+'Script version Wednesday, January 13, 2010
+'Work in progress...!
+
+'Call DupLayerAndSublayers()
+Sub DupLayerAndSublayers()
+	
+	Dim arrLayers,strLayer
+	
+	arrLayers=Rhino.LayerNames
+	strLayer=Rhino.ListBox(arrLayers,"Pick a layer to duplicate","Dup Layer and Sublayers")
+	If IsNull(strLayer) Then Exit Sub
+	
+	Dim strPLayerCopy,lngLayerColor
+	strPLayerCopy=NameLayer(strLayer)
+	lngLayerColor=Rhino.LayerColor(strLayer)
+	Call Rhino.AddLayer(strPLayerCopy,lngLayerColor)	
+	Call CopyObjectsToLayer(strLayer,strPLayerCopy)
+	Call Rhino.ExpandLayer(strPLayerCopy,False)
+	Call DupAllSubLayers(strLayer,strPLayerCopy)
+	
+End Sub
+
+Function NameLayer(ByVal strLayerName)
+	
+	NameLayer=Null	
+	Dim suffixNo : suffixNo=1	
+	Do
+		strLayerName=strLayerName&"-"&Cstr(SuffixNo)	
+		If Not Rhino.IsLayer(strLayerName) Then
+			Exit Do		
+		End If
+		suffixNo=suffixNo+1
+	Loop
+	NameLayer=strLayerName	
+End Function
+
+Sub CopyObjectsToLayer(strLayer,strLayerCopy)
+	
+	Dim arrObjs,arrCopy
+	arrObjs=Rhino.ObjectsByLayer(strLayer)
+	If IsArray(arrObjs) Then
+		arrCopy=Rhino.CopyObjects(arrObjs)
+		Call Rhino.ObjectLayer(arrCopy,strLayerCopy)
+	End If		
+End Sub
+
+Sub DupAllSubLayers(ByVal strLayer,ByVal strLayerCopy)
+	
+	Dim arrSubs,strSLayerCopy,lngLayerColor
+	arrSubs=Rhino.LayerChildren(strLayer)
+	If IsArray(arrSubs) Then
+		For Each strLayer In arrSubs
+			strSLayerCopy=NameLayer(strLayer)
+			lngLayerColor=Rhino.LayerColor(strLayer)
+			Call Rhino.AddLayer(strSLayerCopy,lngLayerColor,,,strLayerCopy)
+			Call CopyObjectsToLayer(strLayer,strSLayerCopy)
+			Call Rhino.ExpandLayer(strSLayerCopy,False)
+			Call DupAllSubLayers(strLayer,strSLayerCopy)
+		Next
+	End If	
+End Sub

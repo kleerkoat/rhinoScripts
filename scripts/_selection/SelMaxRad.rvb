@@ -1,0 +1,41 @@
+Option Explicit
+'Script written by Pascal
+
+'Script version Monday, August 22, 2011 
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile()
+'Rhino.AddAlias "SelMinrad", "_NoEcho _-Runscript (SelMinrad)"
+private oldDblrad
+If isEmpty(OldDblRad) then
+	OldDblrad = 1
+	
+End If
+
+'Call SelMinrad()
+Sub SelMaxRad()
+	Dim aCrv: aCrv = Rhino.ObjectsByType(4)
+	If not isArray(aCrv) then exit sub
+	
+	dim dblrad: dblRad = Rhino.GetReal("Arc radius",oldDblRad)
+	If isnull(dblrad) then exit sub
+		
+	oldDblrad = dblrad
+	Rhino.EnableRedraw False	
+	dim sCrv, n
+	n = 0
+	For each sCrv in aCrv
+		if Rhino.IsArc(sCrv) then
+			if Rhino.ArcRadius(sCrv) > dblrad then 
+				Rhino.SelectObject(sCrv)
+				n = n + 1
+			end if
+			
+		End If
+	Next
+	
+	Rhino.EnableRedraw True
+	
+	if n >0 then Rhino.Print n & " arcs added to the selection."
+	if n = 0 then Rhino.Print "No arcs added to the selection."
+	
+End Sub

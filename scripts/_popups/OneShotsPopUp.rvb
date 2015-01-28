@@ -1,0 +1,55 @@
+'Option Explicit
+'Script written by Pascal
+
+
+'Script version Wednesday, June 04, 2008
+
+'Hi Ryan- I guess the problem is going to be that the rmb context menu is not 
+'available inside a command, which is when one-shots are available. But it is 
+'easy enough to make a script that will pop up a menu of them, if you are 
+'willing to activate the menu some other way, like with an alias or even a 
+'button. 
+'
+'The attached script will register 'OneShots' as an alias for the 
+'pop-up; I would change this (in Options > Aliases) to something quick and dumb 
+'like 'mm' or something so you can get it with alias + spacebar really quickly. 
+'Drag and drop over a V4 window if you want to try it out. You could even put 
+'the alias on the middle mouse button macro, maybe, in Options > Mouse.
+
+'Script version Wednesday, June 04, 2008
+'Near, Midpoint, Center, Intersection, perpendicular, Tangent, Quad, Knot'
+
+Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+Rhino.AddAlias "OneShots" , "_NoEcho _-Runscript OneShotsPopup"
+
+
+Sub OneShotsPopup()
+	
+	Dim aSnaps(14)
+	
+	aSnaps(0) = "Near"
+	aSnaps(1) = "Center"
+	aSnaps(2) = "Perpendicular"
+	aSnaps(3) = "From"
+	aSnaps(4) = "PerpendicularFrom"
+	aSnaps(5) = "TangentFrom"
+	aSnaps(6) = "AlongLine"
+	aSnaps(7) = "Alongparallel"
+	aSnaps(8) = "Between"
+	aSnaps(9) = "OnCurve"
+	aSnaps(10) = "OnSurface"
+	aSnaps(11) = "OnPolysurface"
+	aSnaps(12) = "PercentageSnap"
+  aSnaps(13) = "testAddSmartPoint"
+  aSnaps(14) = "testAddSmartPoint"
+
+
+
+	Dim intSnap: intSnap = Rhino.PopupMenu(aSnaps)
+	
+	If isnull (intSnap) Or intSnap = -1 Then Exit Sub
+	
+	Dim sSnap: sSnap = aSnaps(intSnap)
+	Rhino.SendKeystrokes sSnap
+	
+End Sub

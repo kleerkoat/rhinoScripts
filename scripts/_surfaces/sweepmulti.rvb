@@ -1,0 +1,158 @@
+﻿Option Explicit
+'Script written by <Simon Aulis Kallioinen>
+'Script copyrighted by <>
+'Script version den 2 december 2008 10:24:48
+
+Call Main()
+Sub Main()
+
+	Dim arrRails , strRail, arrProfiles, strObject, arrAxis, strPoint, strStartRail, dblParameter, arrStartPoint
+	Dim arrRefPoints, arrTargetPoints, arrNewProfiles, arrRailStart, arrRailEnd, strProfile, blnReverse, strSurface
+	Dim blnSolid, arrSurfaces, arrResults, arrItems, arrTangent, arrDir, strPerpSurface
+	Dim dblEndParameter, dblStartParameter, arrDomain, arrY
+
+	
+	blnReverse = False
+	
+	arrRails = Rhino.GetObjects("Select rails", 4, True, True, False)
+	
+	arrProfiles = Rhino.GetObjects("Select profile curve/curves", 4,,True)
+	
+	strStartRail = Rhino.GetObject("Select rail curve where profile is placed, Select none if profile is placed in origo in top view", 4,,True, arrRails)
+		
+	arrItems = Array("CapPlanarHoles","No", "Yes", "StraightBeams", "Yes", "No", "BeamDirection", "StraightUpwards", "PerpendicularToSurface")
+	
+	arrResults = Rhino.GetBoolean ("Options", arrItems, Array(True, True, False))
+	blnSolid = arrResults(0)
+
+	If arrResults(2) Then	
+		strSurface = Rhino.GetObject("Select surface for perpendicular placement", 8, False)
+		Call Rhino.EnableRedraw(False)
+	
+
+		Dim dblDistance
+		dblDistance = -5.0
+		strPerpSurface = Rhino.OffsetSurface(strSurface, dblDistance)
+	
+		While IsNull(strPerpSurface)
+			dblDistance = dblDistance/5.0
+			
+			strPerpSurface = Rhino.OffsetSurface(strSurface, dblDistance)	
+		Wend
+		
+	End If
+	
+	Call Rhino.UnselectAllObjects()
+
+
+	If IsNull (strStartRail) Then
+		arrRailStart = Array(0,0,0)
+		
+		arrRefPoints = Array(arrRailStart,Array(0,0,-1),Array(0,-1,0))
+	
+	Else
+	
+		Dim arrProfilePoint : arrProfilePoint = Rhino.CurveStartPoint (arrProfiles(0))
+	
+		
+		arrRailStart =  Rhino.CurveStartPoint (strStartRail)
+		arrRailEnd = Rhino.CurveEndPoint (strStartRail)
+	
+		If Rhino.Distance(arrProfilePoint,arrRailStart) > Rhino.Distance(arrProfilePoint,arrRailEnd) Then
+			strStartRail = Rhino.ReverseCurve(strStartRail)
+		End If
+		
+		arrRailStart =  Rhino.CurveStartPoint (strStartRail)
+		arrRailEnd = Rhino.CurveEndPoint (strStartRail)
+	
+	
+		arrDomain = Rhino.CurveDomain(strStartRail)
+		
+		dblEndParameter = arrDomain(1)
+		dblStartParameter = arrDomain(0)
+		
+		arrTangent = Rhino.CurveTangent (strStartRail, dblStartParameter)
+		arrDir = Rhino.PointAdd(arrTangent, arrRailStart)
+	
+		arrY = Rhino.PointAdd(arrRailStart,Array(0,0,-1))
+		
+		arrRefPoints = Array(arrRailStart,arrDir, arrY)
+
+		
+	End If
+
+	
+	
+	For Each strRail In arrRails
+		
+		
+		Call Rhino.EnableRedraw(False)
+	
+		If Rhino.IsCurveClosed(strRail) Then
+			
+		End If
+				
+		If blnReverse Then 	strRail = Rhino.ReverseCurve(strRail)
+		
+		
+		arrStartPoint = Rhino.CurveStartPoint (strRail)
+	
+		arrDomain = Rhino.CurveDomain(strRail)
+		
+		dblEndParameter = arrDomain(1)
+		dblStartParameter = arrDomain(0)
+	
+	
+		arrTangent = Rhino.CurveTangent (strRail, dblStartParameter)
+			
+		arrDir = Rhino.PointAdd(arrTangent, arrStartPoint)
+	
+		arrY = Rhino.PointAdd(arrStartPoint,Array(0,0,-1))
+	
+		
+		If arrResults(2) Then
+					
+			Dim arrPulledCrvs
+			
+			arrPulledCrvs = Rhino.PullCurve (strPerpSurface, strRail)
+
+			'arrPulledCrvs = Rhino.MoveObjects(arrPulledCrvs, Array(0,0,0), Array(0,0,-1))
+			
+			arrY = Rhino.CurveStartPoint(arrPulledCrvs(0))
+			
+			Call Rhino.DeleteObjects(arrPulledCrvs)
+		End If
+
+	
+		arrTargetPoints = Array(arrStartPoint,arrDir, arrY)
+	
+		arrNewProfiles = Rhino.OrientObjects(arrProfiles, arrRefPoints, arrTargetPoints ,1)
+		
+		If IsArray(arrNewProfiles) Then
+
+			Rhino.Prompt("Creating profiles, press and hold ESC to quit")
+			
+			If blnSolid Then
+				For Each strProfile In arrNewProfiles
+					arrSurfaces = Rhino.AddSweep1(strRail, strProfile)
+				
+					If IsArray(arrSurfaces) Then
+					
+						For Each strSurface In arrSurfaces
+				
+							Rhino.CapPlanarHoles (strSurface)
+						Next
+					End If
+				Next
+			End If
+			
+		End If
+		
+		Rhino.DeleteObjects(arrNewProfiles)
+		
+	Next
+	
+	Call Rhino.DeleteObject(strPerpSurface)
+	
+	Call Rhino.EnableRedraw(True)
+End Sub

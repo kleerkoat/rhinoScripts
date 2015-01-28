@@ -1,0 +1,40 @@
+Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version den 10 mars 2010 20:21:48
+'Call IsolateFromGroup()
+Sub IsolateFromGroup()
+	
+	Dim arrObjects, strObject,i
+	arrObjects = Rhino.GetObjects("Select objects to exclude from all their groups",,False,False,True)
+	
+	Dim strReadGrouping, arrAllGroups, strGroup
+	strReadGrouping = Rhino.GetDocumentData("ReadGroupingOnOrOff","OnOrOff")
+	arrAllGroups  = Rhino.GetDocumentData("ReadGrouping")
+	i=0
+	
+	If IsArray(arrObjects) Then
+		For Each strObject In arrObjects 
+			If strReadGrouping = "false" Then
+				For Each strGroup In arrAllGroups
+					If Rhino.GetDocumentData("ReadGrouping",strGroup) = strObject Then
+						Call Rhino.DeleteDocumentData("ReadGrouping", strGroup)
+						i = i+1
+					End If 
+				Next
+			Else
+				Rhino.RemoveObjectFromAllGroups(strObject)
+			End If
+		
+		Next
+	End If
+	
+	If i > 0 Then
+		If i = 1 Then 
+			Rhino.Print(CStr(i) & " object will be isolated from its group when Read Group is turned on.")
+		Else
+			Rhino.Print(CStr(i) & " objects will be isolated from their groups when Read Group is turned on.")
+		End If
+	End If
+End Sub
+

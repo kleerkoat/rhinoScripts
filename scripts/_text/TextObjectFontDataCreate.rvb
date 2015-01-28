@@ -1,0 +1,27 @@
+Option Explicit
+'Script written by Jarek Bieda
+'Script version Thursday, July 22, 2010 10:23:47 PM
+
+'Call TextObjectFontDataCreate()
+Sub TextObjectFontDataCreate()
+
+'run the command
+Call Rhino.Command("!_TextObject")
+'check if text was created 
+If Rhino.LastCommandResult()=0 then
+	Dim arrObjects : arrObjects=Rhino.LastCreatedObjects()
+	'retrieve last used font front info from the command line history
+	Call Rhino.ClearCommandHistory()
+	Call Rhino.Command("_-TextObject !")
+	Dim strHistory : strHistory=Rhino.CommandHistory()
+	Dim strText : strText=Rhino.Strtok(strHistory,chr(41))(0)
+	strText=Rhino.Strtok(strText,chr(40))(1)
+	'add text info to object data
+	Dim i
+	for i=0 to Ubound(arrObjects)
+		Call Rhino.SetObjectData(arrObjects(i),"UserData","FontData",strText)
+	next
+End If
+
+End Sub
+

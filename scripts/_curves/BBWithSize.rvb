@@ -1,0 +1,47 @@
+Option Explicit
+'Script written by Mitch Heynick
+'Script version Thursday, 15 April 2010
+
+'Call BBWithSize
+
+Sub BBWithSize()
+	Dim arrObjs,arrBB,dblPrec
+	dblPrec=Rhino.UnitDistanceDisplayPrecision
+
+	arrObjs = Rhino.GetObjects ("Pick objects for bounding box",,True,True)
+	If Not IsArray(arrObjs) Then Exit Sub
+	Call Rhino.Print("Calculating bounding box... Please wait...")
+	Call Rhino.EnableRedraw (False)
+	arrBB=Rhino.BoundingBox(arrObjs,,True)
+
+	If Not IsArray(arrBB) Then 
+		Call Rhino.Print("Unable to calculate bounding box")
+		Exit Sub
+	End If
+	
+	Dim dblXL,dblYL,dblZL,arrXMpt,arrYMpt,arrZMpt
+	dblXL=Rhino.Distance(arrBB(1),arrBB(0))
+	dblYL=Rhino.Distance(arrBB(3),arrBB(0))
+	dblZL=Rhino.Distance(arrBB(4),arrBB(0))
+	
+  'location of dots'
+	arrXMpt=Rhino.PointDivide(Rhino.PointAdd(arrBB(1),arrBB(0)),2)
+	arrYMpt=Rhino.PointDivide(Rhino.PointAdd(arrBB(3),arrBB(0)),2)
+	arrZMpt=Rhino.PointDivide(Rhino.PointAdd(arrBB(4),arrBB(0)),2)
+	
+	Dim strXL,strYL,strZL
+	strXL=CStr(Round(dblXL,dblPrec))
+	strYL=CStr(Round(dblYL,dblPrec))
+	strZL=CStr(Round(dblZL,dblPrec))
+	
+	Call Rhino.AddBox(arrBB)
+	Call Rhino.AddTextDot(strXL,arrXMpt)
+	Call Rhino.AddTextDot(strYL,arrYMpt)
+	Call Rhino.AddTextDot(strZL,arrZMpt)
+	
+	Dim strDims
+	strDims="X: "&strXL&" | Y: "&strYL&" | Z: "&strZL
+	Call Rhino.Print("Bounding box size: "&strDims)
+	Call Rhino.EnableRedraw (True)
+End Sub
+

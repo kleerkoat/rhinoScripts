@@ -1,0 +1,54 @@
+Option Explicit
+'Script by Mitch Heynick
+'Version Tuesday, 07 December, 2010
+
+'Call TestScaleObjsAboutCtrs()
+Sub TestScaleObjsAboutCtrs()
+	
+	Dim arrObjs,strObj,dblScale,arrScale,dblTol,arrCtrPt
+	dblTol=Rhino.UnitAbsoluteTolerance
+	
+	'get your objects
+	arrObjs=Rhino.GetObjects("Select objects to scale",4+8+16+32,,True)
+	'get out if the user doesn't select any objects
+	If Not IsArray(arrObjs) Then Exit Sub
+	
+	'get the scale factor
+	dblScale=Rhino.GetReal("Scale for objects?",,dblTol)
+	'get out if the user doesn't enter a valid scale
+	If vartype(dblScale)<>5 Then Exit Sub
+	arrScale=Array(dblScale,dblScale,dblScale) 'needed for 3D scaling, XYZ
+	
+	'now get each object's BB center and scale: use a For loop
+	Call Rhino.EnableRedraw(False)  'cut the display redraw
+	
+	For each strObj in arrObjs 'loop through all selected objects
+		
+		'call the custom function with strObj as its input
+		arrCtrPt=BoundingBoxCenterPoint(strObj)
+		
+		'if the function returns a valid point, do the scale
+		'if no valid point is returned, nothing will happen
+		If IsArray(arrCtrPt) Then
+			Call Rhino.ScaleObject(strObj,arrCtrPt,arrScale,False)
+		End If
+	Next
+	
+	'clean up: reenable the display redraw
+	Call Rhino.EnableRedraw(True)  
+End Sub
+
+Function BoundingBoxCenterPoint(objs)
+	' returns the center point of bounding box
+	' objs can be a string or an array of objects
+	'in case of failure the function will return Null
+	BoundingBoxCenterPoint=Null
+	Dim arrBB,arrPt
+	arrBB=Rhino.BoundingBox(objs)
+	If IsArray(arrBB) Then
+		arrPt=Rhino.PointDivide(Rhino.PointAdd(arrBB(0),arrBB(6)),2)
+		'if we get this far, set the output of the function to the point
+		BoundingBoxCenterPoint=arrPt
+	End If
+End Function
+

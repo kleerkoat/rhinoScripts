@@ -1,0 +1,46 @@
+Option Explicit
+'Script written by Pascal
+' RMA
+'Script version Friday, May 04, 2012
+
+'Rhino.AddStartUpScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "BadObjectFinder", "_NoEcho _-Runscript (BadObjectFinder)"
+
+'Call BadObjectFinder()
+Sub BadObjectFinder()
+	Dim aAll: aAll = Rhino.AllObjects()
+	Dim aLayers(), n,h, sObj
+	n = 0
+	h = 0
+	For Each sObj In aAll 
+		If Not Rhino.IsObjectValid(Sobj) Then
+			ReDim Preserve aLayers(n)
+			aLayers(n) = Rhino.ObjectLayer(sObj)
+			n = n + 1
+			If Rhino.IsObjectHidden(sObj) Then h = h + 1
+		End If
+	Next
+	
+	If n > 0 Then
+		Dim str: str = n & " bad objects were found on the follwing layers:" 
+		If h > 0 Then 
+			
+			If h = 1 Then
+				str = n & " bad objects were found on the follwing layers, " & h & " of these objects is hidden:"
+			Else
+				str = n & " bad objects were found on the follwing layers, " & h & " of these objects are hidden:"
+			End If
+		End If
+		
+		'Dim strNotes: strNotes = Now & "--: " & str & " " & Join(Rhino.CullDuplicateStrings(aLayers), ",")
+		'str = str & vbNewline & vbnewline & Join(Rhino.CullDuplicateStrings(aLayers), vbNewline)
+
+		'Rhino.ClipboardText str
+		'Rhino.Command "_-Notes _Visible=_Yes _Edit _Mode=_Append " & chr(34) & strNotes & chr(34) & " _Enter _Enter "
+	
+		'Rhino.TextOut(Str)
+	Else
+		Rhino.Print "No bad objects found."
+	End If
+	
+End Sub

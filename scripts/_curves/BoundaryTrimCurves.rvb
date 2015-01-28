@@ -1,0 +1,97 @@
+Option Explicit
+'Script by Mitch Heynick
+'Version 27 February, 2011 - V4 or V5
+
+Private oldSideChoice
+If IsEmpty(oldSideChoice) Then oldSideChoice=False
+
+'Call BoundaryTrimCurves()
+Sub BoundaryTrimCurves()
+
+	Dim arrOrigCrvs,strCut,arrRefPlane,ub
+	arrOrigCrvs=Rhino.GetObjects("Select curves to trim",4,,True)
+	If Not IsArray(arrOrigCrvs) Then Exit Sub
+	ub=Ubound(arrOrigCrvs)
+	Call Rhino.LockObjects(arrOrigCrvs) 'temp lock to avoid selection errors
+	
+	strCut=Rhino.GetObject("Select closed boundary curve for trimming",4,,True)
+	Call Rhino.UnlockObjects(arrOrigCrvs)
+	If IsNull(strCut) Then Exit sub
+	If not Rhino.IsCurveClosed(strCut) Then 
+		Call Rhino.Print("Boundary curve is not closed") : Exit Sub
+	End If
+	arrRefPlane=Rhino.ViewCPlane() 'plane which is active when trim curve is chosen
+	
+	Dim arrChoice,arrRes,blnTrimIns
+	arrChoice=Array("Trim","Outside","Inside")
+	arrRes=Rhino.GetBoolean("Side to trim away?",arrChoice,Array(oldSideChoice))
+	If Not IsArray(arrRes) Then Exit Sub
+	blnTrimIns=arrRes(0) 	'False=Outside
+	oldSideChoice=blnTrimIns
+	
+	Call Rhino.EnableRedraw(False)
+	Dim arrBB,zVec,arrPt1,arrPt2,arrBBPlane,arrXform,strExtrude,dblTol
+	dblTol=Rhino.UnitAbsoluteTolerance
+	arrBB=Rhino.BoundingBox(arrOrigCrvs,arrRefPlane)
+	zVec=arrRefPlane(3)
+	
+	'extend BB 1 unit in CPlane Z both directions
+	arrPt1=Rhino.PointSubtract(arrBB(0),zVec)
+	arrPt2=Rhino.PointAdd(arrBB(4),zVec)
+
+	'project trim curve to bottom of extended BB
+	arrBBPlane=Rhino.MovePlane(arrRefPlane,arrPt1)
+	arrXForm=Rhino.XformPlanarProjection(arrBBPlane)
+	strCut=Rhino.TransformObject(strCut,arrXForm,True) 'copy of object
+	'extrude the projected trim curve the Z of extended BB
+	'this will be the trimming object
+	strExtrude=Rhino.ExtrudeCurveStraight(strCut,arrPt1,arrPt2)
+	Call Rhino.CapPlanarHoles(strExtrude) 'make solid
+
+	'split with polysurface object
+	Dim arrSplitRes,strSplitcrv
+	Call Rhino.UnselectAllObjects
+	Call Rhino.SelectObjects(arrOrigCrvs)
+	Call Rhino.Command("_Split SelID "&strExtrude&" _Enter",False)
+	arrSplitRes=Rhino.LastCreatedObjects
+	Call Rhino.DeleteObject(strExtrude)
+	
+	Dim strObj,arrNoSplit(),n : Redim arrNoSplit(ub) : n=-1
+	For each strObj in arrOrigCrvs
+		If Rhino.IsCurve(strObj) Then
+			n=n+1
+			arrNoSplit(n)=strObj
+		End If	
+	Next
+	If n>-1 Then
+		Redim Preserve arrNoSplit(n)	
+	End If
+	
+	'run usual test
+	If IsArray(arrSplitRes) Then
+		If n>1 then arrSplitRes=Rhino.JoinArrays(arrNoSplit,arrSplitRes)
+		For Each strSplitCrv in arrSplitRes			
+			Call DeleteInOrOut(strSplitCrv,strCut,blnTrimIns,arrBBPlane)
+		Next
+	Else
+		Call Rhino.Print("Nothing trimmed")
+	End If
+	Call Rhino.DeleteObject(strCut)
+	Call Rhino.EnableRedraw(True)
+End Sub
+
+
+Sub DeleteInOrOut(testCrv,refCrv,delIns,plane)
+	'refCrv must be a closed planar curve
+	'deletes curves one side or other, also deletes on condition
+	Dim arrMP,crvPt,arrXForm,projCrv,dblTol
+	dblTol=Rhino.UnitAbsoluteTolerance
+	arrXForm=Rhino.XformPlanarProjection(plane)
+	projCrv=Rhino.TransformObject(testCrv,arrXForm,True)
+	arrMP=Rhino.CurveMidPoint(projCrv)
+	crvPt=Rhino.PointInPlanarClosedCurve(arrMP,refCrv,plane,dblTol)	
+	If crvPt=2 or (delIns and crvPt=1) or (Not delIns and crvPt=0) Then
+		Call Rhino.DeleteObject(testCrv)		
+	End If
+	Call Rhino.DeleteObject(projCrv)
+End Sub

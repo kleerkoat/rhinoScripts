@@ -1,0 +1,180 @@
+'Script written and copyrighted by Gelfling '04 aka David Rutten
+'December 7th 2004 revision
+Option Explicit
+
+Sub SequentialNaming()
+	Dim prefix, Increment, intValue, limList(8)
+	Dim blnRename, idObject, objFilter, fixLength
+	Dim strResult, arrOptions(8), i, frzObjects(), F
+
+	Rhino.UnselectAllObjects
+	prefix = Rhino.GetSettings(Rhino.InstallFolder & "Gelfling.ini", "SequentialNaming", "Prefix")
+	If IsNull(prefix) Then prefix = "object "
+	Increment = Rhino.GetSettings(Rhino.InstallFolder & "Gelfling.ini", "SequentialNaming", "Increment")
+	If IsNull(Increment) Then Increment = 1 Else Increment = CInt(Increment)
+	fixLength = Rhino.GetSettings(Rhino.InstallFolder & "Gelfling.ini", "SequentialNaming", "FixedLength")
+	If IsNull(fixLength) Then fixLength = 0 Else fixLength = CInt(fixLength)
+	intValue = Rhino.GetSettings (Rhino.InstallFolder & "Gelfling.ini", "SequentialNaming", "InitialValue")
+	If IsNull(intValue) Then intValue = 1 Else intValue = CInt(intValue)
+	blnRename = Rhino.GetSettings(Rhino.InstallFolder & "Gelfling.ini", "SequentialNaming", "Rename")
+	If IsNull(blnRename) Then blnRename = vbFalse Else blnRename = CBool(blnRename)
+	For i = 0 To 8
+		limList(i) = Rhino.GetSettings(Rhino.InstallFolder & "Gelfling.ini", "SequentialNaming", "FilterGeometry" & i)
+		If IsNull(limList(i)) Then limList(i) = True Else limList(i) = CBool(limList(i))
+	Next
+	objFilter = GetTypeIDs(limList)
+	F = 0
+
+	Do
+		arrOptions(0) = "Prefix"
+		arrOptions(1) = "First_" & intValue
+		arrOptions(2) = "Step_" & Increment
+		arrOptions(3) = "FixedLength_" & fixLength
+		arrOptions(4) = "Filter"
+		arrOptions(5) = "Unlock"
+		If blnRename Then arrOptions(6) = "Overwrite_Yes" Else arrOptions(6) = "Overwrite_No"
+		arrOptions(7) = "Start"
+		arrOptions(8) = "Quit"
+
+		strResult = Rhino.GetString("Sequential naming [" & Prefix & " " & intValue & "++" & Increment & "]", "Start", arrOptions)
+		
+		If IsNull(strResult) Then strResult = "Quit"
+		Select Case UCase(Left(strResult, 3))
+		Case "PRE"
+			strResult = Rhino.GetString("Specify a new prefix text...", prefix)
+			If Not IsNull(strResult) Then prefix = strResult
+		Case "FIR"
+			strResult = Rhino.GetInteger("Specify a new starting value...", intValue)
+			If Not IsNull(strResult) Then intValue = strResult
+		Case "STE"
+        	strResult = Rhino.GetInteger("Specify a new increment value...", Increment)
+			If Not IsNull(strResult) Then Increment = strResult
+		Case "FIX"
+			strResult = Rhino.GetInteger("Specify a fixed length for the incremental numbers. Use 0 to disable fixing.", fixLength, 0, 10)
+			If Not IsNull(strResult) Then fixLength = strResult
+		Case "FIL"
+			Call GetObjectTypes("Select the object types you want to enable", limList)
+        	objFilter = GetTypeIDs(limList)
+		Case "STA"
+        	Do
+        		idObject = Rhino.GetObject("Select an object to name <" & _
+											CStr(Prefix & FixStringLength(intValue, "0", fixLength,  vbTrue)) & "> Press Esc to return to options", _
+											0, vbFalse, vbTrue, objFilter)
+				If IsNull(idObject) Then Exit Do
+				If Not IsNull(Rhino.ObjectName(idObject)) And Not blnRename Then
+					If msgBox("The object you selected already has a name:" & vbNewLine & _
+							  "<" & Rhino.ObjectName(idObject) & ">" & vbNewLine & _
+							  "Would you like to overwrite the current name?", vbYesNo Or vbExclamation, "Name conflict") = vbYes Then
+						Rhino.ObjectName idObject, CStr(Prefix & FixStringLength(intValue, "0", fixLength,  vbTrue))
+						intValue = intValue+Increment
+						Rhino.SaveSettings Rhino.InstallFolder & "Gelfling.ini", "SequentialNaming", "InitialValue", CStr(intValue)
+						ReDim Preserve frzObjects(F)
+						frzObjects(F) = idObject
+						Rhino.LockObject idObject
+						F = F+1
+					End If
+				Else
+					Rhino.ObjectName idObject, CStr(Prefix & FixStringLength(intValue, "0", fixLength,  vbTrue))
+					intValue = intValue+Increment
+					Rhino.SaveSettings Rhino.InstallFolder & "Gelfling.ini", "SequentialNaming", "InitialValue", CStr(intValue)
+					ReDim Preserve frzObjects(F)
+					frzObjects(F) = idObject
+					Rhino.LockObject idObject
+					F = F+1
+				End If
+        	Loop
+        Case "UNL"
+        	If F <> 0 Then Rhino.UnlockObjects frzObjects
+        	Erase frzObjects
+        	F = 0
+        Case "OVE"
+        	blnRename = Not blnRename
+		Case "QUI"
+			If F <> 0 Then Rhino.UnlockObjects frzObjects
+			Exit Do
+		End Select
+
+        Rhino.SaveSettings Rhino.InstallFolder & "Gelfling.ini", "SequentialNaming", "FixedLength", CStr(fixLength)
+		Rhino.SaveSettings Rhino.InstallFolder & "Gelfling.ini", "SequentialNaming", "Prefix", CStr(prefix)
+	    Rhino.SaveSettings Rhino.InstallFolder & "Gelfling.ini", "SequentialNaming", "Increment", CStr(Increment)
+	    Rhino.SaveSettings Rhino.InstallFolder & "Gelfling.ini", "SequentialNaming", "InitialValue", CStr(intValue)
+	    Rhino.SaveSettings Rhino.InstallFolder & "Gelfling.ini", "SequentialNaming", "Rename", CStr(blnRename)
+		For i = 0 To 8
+			Rhino.SaveSettings Rhino.InstallFolder & "Gelfling.ini", "SequentialNaming", "FilterGeometry" & i, CStr(limList(i))
+		Next
+	Loop
+	Rhino.Print "Objects renamed"
+End Sub
+'SequentialNaming
+
+Function GetObjectTypes(strMessage, Byref limList)
+	GetObjectTypes = Null
+	Dim arrTypes, arrResult, i
+
+	arrTypes = Split("Points;PointClouds;Curves;Surfaces;Polysurfaces;Meshes;Lights;Annotation;Blocks", ";")
+	arrResult = Rhino.CheckListBox(arrTypes, limList, strMessage, "Sequential naming")
+	If IsNull(arrResult) Then Exit Function
+	
+	For i = 0 To UBound(arrResult)
+		limList(i) = arrResult(i)
+	Next
+	GetObjectTypes = vbTrue
+End Function
+
+Function FixStringLength(strIn, charAdd, intLength, blnAddInFront)
+	FixStringLength = strIn
+	If intLength = 0 Then Exit Function
+
+	Dim Suffix, Result
+	Suffix = String(intLength, charAdd)
+	If blnAddInFront Then
+		Result = Suffix & strIn
+		Result = Right(Result, intLength)
+	Else
+    	Result = strIn & Suffix
+		Result = Left(Result, intLength)
+	End If
+	FixStringLength = Result
+End Function
+
+Function GetTypeIDs(ByVal limList)
+	GetTypeIDs = Null
+	Dim arrIDs(8), retIDs, i
+
+	If limList(0) Then arrIDs(0) = Rhino.ObjectsByType(1) Else arrIDs(0) = Array("Nothing")
+    If limList(1) Then arrIDs(1) = Rhino.ObjectsByType(2) Else arrIDs(1) = Array("Nothing")
+    If limList(2) Then arrIDs(2) = Rhino.ObjectsByType(4) Else arrIDs(2) = Array("Nothing")
+    If limList(3) Then arrIDs(3) = Rhino.ObjectsByType(8) Else arrIDs(3) = Array("Nothing")
+    If limList(4) Then arrIDs(4) = Rhino.ObjectsByType(16) Else arrIDs(4) = Array("Nothing")
+    If limList(5) Then arrIDs(5) = Rhino.ObjectsByType(32) Else arrIDs(5) = Array("Nothing")
+    If limList(6) Then arrIDs(6) = Rhino.ObjectsByType(256) Else arrIDs(6) = Array("Nothing")
+    If limList(7) Then arrIDs(7) = Rhino.ObjectsByType(512+8192) Else arrIDs(7) = Array("Nothing")
+    If limList(8) Then arrIDs(8) = Rhino.ObjectsByType(4096) Else arrIDs(8) = Array("Nothing")
+
+	For i = 0 To 8
+		If Not IsArray(arrIDs(i)) Then arrIDs(i) = Array("Nothing")
+	Next
+
+	retIDs = JoinArrays(arrIDs(0), arrIDs(1))
+	retIDs = JoinArrays(retIDs, arrIDs(2))
+	retIDs = JoinArrays(retIDs, arrIDs(3))
+	retIDs = JoinArrays(retIDs, arrIDs(4))
+	retIDs = JoinArrays(retIDs, arrIDs(5))
+	retIDs = JoinArrays(retIDs, arrIDs(6))
+	retIDs = JoinArrays(retIDs, arrIDs(7))
+	retIDs = JoinArrays(retIDs, arrIDs(8))
+	GetTypeIDs = retIDs
+End Function
+
+Function JoinArrays(arr1, arr2)
+	JoinArrays = Null
+	Dim arrN(), i
+	ReDim arrN(UBound(arr1)+UBound(arr2)+1)
+	For i = 0 To UBound(arr1)
+		arrN(i) = arr1(i)
+	Next
+	For i = 0 To UBound(arr2)
+		arrN(UBound(arr1)+i+1) = arr2(i)
+	Next
+	JoinArrays = arrN
+End Function

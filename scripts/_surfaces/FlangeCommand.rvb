@@ -1,0 +1,433 @@
+Imports RMA.Rhino
+Imports RMA.OpenNURBS
+Imports RMA.Rhino.RhUtil
+
+Namespace Flange
+    Public Class FlangeCommand
+        Inherits RMA.Rhino.MRhinoCommand
+
+        Public Overrides Function CommandUUID() As System.Guid
+            Return New Guid("{3ddddf91-2ba9-4ae1-a39f-22bc08b72cb8}")
+        End Function
+
+        Public Overrides Function EnglishCommandName() As String
+            Return "Flange"
+        End Function
+
+        Public Overrides Function RunCommand(ByVal context As RMA.Rhino.IRhinoCommandContext) As RMA.Rhino.IRhinoCommand.result
+            Dim OuterCircle As OnCircle = GetOuterCircle()
+            If OuterCircle Is Nothing Then Return IRhinoCommand.result.cancel
+
+            'If the outer radius is zero, abort.
+            If OuterCircle.radius = 0.0 Then Return IRhinoCommand.result.nothing
+
+            'Create a flange instance, we're going to store all variables directly into the class.
+            Dim local_Flange As New Flange
+            'Use the outer circle define base plane and outer radius.
+            local_Flange.m_Plane = New OnPlane(OuterCircle.plane)
+            local_Flange.m_OuterRadius = OuterCircle.radius
+
+            'Prompt for inner radius using our own MRhinoGetPoint derived class.
+            Dim nGetInnerRadius As New GetFlangeInnerCircle(local_Flange)
+            Select Case nGetInnerRadius.GetPoint
+                Case IRhinoGet.result.point
+                    'If a point was picked we continue
+                Case IRhinoGet.result.number
+                    'The GetFlangeInnerCircle cannot respond to its own number event, 
+                    'that's why we need to set it
+                    local_Flange.m_InnerRadius = nGetInnerRadius.Number
+                Case Else
+                    'User cancelled the getpoint operation
+                    Return IRhinoCommand.result.cancel
+            End Select
+
+            'If the inner radius is zero, abort.
+            If local_Flange.m_InnerRadius = 0.0 Then Return IRhinoCommand.result.nothing
+
+            'If the inner and outer radii are the same, this cannot be a valid object, abort.
+            If local_Flange.m_InnerRadius = local_Flange.m_OuterRadius Then Return IRhinoCommand.result.nothing
+
+            'The user is allowed to change his/her mind an undefined number of times regarding the
+            'number of holes in the flange, we need an infinite do loop for this.
+            Do
+                'We'll get the hole radii using another MRhinoGetPoint derived class.
+                'This one also provides the frontend to change the number of holes.
+                Dim nGetHoleRadii As New GetFlangeHoleRadius(local_Flange)
+                Select Case nGetHoleRadii.GetPoint
+                    Case IRhinoGet.result.point
+                        'A point was picked meaning that nGetHoleRadii took care of all bookkeeping.
+                        Exit Do
+                    Case IRhinoGet.result.number
+                        'Again, we need to handle number events up here.
+                        local_Flange.m_HoleRadius = nGetHoleRadii.Number
+                        'Limit the hole radius to sensible values
+                        local_Flange.m_HoleRadius = Math.Min(local_Flange.m_HoleRadius, local_Flange.MaximumHoleRadius)
+                        local_Flange.m_HoleRadius = Math.Max(local_Flange.m_HoleRadius, Double.Epsilon)
+
+                        Exit Do
+
+                    Case IRhinoGet.result.option
+                        'An option was picked, we need to handle these events as well.
+                        If nGetHoleRadii.Option.m_english_option_name = "Holes" Then
+                            Dim intCount As Int32 = local_Flange.m_Holes
+                            Select Case RMA.Rhino.RhUtil.RhinoGetInteger("Number of holes", True, intCount, 2)
+                                Case IRhinoCommand.result.success
+                                    'Set the new number of holes.
+                                    local_Flange.m_Holes = intCount
+                                Case Else
+                                    'Do nothing
+                            End Select
+                        End If
+                    Case Else
+                        Return IRhinoCommand.result.cancel
+                End Select
+            Loop
+
+            'If the hole radius is zero, abort.
+            If local_Flange.m_HoleRadius = 0.0 Then Return IRhinoCommand.result.nothing
+
+            'Prompt for the thickness of the flange shape using a third MRhinoGetPoint derivative.
+            Dim nGetThickness As New GetFlangeThickness(local_Flange)
+            Select Case nGetThickness.GetPoint
+                Case IRhinoGet.result.point
+                    'continue
+                Case IRhinoGet.result.number
+                    'Blah blah, we've been through this.
+                    local_Flange.m_Thickness = nGetThickness.Number
+                Case Else
+                    Return IRhinoCommand.result.cancel
+            End Select
+
+            'Create a fresh instance of the FlangeBRep and add it to the document.
+            RMA.Rhino.RhUtil.RhinoApp.ActiveDoc.AddBrepObject(local_Flange.CreateBRep)
+            'Refresh the rhino viewports.
+            RMA.Rhino.RhUtil.RhinoApp.ActiveDoc.Regen()
+
+            Return IRhinoCommand.result.success
+        End Function
+
+        Protected Function GetOuterCircle() As OnCircle
+            'We'll use the RhinoGetCircle function in RhUtil since it wraps all
+            'the standard options. We'll have to override some prompts though.
+            Dim local_Circle As New OnCircle
+            Dim GetCircleArguments As New MArgsRhinoGetCircle
+
+            GetCircleArguments.SetAllowDeformable(False)
+            GetCircleArguments.SetPrompt0("Center of flange base plane")
+            GetCircleArguments.SetRadiusPrompt("Outer radius of flange")
+            GetCircleArguments.SetDiameterPrompt("Diameter of flange")
+
+            Select Case RMA.Rhino.RhUtil.RhinoGetCircle(GetCircleArguments, local_Circle)
+                Case IRhinoCommand.result.success
+                    'A circle was picked, return it.
+                    Return local_Circle
+                Case Else
+                    'No circle was picked, return a null reference.
+                    Return Nothing
+            End Select
+        End Function
+    End Class
+
+    Public Class GetFlangeInnerCircle
+        Inherits MRhinoGetPoint
+
+        Protected m_Flange As Flange
+
+        Public Sub New(ByVal nFlange As Flange)
+            'We need an instance of the flange class to store the results
+            m_Flange = nFlange
+
+            'We accept (but do not handle) number. Handling these is up to the caller.
+            MyBase.AcceptNumber(True)
+            MyBase.SetCommandPrompt("Inner radius of flange")
+
+            'Set the basepoint (so we can use Ortho and other picking tools without problems.
+            MyBase.SetBasePoint(m_Flange.m_Plane.origin)
+
+            'Limit the picking to the flange plane.
+            MyBase.Constrain(m_Flange.m_Plane)
+        End Sub
+
+        Public Overrides Sub OnMouseMove(ByVal vp As RMA.Rhino.MRhinoViewport, _
+                                         ByVal nFlags As UInteger, _
+                                         ByVal point As RMA.OpenNURBS.IOn3dPoint, _
+                                         ByVal view_wnd_point As System.Drawing.Point)
+            'This happens once every time the mouse is moved.
+            MyBase.OnMouseMove(vp, nFlags, point, view_wnd_point)
+
+            'Compute the inner radius.
+            m_Flange.m_InnerRadius = point.DistanceTo(m_Flange.m_Plane.origin)
+        End Sub
+
+        Public Overrides Sub DynamicDraw(ByVal hdc As System.IntPtr, _
+                                         ByVal viewport As RMA.Rhino.MRhinoViewport, _
+                                         ByVal pt As RMA.OpenNURBS.IOn3dPoint)
+            'This happens once for every viewport whenever the mouse is dragged.
+            MyBase.DynamicDraw(hdc, viewport, pt)
+
+            'We're going to draw a lot of extra stuff in the viewport.
+            'First we cache some of the base geometry.
+            Dim cirA As OnCircle = m_Flange.OuterCircle
+            Dim cirB As OnCircle = m_Flange.InnerCircle
+            Dim conL As New OnLine(pt, cirA.ClosestPointTo(pt))
+
+            'Draw the inner and outer circles.
+            viewport.DrawCircle(cirA)
+            viewport.DrawCircle(cirB)
+
+            'Draw the center point and the picking line.
+            'The line is drawn to the NEAREST circle, not necessarily the inner circle
+            viewport.DrawPoint(m_Flange.m_Plane.origin)
+            Dim PickLineEndPoint As New On3dPoint(pt)
+            If m_Flange.m_InnerRadius > m_Flange.m_OuterRadius Then
+                PickLineEndPoint = cirA.ClosestPointTo(pt)
+            End If
+            viewport.DrawLine(m_Flange.m_Plane.origin, PickLineEndPoint)
+
+            'Draw the distance widget between the inner and outer circles.
+            viewport.DrawPoint(conL.from)
+            viewport.DrawPoint(conL.to)
+            viewport.DrawDottedLine(conL.from, conL.to)
+
+            'Draw the distance tag
+            Dim iText As New MRhinoText
+            iText.SetString(String.Format("{0:#0.00}", conL.Length))
+
+            viewport.DrawString(New OnPlane(conL.PointAt(0.5), New On3dVector(1, 0, 0), New On3dVector(0, 1, 0)), _
+                                New On2dPoint(0, 0), New On2dVector(0, 0), iText)
+        End Sub
+    End Class
+
+    Public Class GetFlangeHoleRadius
+        Inherits MRhinoGetPoint
+
+        Protected m_Flange As Flange
+
+        Public Sub New(ByVal nFlange As Flange)
+            m_Flange = nFlange
+
+            'Add a command option for the Hole count, we do not handle this event, it is up to the caller
+            MyBase.AddCommandOption(New MRhinoCommandOptionName("Holes"), m_Flange.m_Holes)
+
+            MyBase.AcceptNumber(True)
+            MyBase.SetCommandPrompt("Radii of flange holes")
+            MyBase.SetBasePoint(m_Flange.MiddleCircle.PointAt(0.0))
+            MyBase.Constrain(m_Flange.m_Plane)
+        End Sub
+
+        Public Overrides Sub OnMouseMove(ByVal vp As RMA.Rhino.MRhinoViewport, _
+                                         ByVal nFlags As UInteger, _
+                                         ByVal point As RMA.OpenNURBS.IOn3dPoint, _
+                                         ByVal view_wnd_point As System.Drawing.Point)
+            MyBase.OnMouseMove(vp, nFlags, point, view_wnd_point)
+            'compute new hole radius and make sure the value is a proper one.
+            m_Flange.m_HoleRadius = point.DistanceTo(MyBase.BasePoint)
+            m_Flange.m_HoleRadius = Math.Min(m_Flange.m_HoleRadius, m_Flange.MaximumHoleRadius)
+        End Sub
+
+        Public Overrides Sub DynamicDraw(ByVal hdc As System.IntPtr, _
+                                         ByVal viewport As RMA.Rhino.MRhinoViewport, _
+                                         ByVal pt As RMA.OpenNURBS.IOn3dPoint)
+            MyBase.DynamicDraw(hdc, viewport, pt)
+
+            'Draw the inner and outer circles.
+            viewport.DrawCircle(m_Flange.OuterCircle)
+            viewport.DrawCircle(m_Flange.InnerCircle)
+            viewport.DrawLine(MyBase.BasePoint, pt)
+
+            'Draw all hole circles.
+            Dim iCircles As OnCircle() = m_Flange.Holes
+            For Each iCircle As OnCircle In iCircles
+                viewport.DrawCircle(iCircle)
+                viewport.DrawPoint(iCircle.Center)
+            Next
+        End Sub
+    End Class
+
+    Public Class GetFlangeThickness
+        Inherits MRhinoGetPoint
+
+        Protected m_Flange As Flange
+        Protected localBRep As OnBrep
+        Protected scaleBRep As OnBrep
+
+        Public Sub New(ByVal nFlange As Flange)
+            m_Flange = nFlange
+
+            MyBase.AcceptNumber(True)
+            MyBase.SetCommandPrompt("Thickness of flange")
+            MyBase.SetBasePoint(m_Flange.m_Plane.origin)
+            'Constrain the picking to the z-axis of the flange base plane.
+            MyBase.Constrain(New OnLine(m_Flange.m_Plane.origin, m_Flange.m_Plane.PointAt(0, 0, 1)))
+
+            'Set a default thickness...
+            m_Flange.m_Thickness = 1.0
+            'and create a caches brep of the flange. This is expensive so we only want to do it once.
+            localBRep = m_Flange.CreateBRep
+        End Sub
+
+        Public Overrides Sub OnMouseMove(ByVal vp As RMA.Rhino.MRhinoViewport, _
+                                         ByVal nFlags As UInteger, _
+                                         ByVal point As RMA.OpenNURBS.IOn3dPoint, _
+                                         ByVal view_wnd_point As System.Drawing.Point)
+            MyBase.OnMouseMove(vp, nFlags, point, view_wnd_point)
+            'Set the new thickness
+            m_Flange.m_Thickness = m_Flange.m_Plane.DistanceTo(point)
+
+            'We're going to scale a copy of the cached brep to simulate the new thickness.
+            'We're not scaling the cached object itself since the scaling errors will
+            'accumulate.
+            'First, make a scaling transformation.
+            Dim xForm As New OnXform
+            xForm.Scale(m_Flange.m_Plane, 1.0, 1.0, m_Flange.m_Thickness)
+
+            'Copy the cached object and transform it.
+            scaleBRep = New OnBrep(localBRep)
+            scaleBRep.Transform(xForm)
+        End Sub
+
+        Public Overrides Sub DynamicDraw(ByVal hdc As System.IntPtr, _
+                                         ByVal viewport As RMA.Rhino.MRhinoViewport, _
+                                         ByVal pt As RMA.OpenNURBS.IOn3dPoint)
+            MyBase.DynamicDraw(hdc, viewport, pt)
+
+            'A fail-safe device to stop us from passing null objects into Rhino.
+            'This object should never be Null... but it never hurts to check.
+            If scaleBRep IsNot Nothing Then
+                viewport.DrawBrep(scaleBRep)
+            End If
+        End Sub
+    End Class
+
+    Public Class Flange
+        'This class represents a Flange object, 
+        'it contains all variables and is capable of generating a BRep
+
+        'Start out with default values
+        Public m_Plane As New OnPlane(New On3dPoint(0, 0, 0), New On3dVector(1, 0, 0), New On3dVector(0, 1, 0))
+        Public m_OuterRadius As Double = 10.0
+        Public m_InnerRadius As Double = 6.0
+        Public m_HoleRadius As Double = 1.0
+        Public m_Holes As Int32 = 8
+        Public m_Thickness As Double = 1.0
+
+        'Generate the outer circle from the local variables.
+        Public ReadOnly Property OuterCircle() As OnCircle
+            Get
+                Return New OnCircle(m_Plane, m_Plane.origin, m_OuterRadius)
+            End Get
+        End Property
+
+        'Generate the inner circle from the local variables.
+        Public ReadOnly Property InnerCircle() As OnCircle
+            Get
+                Return New OnCircle(m_Plane, m_Plane.origin, m_InnerRadius)
+            End Get
+        End Property
+
+        'Generate the middle circle from the local variables.
+        'All holes are centerd ON this curve.
+        Public ReadOnly Property MiddleCircle() As OnCircle
+            Get
+                Return New OnCircle(m_Plane, m_Plane.origin, 0.5 * (m_OuterRadius + m_InnerRadius))
+            End Get
+        End Property
+
+        'Generate all centers of all hole circles.
+        Public ReadOnly Property HolePoints() As On3dPoint()
+            Get
+                'Get the middle circle and create an array to contain all points.
+                Dim hRail As OnCircle = MiddleCircle
+                Dim Pt(m_Holes - 1) As On3dPoint
+
+                'A circle domain is always, always, always between 0.0 and 2Pi,
+                'thus our step size is 2Pi divided by the number of holes.
+                Dim tStep As Double = (2 * Math.PI) / m_Holes
+
+                'Create a counter variable
+                Dim i As Int32 = -1
+                'Make sure we do not step on 0.0 and 2Pi because that results in a duplicate hole.
+                'The obvious solution to prevent this is to lower the loop termination value with
+                'half the stepsize.
+                For t As Double = 0.0 To 2 * Math.PI - 0.5 * tStep Step tStep
+                    i += 1
+                    Pt(i) = hRail.PointAt(t)
+                Next
+
+                Return Pt
+            End Get
+        End Property
+
+        'Compute the maximum hole radius which still results in a valid solid.
+        'I.e. holes are not allowed to intersect each other, or the outer circles.
+        'Note; there is no protection against invalid polysurfaces, this is up to the caller.
+        Public ReadOnly Property MaximumHoleRadius() As Double
+            Get
+                Dim maxRad As Double
+                Dim HoleCircle As OnCircle = MiddleCircle
+                maxRad = 0.5 * HoleCircle.PointAt(0.0).DistanceTo( _
+                               HoleCircle.PointAt(2 * Math.PI / m_Holes))
+                maxRad = Math.Min(maxRad, 0.5 * Math.Abs(m_OuterRadius - m_InnerRadius))
+                Return 0.999 * maxRad
+            End Get
+        End Property
+
+        'Generate an array with all hole circles.
+        Public ReadOnly Property Holes() As OnCircle()
+            Get
+                'Get all hole centers and create an array to hold the hole circles.
+                Dim HoleCenters() As On3dPoint = HolePoints
+                Dim HoleCircles(HoleCenters.GetUpperBound(0)) As OnCircle
+
+                For i As Int32 = 0 To HoleCenters.GetUpperBound(0)
+                    HoleCircles(i) = New OnCircle(m_Plane, HoleCenters(i), m_HoleRadius)
+                Next
+
+                Return HoleCircles
+            End Get
+        End Property
+
+        'Create a BRep, this is quite an expensive function, so cache the results if possible.
+        Public ReadOnly Property CreateBRep() As OnBrep
+            Get
+                'An array of faces required to store the result of the RhinoMakePlanarBReps function
+                Dim iFaces() As OnBrep = Nothing
+                'An array of edges that define the trims of the flange baseplane
+                Dim iEdges(m_Holes + 1) As IOnCurve
+                'A curve instance used to translate circles into curves.
+                Dim iNurbsCurve As OnNurbsCurve
+
+                'Collect all edges
+                iNurbsCurve = New OnNurbsCurve
+                OuterCircle.GetNurbForm(iNurbsCurve)
+                iEdges(0) = iNurbsCurve
+
+                iNurbsCurve = New OnNurbsCurve
+                InnerCircle.GetNurbForm(iNurbsCurve)
+                iEdges(1) = iNurbsCurve
+
+                Dim iHoleEdges As OnCircle() = Holes
+                For i As Int32 = 0 To iHoleEdges.GetUpperBound(0)
+                    iNurbsCurve = New OnNurbsCurve
+                    iHoleEdges(i).GetNurbForm(iNurbsCurve)
+                    iEdges(i + 2) = iNurbsCurve
+                Next
+
+                'If this fails we have nothing to continue with, abort.
+                If Not RMA.Rhino.RhUtil.RhinoMakePlanarBreps(iEdges, iFaces) Then Return Nothing
+
+                'Only extrude if the thickness is not zero.
+                If m_Thickness <> 0.0 Then
+                    'We're assuming that the result of the RhinoMakePlanarBreps was just a single face.
+                    'This is not always the case, if the hole radius is too big there will be multiple
+                    'faces, however if we have multiple faces all is lost so we might as well continue on
+                    'regardless.
+                    OnUtil.ON_BrepExtrude(iFaces(0), _
+                        New OnLineCurve(m_Plane.origin, m_Plane.origin + (m_Plane.zaxis * m_Thickness)))
+                End If
+
+                Return iFaces(0)
+            End Get
+        End Property
+    End Class
+End Namespace

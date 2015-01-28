@@ -1,0 +1,65 @@
+'--------------------------------------------------------------
+'Command   :  sola (Separate objects at the layer All)
+'Date      :  2011/08/10
+'Version   :  1.5
+'Organization   :  Rhino+
+'--------------------------------------------------------------
+Sub SeperateObjsIntoLayers
+
+Dim arrLayers,strNewName,arrObjects,strObject
+
+'-------------------------------------------
+Mesno=Rhino.MessageBox ("Do you want to run?" ,0 +1)
+If (Mesno=1) Then
+'-------------------------------------------
+
+
+arrLayers= Rhino.LayerNames
+
+strNewName = CStr(Rhino.CurrentLayer)
+
+
+If IsArray(arrLayers) Then
+For Each strLayer In arrLayers
+  
+      arrObjects = Rhino.ObjectsByLayer(strLayer, True)
+
+      If IsArray(arrObjects) Then
+      For Each strObject In arrObjects
+        
+      If (Rhino.objectColor(strObject)=Rhino.LayerColor ( strLayer)) Then
+      Rhino.currentLayer ( Rhino.addlayer (,RandomColor))
+      Rhino.ObjectLayer strObject, Rhino.CurrentLayer
+
+End If
+
+Next
+
+End If
+
+Rhino.command "_NoEcho _SelNone"
+
+Next
+
+End If
+
+Rhino.CurrentLayer strNewName
+End If
+End Sub
+'------------------------------------------
+
+
+
+Function RandomColor()
+
+Dim intRed, intGreen, intBlue
+
+Randomize
+
+intRed = Int(255 * Rnd)
+intGreen = Int(255 * Rnd)
+intBlue = Int(255 * Rnd)
+
+RandomColor = RGB(intRed, intGreen, intBlue)
+
+End Function

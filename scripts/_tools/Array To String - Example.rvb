@@ -1,0 +1,31 @@
+Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version Thursday, January 26, 2012 9:35:41 AM
+
+Call CheckObjects()
+Sub CheckObjects()
+	Dim strObjects, arrObjects
+
+	arrObjects = Rhino.GetObjects("Select objects.")
+	
+	Dim strDelimiter
+	strDelimiter = ","
+
+	strObjects = join(arrObjects, strDelimiter)
+	For Each strObjects In arrObjects 
+	
+		If Rhino.IsObjectSolid(strObjects) Then
+
+			Rhino.Print "The object is solid."
+
+		Else
+
+			Rhino.Print "The object is not solid."
+
+		End If
+
+	Next
+End Sub
+	
+

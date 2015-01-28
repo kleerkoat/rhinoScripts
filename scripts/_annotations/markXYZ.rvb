@@ -1,0 +1,57 @@
+﻿Option Explicit
+'Script written by Pascal
+
+'Script version Wednesday, July 09, 2008
+
+Private intOldPrec
+
+If isEmpty(intOldPrec) Then'
+	intOldPrec = 3
+End If
+
+Sub PtObjXYZ
+	
+	
+	Dim apts: aPts = Rhino.GetObjects("Select point objects",1,True,True)
+	If Not isArray(aPts)Then Exit Sub
+	
+	Dim intPrec: intPrec = Rhino.GetInteger("Precision",intOldPrec,0,10)
+	
+	If isNull(intPrec) Then Exit Sub
+	
+	intOldPrec = intPrec
+	
+	Dim sPt, aPt
+
+	For Each sPt In aPts
+		aPt = Rhino.PointCoordinates(sPt)
+		Rhino.AddText Rhino.Pt2Str(aPt,intPrec),aPt
+	Next
+
+End Sub
+
+
+Sub MarkXYZ
+	
+	Dim sPt, aPt
+
+	Dim intPrec: intPrec = Rhino.GetInteger("Precision",intOldPrec,0,10)
+	
+	If isNull(intPrec) Then Exit Sub
+	
+	intOldPrec = intPrec
+	
+	Do
+		aPt = Rhino.GetPoint
+		If Not isArray(aPt)Then Exit Sub
+		Rhino.AddPoint aPt
+		Rhino.AddText Rhino.Pt2Str(aPt,intPrec),aPt
+		
+	Loop Until isNull(aPt)
+	
+End Sub
+
+
+Rhino.AddStartUpScript Rhino.lastLoadedScriptFile
+Rhino.AddAlias "MarkXYZ" , "_noEcho _-Runscript MarkXYZ"
+Rhino.AddAlias "PtObjXYZ" , "_noEcho _-Runscript PtObjXYZ"

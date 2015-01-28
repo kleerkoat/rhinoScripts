@@ -1,0 +1,65 @@
+Option Explicit
+'Script written by Pascal Golay
+'RMA
+'Script version Tuesday, May 06, 2008
+
+
+Sub SelAdjacent
+
+	Dim aPt: aPt = Rhino.GetPoint
+	If Not isArray(aPt) Then Exit Sub
+	
+	Dim aObj: aObj = Rhino.AllObjects
+	
+	If Not isArray(aObj) Then Exit Sub
+	
+	Dim Tol: Tol = Rhino.UnitAbsoluteTolerance
+	Dim sObj, tempPt, atemp,temp, dist
+	
+	Rhino.EnableRedraw(False)
+	For Each sObj In aObj 
+	
+		If Rhino.IsCurve(sobj) Then
+			
+			temp = Rhino.CurveClosestPoint(sObj,aPt)
+			tempPt = Rhino.EvaluateCurve(sobj,temp)
+			dist = Rhino.Distance(aPt, tempPt)
+
+		ElseIf Rhino.IsSurface(sObj) Or Rhino.IsPolysurface(sObj) Then
+			
+			temp = Rhino.BrepClosestPoint(sObj,aPt)
+			tempPt = temp(0)
+			dist = Rhino.Distance(aPt, tempPt)
+				
+		ElseIf Rhino.IsMesh(sObj) Then
+			
+			temp = Rhino.MeshClosestPoint(sObj,aPt)
+			tempPt = temp(0)
+			dist = Rhino.Distance(aPt, tempPt)
+			
+		ElseIf Rhino.Ispoint(sObj) Then
+		
+			tempPt = Rhino.PointCoordinates(sobj)
+			dist = Rhino.Distance(aPt, tempPt)
+			
+		ElseIf Rhino.IsPointCloud(sObj) Then
+		
+			atemp = PointCloudPoints(sobj)
+			temp = PointArrayClosestPoint(atemp, aPt)
+			tempPt = atemp(temp)
+			dist = Rhino.Distance(aPt, tempPt)
+			
+		End If
+	
+		If dist <=Tol Then 
+			Rhino.SelectObject(sobj)
+		End If
+		
+	Next
+	
+	Rhino.EnableRedraw(True)
+	
+End Sub
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "SelAdjacent", "_noEcho _-Runscript SelAdjacent"

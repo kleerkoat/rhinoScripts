@@ -1,0 +1,33 @@
+'Script written by Ryan Gilmore (monkeygrip@gmail.com)
+'Script version Thursday, September 27, 2012 1:29:41 PM
+
+'Description: PRINTS BY SELECTIONS BOUNDING BOX.
+'
+'Edits:
+'Todo:
+
+Option Explicit
+
+
+'Call PrintFromBoundingBox()
+Sub PrintFromBoundingBox()
+	
+	Dim arrBBoxPts, arrObjs, strPt1, strPt2
+	
+	arrObjs = Rhino.GetObjects("Select objects to print to PDF:",,, 1)
+	
+	If IsArray(arrObjs) Then
+		arrBBoxPts = Rhino.BoundingBox(arrObjs)
+	
+		strPt1 = Rhino.Pt2Str(arrBBoxPts(0))
+		strPt2 = Rhino.Pt2Str(arrBBoxPts(2))
+	
+		Rhino.Command("_-Print _Setup _View _ViewportArea _Window " & strPt1 & chr(32) & strPt2 & chr(32) & " EnterEnd")
+	Else
+
+	
+	End If
+
+End Sub
+
+

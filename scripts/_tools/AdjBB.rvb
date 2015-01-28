@@ -1,0 +1,81 @@
+Option Explicit
+'Script written by Mitch
+'Script version Monday, 19 October, 2009
+
+
+Sub AdjBBox()
+	
+	Dim strObj,arrBBObj,arrBBCtr,dblX,dblY,dblZ
+	
+	strObj=Rhino.GetObject("Select object to process",4+8+16+32+4096,True)
+	If IsNull(strObj) Then Exit Sub
+	arrBBObj=Rhino.BoundingBox(strObj)
+	If Not IsArray(arrBBObj) then Exit Sub
+	
+	arrBBCtr=Rhino.PointDivide(Rhino.PointAdd(arrBBObj(0),arrBBObj(6)),2)	
+	dblX=(arrBBObj(1)(0))-(arrBBObj(0)(0))
+	dblY=(arrBBObj(2)(1))-(arrBBObj(1)(1))
+	dblZ=(arrBBObj(4)(2))-(arrBBObj(0)(2))
+	
+	Dim arrItems,arrValues,strMsg,strTitle,arrNewBB
+	
+	arrItems=Array("X Length","Y Width","Z Height")
+	arrValues=Array(Cstr(dblX),Cstr(dblY),Cstr(dblZ))
+	strMsg="Modify dimensions as needed and press OK"
+	strTitle="Object bounding box dimensions"
+	
+	arrNewBB=Rhino.PropertyListBox(arrItems,arrValues,strMsg,strTitle)
+	If Not IsArray(arrNewBB) Then Exit Sub
+	
+	Dim dblNX,dblNY,dblNZ,StrBBCtr, strComm, strNewBB
+	
+	If Not IsNull(arrNewBB(0)) and IsNumeric(arrNewBB(0)) Then
+		dblNX=Cdbl(arrNewBB(0))
+	End If
+	
+	If Not IsNull(arrNewBB(1)) and IsNumeric(arrNewBB(1)) Then
+		dblNY=Cdbl(arrNewBB(1))
+	End If
+	
+	If Not IsNull(arrNewBB(2)) and IsNumeric(arrNewBB(2)) Then
+		dblNZ=Cdbl(arrNewBB(2))
+	End If
+	
+	If IsNull(dblNX) or IsNull(dblNY) or IsNull(dblNZ) Then
+		Call Rhino.Print("Unable to get new bounding box")
+		Exit Sub
+	ElseIf dblNX<0 or dblNY<0 or dblNZ<0 Then
+		Call Rhino.Print("Dimensions cannot be negative")
+			Exit Sub
+	End If	
+	
+	Dim pt0,pt1,pt2,pt3,pt4,pt5,pt6,pt7,arrPts
+	
+	pt0=Rhino.PointAdd(arrBBCtr,Array(-dblNX/2,-dblNY/2,-dblNZ/2))
+	pt1=Rhino.PointAdd(pt0,array(dblNX,0,0))
+	pt2=Rhino.PointAdd(pt1,array(0,dblNY,0))
+	pt3=Rhino.PointAdd(pt0,array(0,dblNY,0))
+	pt4=Rhino.PointAdd(pt0,array(0,0,dblNZ))
+	pt5=Rhino.PointAdd(pt1,array(0,0,dblNZ))
+	pt6=Rhino.PointAdd(pt2,array(0,0,dblNZ))
+	pt7=Rhino.PointAdd(pt3,array(0,0,dblNZ))
+	
+	If dblNX>0 And dblNY>0 And dblNZ>0 Then
+	arrPts=Array(pt0,pt1,pt2,pt3,pt4,pt5,pt6,pt7)
+		Call Rhino.AddBox(arrPts)
+	End If
+	
+	If (dblNX=0 and dblNY=0) or (dblNY=0 and dblNZ=0) or (dblNX=0 and dblNZ=0) Then
+		Call Rhino.Print("Two zero length dimensions found - nothing done")
+		Exit Sub
+	ElseIf dblNX=0 Then
+		Call Rhino.AddPolyline(Array(pt0,pt3,pt7,pt4,pt0))
+	ElseIf dblNY=0 Then
+		Call Rhino.AddPolyline(Array(pt0,pt1,pt5,pt4,pt0))
+	ElseIf dblNZ=0 Then
+		Call Rhino.AddPolyline(Array(pt0,pt1,pt2,pt3,pt0))		
+	End If
+
+End Sub
+
+Call AdjBB2()

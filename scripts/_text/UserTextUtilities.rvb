@@ -1,0 +1,93 @@
+Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version Friday, October 15, 2010
+
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "EditUserText","_-Runscript (EditUserText)"
+'Rhino.AddAlias "AddUserText","_-Runscript (AddUserText)"
+'Rhino.AddAlias "RemoveUserText","_-Runscript (RemoveUserText)"
+
+'Call EditUserText()
+
+'Call AddUserText()
+
+'Call RemoveUsertext()
+
+
+Sub EditUserText()
+	
+	dim sObj: sObj = Rhino.GetObject(,,true)
+	If isNull(sObj) then exit sub
+	
+	Dim aKeys: aKeys = Rhino.GetUsertext(sobj)
+	
+	If not isArray(akeys) then 
+		Rhino.Print "No user text found on this object."
+		Exit sub
+	End If
+	dim Bound: Bound = UBound(aKeys)
+	Dim atext(), i
+	
+	For i = 0 to Bound
+		redim aText(i)
+		atext(i) = Rhino.GetUserText(sobj,aKeys(i))
+	Next
+	
+	Dim aEdit: aEdit = Rhino.PropertyListBox(aKeys,atext,"Edit user text", "User Text")
+	If not isArray(aEdit) then exit sub
+	
+	For i = 0 to Bound
+		Rhino.SetUserText sobj, aKeys(i), aEdit(i)
+	next
+	
+End Sub
+
+Sub AddUserText()
+	
+	dim sObj: sObj = Rhino.GetObject(,,true)
+	If isNull(sObj) then exit sub
+	
+	Dim strK: strK = Rhino.StringBox("Enter key name",,"User Text Key")
+	If isNull(strK) then exit sub
+	
+	Dim StrV: strV = Rhino.StringBox("Enter value for " &chr(34) &strK &chr(34),,strK  & "UserText value")
+	If isNull(strV) then exit sub
+	
+	Rhino.SetUserText sobj, strK,strV
+	
+End Sub
+
+
+Sub RemoveuserText()
+	
+		
+	dim sObj: sObj = Rhino.GetObject(,,true)
+	If isNull(sObj) then exit sub
+	
+	Dim aKeys: aKeys = Rhino.GetUsertext(sObj)
+	
+	If not isArray(akeys) then 
+		Rhino.Print "No user text found on this object."
+		Exit sub
+	End If
+	
+	dim Bound: Bound = UBound(aKeys)
+	
+	dim aState, i
+	redim aState(Bound)
+	
+	For i = 0 to Bound
+		aState(i) = False
+	Next
+	
+	Dim aEdit: aEdit = Rhino.CheckListBox(aKeys,aState,"User text keys", "Remove User Text")
+	If not isArray(aEdit) then exit sub
+	
+	For i = 0 to Bound
+		if aEdit(i) = true then Rhino.SetUserText sobj,Akeys(i), ""
+	next
+	
+	
+End Sub

@@ -1,0 +1,21 @@
+﻿Option Explicit
+'Script written by Damien Alomar
+'Script version Friday, February 01, 2008
+
+Call Main()
+Sub Main()
+
+	Dim arrGroupNames, strGroupName, arrGroupIDs
+	
+	arrGroupNames = Rhino.GroupNames
+	
+	If IsArray(arrGroupNames) Then
+		strGroupName = Rhino.ListBox (arrGroupNames, "Pick the Name of a Group to Select", "Pick a Group")
+		If Not IsNull(strGroupName) Then
+			arrGroupIDs = Rhino.ObjectsByGroup (strGroupName, True)
+		End If
+	Else
+		Rhino.Print "There are No Groups in the File"
+	End If
+	
+End Sub

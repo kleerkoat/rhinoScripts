@@ -1,0 +1,9 @@
+﻿Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version Tuesday, December 07, 2010 12:00:39 PM
+
+Call commandDescription()
+Sub commandDescription()
+	Rhino.MessageBox "Enter command description here.", 0 + 64,"About this script....."
+End Sub

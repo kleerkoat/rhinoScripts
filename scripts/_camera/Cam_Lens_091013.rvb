@@ -1,0 +1,242 @@
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+'Cam_Lens 01/20/09
+'By Sam Page
+'
+'Script contains three subroutines, Change_Camera, Cam_Lens, Viewport_Aspect
+'The script changes Rhino's lens lengths to imitate different types of motion picture cameras
+'
+'10/13/09 update: include other camera types
+
+Option Explicit
+
+'Declare Global Variable
+Dim str_CamType: str_CamType = Null
+Dim nTargetGateWidth: nTargetGateWidth = Null
+
+
+
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+'Sub Change_Camera() changes the camera type that we are on and sets nTargetGateWidth
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+Sub Change_Camera()
+	Dim arrCamTypes(4)
+	arrCamTypes(0) = "DIN_Super35"
+	arrCamTypes(1) = "ANSI_Super35"
+	arrCamTypes(2) = "Normal35"
+	arrCamTypes(3) = "Anamorphic"
+	arrCamTypes(4) = "TwoThirds_inch"
+	Dim disp_cam
+	If (IsNull(str_CamType)) Then
+		disp_cam = "DIN_Super35"
+	Else
+		disp_cam = str_CamType
+	End If
+	str_CamType = Rhino.GetString ("Camera type?", disp_cam,arrCamTypes)
+	'Check to see if it is null, if so, user exited out
+	If (IsNull(str_CamType)) Then
+		Exit Sub
+	End If
+	'Now that we have the camera type, set the target gate width
+	Select Case str_CamType
+		Case "DIN_Super35"
+			nTargetGateWidth = 24
+		Case "ANSI_Super35"
+			nTargetGateWidth = 24.9
+		Case "Normal35"
+			nTargetGateWidth = 22
+		Case "Anamorphic"
+			nTargetGateWidth = 41.91
+		Case "TwoThirds_inch"
+			nTargetGateWidth = 8.8
+		'Add more cases as you add cameras
+		Case Else
+			str_CamType = Null
+			Rhino.MessageBox "Camera type not recognized or not set", 0, "Camera Lens"
+			Exit Sub
+	End Select
+End Sub
+
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+'Function change_lens takes a target lens length, converts it to a rhino lens length
+'and sets the Rhino lens
+'
+'Arguments:
+'   nlensLengh = desired length of lens on motion picture camera system
+'
+'Returns:
+'   The length of the Rhino lens On sucess, Null on fail
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+Function change_lens(nlensLength)
+	nLensLength = nLensLength * (1/getLensMult())
+
+	'Set the lens
+	change_lens = Rhino.ViewCameraLens( , nLensLength)
+End Function
+
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+'Function report_lens gets the Rhino lens lenght and converts it to the curent camera
+'system lensing
+'
+'Arguments: none
+'
+'Returns:
+'   The length of the motion picture camera system lens, Null on fail
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+Function report_lens()
+	Dim nLens
+	'Get the current lens
+	nLens = Rhino.ViewCameraLens()
+	'Check to see if we got a result, if not return Null
+	If (IsNull(nLens)) Then
+		report_lens = Null
+		Exit Function
+	End If
+	'Convert the Rhino lens into a motion picture lens 
+	nLens = nLens * getLensMult()
+      
+	'Round the lens off and return
+	report_lens = CSng(FormatNumber(nLens,1))
+End Function
+
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+'Function getLensMult() gets the current lens multiplier based on the viewport aspect
+'ratio and the current camera system
+'
+'Arguments: none
+'
+'Returns:
+'   The current lens multiplyer (to go from Rhino lens to motion picture lens), Null on fail
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+Function getLensMult()
+	Dim arr_ViewDim, nRhinoGateWidth
+	'Get the size of the viewport
+	arr_ViewDim = Rhino.ViewSize
+	If (Not IsArray(arr_ViewDim)) Then
+		'Something when wrong, return null and exit
+		getLensMult = Null
+		Exit Function
+	End If
+	'Find Rhinos gate width
+	If arr_ViewDim(0) > arr_ViewDim(1) Then
+		nRhinoGateWidth = (arr_ViewDim(0)/arr_ViewDim(1)) * 24
+	Else
+		nRhinoGateWidth = 24  
+	End If
+	'Calculate the lens multiplyer
+	getLensMult = nTargetGateWidth / nRhinoGateWidth
+End Function
+
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''  
+'Sub Cam_Lens() modifies Rhino's lensing to match the selected camera
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+Sub Cam_Lens()
+ 
+	Dim arr_ViewDim, str_CurView, nLensLength
+	Dim nOldLens, nDisplayLens, nRhinoGateWidth
+
+	'First check to see if the view is perspective and if not, cancel out
+	If Rhino.IsViewPerspective(Rhino.CurrentView) Then
+		'Store the name of the view in case the user changes views halfway through
+		str_CurView = Rhino.CurrentView
+  
+		'Check to see if we already have a camera type selected, if not, ask the user
+		If (IsNull(str_CamType)) Then
+			Change_Camera()
+			'Check to see if str_CamType is still null, if so, then user exited
+			If (IsNull(str_CamType)) Then
+				Exit Sub
+			End If
+		End If
+  
+		Dim strDisplayString
+		strDisplayString = "Enter the desired " & str_CamType & " lens length"
+		'Get the desired lens length
+		nLensLength = Rhino.GetReal(strDisplayString, report_lens())
+  
+		'Check if the user cancelled out
+		If IsNull (nLensLength) Then
+			Exit Sub
+		End If
+  
+		nLensLength = nLensLength * (1/getLensMult())
+
+		'Set the lens
+		Rhino.ViewCameraLens str_CurView, nLensLength
+ 
+  
+	Else
+		Rhino.MessageBox "You must be in a perspective viewport to change lenses", 0, "Camera Lens"
+		Exit Sub
+	End If
+End Sub
+  
+ 
+  
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''  
+'Sub Viewport_aspect() changes the aspect ratio of the viewport. If the current viewport is
+'perspective and a camera system has been choosen, then the user is given the oppertunity to
+'update the Rhino lens to keep the motion picture lens constant
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+Sub Viewport_aspect()
+	Dim arr_ViewDim, str_Command, nAspect, nNewHeight
+	Dim arrChangeLens, arrItems, arrDefault, blnVal, nLens
+
+	'Get the current viewport size
+	arr_ViewDim = Rhino.ViewSize
+	'Calculate the current viewport Aspect
+	nAspect = arr_ViewDim(0) / arr_ViewDim(1)
+
+	'Get the desired aspect ratio
+	nAspect = Rhino.GetReal("Desired aspect ratio", CSng(FormatNumber(nAspect,2)))
+
+	'See if the user canceled and if so exit gracefully
+	If (VarType(nAspect) = 1) Then
+		Exit Sub
+	End If
+  
+	'Turn off redraw so the view doesn't jump
+	Rhino.EnableRedraw(False)
+
+	nNewHeight = Int(arr_ViewDim(0)/nAspect)
+
+
+	'Check to see if we are in a perspective viewport
+	If Rhino.IsViewPerspective(Rhino.CurrentView) Then
+		'Check to see if we have a camera type, if we do, then ask if we want to change the lens for consistancy
+		If (Not IsNull(str_CamType)) Then 'We have a camera type
+			'Find out if the user want change the Rhino lens to keep the Motion Picture lensing the same
+			arrItems = Array("LensChange", "No", "Yes")
+			arrDefault = Array(True)
+			arrChangeLens = Rhino.GetBoolean("Change Rhino lens to keep " & str_CamType &" lens constant?", arrItems, arrDefault)
+
+			'Check to see if the user canceled and if so exit gracefully
+			If (Not IsArray(arrChangeLens)) Then
+				'Turn redraw back on
+				Rhino.EnableRedraw(True)
+				Exit Sub
+			End If
+      
+			'Get and store the current lens
+			nLens = report_lens()
+		End If
+	End If
+
+	'Make a string that has all our values to pass to Rhino.Command
+	str_Command = "_-ViewportProperties _Size " & CStr(arr_ViewDim(0)) & " " & CStr(nNewHeight) & " _Enter"
+	'Set the new aspect ratio
+	Rhino.Command (str_Command), False
+
+	'change the lens is the user wanted to do so
+	If (Not IsNull(str_CamType)) Then
+		If (arrChangeLens(0) And nLens) Then
+			change_lens(nLens)
+		End If
+	End If
+
+	'Turn redraw back on
+	Rhino.EnableRedraw(True)
+End Sub
+
+Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+Rhino.AddAlias "Lens", "_NoEcho _-RunScript (Cam_Lens)"
+Rhino.AddAlias "Aspect", "_NoEcho _-RunScript (Viewport_aspect)"

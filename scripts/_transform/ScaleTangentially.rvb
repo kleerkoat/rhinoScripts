@@ -1,0 +1,26 @@
+Option Explicit
+'Script to scale tangentially
+
+'Call ScaleTangentially()
+Sub ScaleTangentially()
+	
+	Dim arrObjects,dblScale,strObject,arrDomain,intType,intSide,dblLength
+	arrObjects=Rhino.GetObjects("Pick the set of curves to scale tangentially.")
+	If IsNull(arrObjects) Then Exit Sub
+	
+	dblScale=Rhino.GetReal("Enter the scale factor.")
+	If IsNull(dblScale) Then Exit Sub
+	
+	dblScale=(dblScale-1)/2
+	For Each strObject In arrObjects
+		
+	
+	arrDomain=Rhino.CurveDomain(strObject)
+		intType=2 'Curvature smooth
+		intSide=2 'Both sides
+		dblLength=arrDomain(1)*(dblScale)
+		Call Rhino.ExtendCurveLength(strObject, intType, intSide, dblLength)
+
+	Next
+	
+End Sub

@@ -1,0 +1,138 @@
+'Option Explicit
+'Script written by Adrian McKenna
+'Script copyrighted by Adrian McKenna
+'Script version Monday, 13 July 2009
+'I didn't get any feedback from anyone that one existed, so I have created one.
+'Everyone has always been helpful to me, so I hope this is a help to others!
+'This will be particularly useful for anyone in manufacturing, or who prepare quotes.
+'The script nests individual item lengths into overall stock lengths.
+'So if you can buy steel in 3000mm lenths, you can enter the individual cut lengths... 3000, 2500, 500, 1200, 1200, 
+'1200, 2000, 1800, 600, 400, 400
+'Results are as follows:
+'--------------------------------------------------------
+'Total Objects Nested = 10
+'Efficiency for length 1 is 100% (->3000)
+'Efficiency for length 2 is 100% (->2500->500)
+'Efficiency for length 3 is 100% (->1800->1200)
+'Efficiency for length 4 is 100% (->1200->1200->600)
+'Efficiency for length 5 is 26.67% (->400->400)
+'TOTAL LENGTHS = 5 (4.27)
+'--------------------------------------------------------
+'The code may not be pretty, but it seem to work :)
+'I have been working in millimetres. I can't see why other units wouldn't work, but I haven't tried them.
+'Instructions are simple:
+'- Run the script
+'- Enter the stock length (you can change the default to suit you - I have set it to 2400mm)
+'- You then enter in individual lengths, either by typing them in or picking 2 points (great for scaling from your 
+'model or 2 drawing) - If you hit ENTER you will get the same value you typed in last (set this way to make multiple 
+'entry easier) - Once you have entered them all type, a distance of 0 (ZERO)
+'A message box comes up with a report on how the objects have been nested, and the efficiency of each length.
+'Total number of objects nested, and the total lengths required to complete the job.
+'As a bonus, I have put the same details into the clipboard, so you can paste the solution into notepad, word or excel. 
+'The results can then be printed. (I guess we could add a WISH for a PRINT button option in the message box?)
+'Suggestions are welcome.
+'Let me know how you find it.
+'Adrian
+
+
+
+Call Main()
+
+Sub Main()
+	Dim bit, stockLength, stockLeft, loopbits, nestNum, bitNum, tempLength, nestedArray(), efficient, lengths, finished, countup, strText
+	Dim SortGroup
+	Dim EachDist, DistLoop, DistRun, DistTemp
+	Dim JoinString, JoinBits
+	Dim bitArray()
+	stockLength = Rhino.GetReal("Stock Length: ",2400)
+	DistTemp = stockLength
+
+	EachDist = 1
+	DistLoop = 0
+	DistRun = 0
+	
+	JoinString = ""
+		
+	Do While EachDist <> "0"
+		EachDist = stockLength + 1
+		Do While EachDist > stockLength
+			EachDist = Rhino.GetDistance(,DistTemp,"Distance or 0 to end: ")
+			If EachDist > stockLength Then
+				Rhino.MessageBox "*** "&CInt(EachDist)&" is more than the "&stockLength&" Stock Length - NOT ADDED ***"
+			Else
+				If EachDist <> 0 Then
+					DistRun = DistRun + EachDist
+					print CInt(EachDist)&" ADDED... "&"Total Running Measurement = "&CInt(DistRun)
+				End If
+			End If
+		Loop
+		EachDist = CInt(EachDist)
+		DistTemp = EachDist	
+		If EachDist <> "0" Then
+			ReDim Preserve bitArray(DistLoop)
+			bitArray(DistLoop) = EachDist
+			DistLoop = DistLoop + 1
+		End If
+		If EachDist = 0 Then Exit Do
+	Loop
+	
+	SortGroup = Rhino.SortNumbers(bitArray, vbFalse)
+	
+	bitNum = UBound(bitArray)
+	'Print "Total Objects Nested = "&(bitNum+1)
+	JoinString = JoinString&"Total Objects Nested = "&(bitNum+1)&vbCr&vbLf
+	lengths = 1
+
+	ReDim nestedArray(bitNum)
+	
+	countup = 0
+	
+	For nestNum = 0 To bitNum
+		nestedArray(nestNum) = -1
+	Next
+
+	Do While finished = 0	
+		
+	stockLeft = stockLength
+		JoinBits = ""
+		
+		For loopbits = 0 To bitNum
+		
+			If nestedArray(loopbits) <> loopbits Then
+				
+				tempLength = SortGroup(loopbits)		
+				If stockLeft >= tempLength Then
+					nestedArray(loopbits) = loopbits
+					'				print nestedArray(loopbits)
+					stockLeft = stockLeft - tempLength
+					'				print SortGroup(loopbits)
+					countup = countup + 1
+					JoinBits = JoinBits&"->"&SortGroup(loopbits)
+				
+				Else
+			
+				End If
+				
+			End If
+			
+			Next
+
+		efficient = (1-(stockLeft/stockLength))*100
+		'print "Efficiency for length "&lengths&" is "&Round(efficient,2)&"%"
+		JoinString = JoinString&vbCr&vbLf&"Efficiency for length "&lengths&" is "&Round(efficient,2)&"%"
+		lengths = lengths + 1
+	
+		JoinString = JoinString&"  ("&JoinBits&")"	
+		
+		If countup > bitNum Then finished = 1
+		
+	Loop		
+	'Print "Total Lengths = "&(lengths-1)&" or "&Round(((lengths-2)+(efficient/100)),2)&" to be more precise"
+	JoinString = JoinString&vbCr&vbLf&vbCr&vbLf&"TOTAL LENGTHS = "&(lengths-1)&" ("&Round(((lengths-2)+(efficient/100)),2)&")"
+	
+	strText = Rhino.ClipboardText(JoinString)
+	
+	Rhino.MessageBox(JoinString)
+	
+	
+End Sub

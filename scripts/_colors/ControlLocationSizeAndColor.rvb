@@ -1,0 +1,63 @@
+Option Explicit
+'Script written by Karl Daubmann
+'Script copyrighted by PLY
+'Script version Monday, March 09, 2009 7:48:33 PM
+
+'Call ControlLocationSizeAndColor()
+Sub ControlLocationSizeAndColor()
+
+	Dim x, y, z
+	Dim xmax, ymax, zmax
+	Dim arrPtCoord, strSphere, scaleOrigin, scaleTranslate
+	
+	xmax=80-1
+	ymax=20-1
+	zmax=20-1
+	
+	
+	
+	
+	
+	For x = 0 To xmax
+		For y = 0 To ymax
+			For z = 0 To zmax
+				
+				
+				If y >9 And y < 11 And z > 10 And z < 20 And x > 10 And x < 79 Then
+		
+				
+					arrPtCoord = array(x*x,y-2,z*(x*3))
+					scaleOrigin = array (x*x, y*y, z*z)
+					scaleTranslate = array (x*y+10, y*(x+x), z*x*2)
+				
+					strSphere = Rhino.AddSphere (arrPtCoord, 0.5)
+				
+				
+					Call rhino.ObjectColor (strSphere, rgb (255/xmax*x,0,255/zmax*z) )
+					Call Rhino.ScaleObject (strSphere, arrPtCoord, scaleTranslate, False)
+		
+					Call rhino.EnableRedraw (True)
+
+				
+				
+				Else
+				
+					
+					
+					
+				End If
+				
+				
+				
+				
+				
+
+			Next
+		Next
+	Next
+	
+	
+	
+	
+	
+End Sub

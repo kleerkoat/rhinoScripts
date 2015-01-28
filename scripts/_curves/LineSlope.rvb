@@ -1,0 +1,72 @@
+Option Explicit
+'Script written by Pascal
+' RMA
+'Script version Wednesday, April 11, 2012
+
+'Rhino.AddStartUpScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "LineSlope", "_NoEcho _-Runscript (LineSlope)"
+Private OldSlope
+If isEmpty(oldSlope) Then
+	OldSlope = "1:1"
+End If
+'Call LineSlope()
+
+Sub LineSlope()
+	Dim aLine: aLine = Rhino.GetCurveObject("Select line at one end. (Line representing height)", False)
+	If Not ISArray(aLine) Then Exit Sub
+	Dim sLine: sLine = aLine(0)
+	If Not Rhino.IsLine(sLine) Then Exit Sub
+	
+	
+	If Not aLine(1)  Then
+		If aLine(2) = 1 Then
+			Dim CrvEnd:CrvEnd = GetCrvEnd(sLine, aLine(4))
+		End If
+		
+	Else
+		CrvEnd = 1
+	End If
+	
+	
+	Dim sSlope: sSlope = Rhino.GetString("Set Slope as A:B", OldSlope)
+	If isNull(sSlope) Then Exit Sub
+	OldSlope = sSlope
+	
+	Dim aStart, aEnd, aStartPlane, aEndPlane
+	If CrvEnd = 1 Then Rhino.ReverseCurve sLine
+
+	aStart = Rhino.CurveStartPoint(sLine)
+	aEnd = Rhino.CurveEndPoint(sLine)
+	
+	Rhino.EnableRedraw False
+	Dim xform: xform = Rhino.XformPlanarProjection(Rhino.ViewCPlane())
+	Dim sProj: sProj = Rhino.TransformObject(sLine, xForm, True)
+
+	Dim aSlope: aSlope = split(sSlope, ":")
+	Dim ProjLen: ProjLen = Rhino.CurveLength(sProj)
+	Dim dblSlope: dblSlope = aSlope(0) / aSlope(1)
+	Dim dy: dy = dblSlope * Projlen
+	
+	Dim  NewEnd:NewEnd = Rhino.PointAdd(Rhino.CurveEndPoint(sProj), Rhino.VectorScale(Rhino.ViewCPlane()(3), dy))
+	Dim newLine: NewLine = Rhino.AddLine(Rhino.CurveStartPoint(sProj), NewEnd)
+	Rhino.MoveObject newLine, Rhino.CurveStartPoint(newLine), aStart
+	Rhino.MatchObjectAttributes newLine, sLine
+	Rhino.DeleteObjects(array(sLine, sProj))
+	Rhino.EnableRedraw True
+	
+	Dim ang: ang = Rhino.ToDegrees(atn(dblSlope))
+	Rhino.Print "Line angle to Cplane = " & round(ang, 2) & " degrees."
+End Sub
+
+
+
+Function GetCrvEnd(crv, t)
+	'0 = Start, 1 = End
+	Dim Dom: dom = Rhino.CurveDomain(crv)
+	If Abs(t - dom(0)) > Abs(t - dom(1)) Then
+		GetCrvEnd = 1
+	Else
+		GetCrvEnd = 0
+	End If
+End Function
+

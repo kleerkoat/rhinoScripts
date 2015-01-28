@@ -1,0 +1,58 @@
+Option Explicit
+'Script by Mitch Heynick
+'Version 21 October, 2010
+
+'Call SelByGrid()
+Sub SelByGrid()
+	'Selects objects in grids based on overall bounding box
+	'user selectable grid divisions
+	'add your opperations to the script at the indicated spot
+	
+	Dim arrObjs,arrBB,pdx,pdY,sX,sY,divsX,divsY
+	arrobjs=Rhino.NormalObjects
+	If Not IsArray(arrObjs) Then Exit Sub
+	
+	divsX=Rhino.GetInteger("Number of grids in X?",2)
+	divsY=Rhino.GetInteger("Number of grids in Y?",2)
+	If IsNull(divsX) Or IsNull(divsY) Then Exit Sub
+
+	arrBB=Rhino.BoundingBox(arrObjs)
+	pdX=(arrBB(1)(0)-arrBB(0)(0))/divsX
+	pdY=(arrBB(3)(1)-arrBB(0)(1))/divsY	
+	sX=arrBB(0)(0) : sY=arrBB(0)(1)
+	
+	'Call Rhino.EnableRedraw(False)
+	Call Rhino.UnselectAllObjects
+	
+	Dim dblTol,arrLLC,arrURC,pt1,pt2,msg,n,m
+	dblTol=Rhino.UnitAbsoluteTolerance
+	n=0 : m=divsX*divsY
+
+	Do Until sY+dblTol>=arrBB(3)(1)		
+		Do Until sX+dblTol>=arrBB(1)(0)
+			n=n+1
+			arrLLC=Array(sX,sY,0)
+			pt1=Rhino.Pt2Str(arrLLC)
+			arrURC=Array(sX+pdX,sY+pdY,0)
+			pt2=Rhino.Pt2Str(arrURC)
+			'create a crossing window
+			Call Rhino.Command("_Select c "&pt1&" "&pt2&" _Enter",False)
+			
+			'command line reporting (optional)
+			msg="Checking grid area "&n&"/"&m
+			Call Rhino.Print(msg)
+			
+			'+++++++++++++++++++++++++++++++++++++++++++++++
+			'Call your functions on selected objects here!!			
+			'+++++++++++++++++++++++++++++++++++++++++++++++
+			
+			Call Rhino.UnselectAllObjects
+			sX=sX+pdX 'increment x
+		Loop
+		sX=arrBB(0)(0) 'reset x
+		sY=sY+pdY 'increment y
+	Loop
+	
+	Call Rhino.EnableRedraw(True)
+End Sub
+

@@ -1,0 +1,26 @@
+Option Explicit
+'Script by Mitch Heynick
+'Version Wednesday, 10 November, 2010
+
+'Call SelBoundaryForRyan()
+Sub SelBoundaryForRyan()
+	Dim arrSel,arrObjs,strGroup,msg,strBC
+	arrSel=Rhino.SelectedObjects
+	msg="Select closed curve to use as a selection boundary within the viewport"
+	strBC = Rhino.GetObject(msg, 4,, True)	
+	If IsNull(strBC) Then Exit Sub
+	Call Rhino.EnableRedraw(False)
+	Call Rhino.UnselectAllObjects
+
+	Call Rhino.Command("_SelBoundary _SelectionMode=_Window _SelID "&strBC,False)
+	arrObjs=Rhino.SelectedObjects
+	
+	If IsArray(arrObjs) Then
+		strGroup=Rhino.AddGroup
+		Call Rhino.AddObjectsToGroup(arrObjs,strGroup)
+		Call Rhino.AddObjectToGroup(strBC,strGroup)
+		Call Rhino.ObjectsByGroup(strGroup,True)
+		If IsArray(arrSel) Then Call Rhino.SelectObjects(arrSel)
+	End If
+	Call Rhino.EnableRedraw(True)
+End Sub

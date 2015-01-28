@@ -1,0 +1,62 @@
+Option Explicit
+'Script written by Pascal
+'Company: RMA
+'Script version Wednesday, May 30, 2007 8:22:09 AM
+'Alows chaining of linear dimensions.
+
+
+Sub DimChain()
+
+	Dim Plane, pt1, pt2, C
+	Dim arrpts, arrpt, arrPtPlane, pt
+	C = 0
+	Plane = Rhino.ViewCPlane
+	
+	arrPts = Rhino.GetPoints(True,,"First dimension point","Dimension point",2)
+
+	If IsArray(arrpts) Then
+		If UBound(arrPts) = 1 Then
+		
+			arrPts = PointsToCPlane(arrPts, Plane)
+			pt1 = Rhino.Pt2Str (arrPts(0),5, True)
+			Pt2 = Rhino.Pt2Str (arrPts(1),6, True)			
+			Rhino.Command "_Dim " &Pt1  &Pt2 &" "
+		Else Exit Sub			
+		End If
+	Else Exit Sub
+	End If
+		
+	Do
+		arrpt = Rhino.GetPoint ("Dimension point")
+		If IsArray(arrpt) Then
+			
+			arrPtPlane = Rhino.XformWorldToCPlane(arrPt, Plane)
+			pt1 = pt2
+			Pt2 = Rhino.Pt2Str (arrPtPlane,6, True)	
+			Rhino.Command "_Dim " &Pt1  &Pt2 &" "
+			
+		End If
+	Loop Until IsNull(arrPt) 
+	
+End Sub
+
+Function PointsToCPlane(arrPts, Plane)
+
+	Dim i, arrPt
+
+	i = 0
+
+	For Each arrPt In arrPts
+		ReDim Preserve arrXform(i)
+		arrXform(i) = Rhino.XFormWorldToCPlane(arrPt, Plane)
+		i = i + 1
+	Next
+
+	If IsArray(arrXform) Then
+		PointsToCPlane = arrXForm
+	End If
+
+End  Function
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "DimChain", "_NoEcho _-Runscript DimChain"

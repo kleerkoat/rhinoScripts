@@ -1,0 +1,62 @@
+Option Explicit
+
+'Call crvAttract()
+Sub CrvAttract()
+
+	Dim crvArr, steps, threshold, i, j, k, gripCount, dist, closestDist, closestVector, ratio
+	Dim crvPt, h, newPos, gripPos, count, crvParam, attArr, closeIndex, attPtArr()
+	
+	' input
+	crvArr = rhino.GetObjects("select curves", 4)
+	attArr = rhino.GetObjects("select attractor points", 1)
+	steps = rhino.GetReal("how many generations", 4)
+	threshold = rhino.GetReal("attraction threshold", 10)
+	ratio = rhino.GetReal("move ration", 0.5)
+	
+	For i = 0 To UBound(attArr)
+		ReDim Preserve attPtArr(i)
+		attPtArr(i) = Rhino.PointCoordinates(attArr(i))
+	Next
+	
+	
+	' loop through steps
+	For h = 0 To steps
+	
+		' loop through all the crvs
+		For i = 0 To UBound(crvArr)
+		
+			' how many control points on the crv
+			Rhino.EnableObjectGrips crvArr(i), True
+			gripCount = Rhino.ObjectGripCount(crvArr(i))
+		
+			' loop through each of the points on the crv
+			For j = 0 To gripCount-1
+	
+				' get location of the grip
+				gripPos = Rhino.ObjectGripLocation(crvArr(i), j)
+				Rhino.SelectObjects attArr
+				closeIndex = Rhino.PointArrayClosestPoint(attPtArr, gripPos)
+					
+				dist = Rhino.Distance(attPtArr(closeIndex), gripPos)
+				
+				If dist < threshold Then
+					closestVector = Rhino.VectorCreate(attPtArr(closeIndex), gripPos)
+					'closestVector = Rhino.VectorReverse(closestVector) '''''''''''COMMENT BACK IN TO MAKE THE ATTRACTORS REPELLERS
+
+				else
+					closestVector = Array(0,0,0)					
+				End If
+				
+				
+				newPos = Rhino.VectorAdd(gripPos, Rhino.VectorScale(closestVector, ratio))
+				Rhino.ObjectGripLocation crvArr(i), j, newPos
+
+				
+			Next' j
+				
+			Rhino.EnableObjectGrips crvArr(i), False
+		Next ' i
+		
+	Next ' h
+	
+End Sub

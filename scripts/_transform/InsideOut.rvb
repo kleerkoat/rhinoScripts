@@ -1,0 +1,114 @@
+﻿Option Explicit
+'Script written by Pascal
+
+'Script version Thursday, March 05, 2009
+
+
+
+Rhino.AddStartUpScript Rhino.LastLoadedScriptFile
+Rhino.AddAlias "InsideOut","_NoEcho _-RunScript (InsideOut)"
+
+
+Private OldPlane, OldDir
+If isEmpty(OldPlane) Then
+	OldPlane = "TwoPt"
+End If
+
+If isEmpty(OldDir) Then
+	OldDir = "ZWorld"
+End If
+
+
+Sub InsideOut()
+	
+	Dim aObj: aObj = Rhino.GetObjects("Select an object",4+8+32,True,True)
+	If Not IsArray(aObj)  Then Exit Sub
+	Dim aPlanes: aPLanes = Array(,"TwoPt","ThreePt","Object")
+	
+	'	Dim aBB: aBB = Rhino.BoundingBox(sObj)
+	'	Dim Dist: Dist = Rhino.Distance(aBB(0), aBB(6))
+	
+	Dim sPlane: sPlane = Rhino.GetString("Set flip plane",OldPlane,aPlanes)
+	If isNull(sPlane) Then Exit Sub
+	
+	Dim Plane, PlanePts, vecX, VecY, tempPlane
+	If lCase(sPlane) = "twopt" Then
+		
+		Planepts = Rhino.GetPoints(True,True,"First point","Second point",2)
+		If Not isArray(Planepts) Then Exit Sub
+		If Ubound(PlanePts) <>1 Then Exit Sub
+		vecX = Rhino.VectorCreate(Planepts(1), PlanePts(0))
+		VecY = Rhino.VectorRotate(VecX,90,Rhino.ViewCPlane()(3))
+		Plane = Rhino.PlaneFromFrame(PlanePts(0),vecX,Rhino.ViewCPlane()(3))
+		
+	ElseIf lCase(sPlane) = "threept" Then
+		
+		PlanePts = Rhino.GetPoints(True,,"First point","Next point",3)
+		If Not isArray(Planepts) Then Exit Sub
+		Plane = Rhino.PlaneFromPoints(PlanePts(0), PlanePts(1), PLanepts(2))
+		
+		
+	ElseIf lCase(sPlane) = "Object" Then
+		Rhino.Print	"Object plane not hooked up yet"
+		'figure it out later
+	Else Exit Sub
+	End If
+	
+	oldPlane = sPlane
+	
+	Dim aDir: aDir = array("XWorld","YWorld","ZWorld")',"User"
+	Dim sDir: sDir = Rhino.GetString("Set flip direction",OldDir,aDir)
+	If IsNull(sDir) Then Exit Sub
+	
+	Dim D1,D2
+	Dim intDir
+	If lCase(sDir) = "xworld" Then
+		
+		D1 = array(0,0,0)
+		D2 = array(1,0,0)
+		OldDir = "XWorld"
+	ElseIf lCase(sDir) = "yworld" Then
+		D1 = array(0,0,0)
+		D2 = array(0,1,0)
+		OldDir = "YWorld"
+	ElseIf	lCase(sDir) = "zworld" Then
+		D1 = array(0,0,0)
+		D2 = array(0,0,1)
+		OldDir = "ZWorld"
+		
+	Else Exit Sub
+		
+	End If
+	
+	
+	
+	Rhino.EnableRedraw(False)
+	'DrawPlaneFrame  Plane, 5
+	
+	Dim sObj, aIdx 
+	Dim aPt, aTest, VecDir, aTarg, i, Line, tempPt, tempPt2
+	
+	FlipOnPlaneAlongAxis aObj,array(D1,D2),Plane,True
+	
+	Rhino.EnableRedraw
+End Sub
+
+Function FlipOnPlaneAlongAxis(OB,aD,P, KeepOriginals)
+	
+	' Applies consecutive shear and mirror transformations to "flip"
+	' objects around an axis over a plane. -- v.2, S. Cinar 2009 Mar 5
+	
+	FlipOnPlaneAlongAxis = Null
+	Dim D,F,XM,XS,X
+
+	D = Rhino.VectorSubtract(aD(1),aD(0))
+	If IsVectorTiny(D) Then Exit Function
+	D = Rhino.VectorUnitize(D)
+	F = Rhino.VectorDotProduct(P(3),D)
+	If Abs(F)<1E-20 Then Exit Function
+	XM = Rhino.XformMirror(P(0),P(3))
+	XS = Rhino.XformShear(P,P(1),P(2),Rhino.VectorScale(D,1/F))
+	X = Rhino.XformMultiply(Rhino.XformMultiply(XS,XS),XM)
+	FlipOnPlaneAlongAxis = Rhino.TransformObjects(OB, X, KeepOriginals)
+	
+End Function

@@ -1,0 +1,61 @@
+Option Explicit
+'Script written by Pascal
+' RMA
+'Script version Thursday, February 23, 2012
+
+Rhino.AddStartUpScript Rhino.LastLoadedScriptFile
+Rhino.AddAlias "Clone", "_NoEcho _-Runscript (Clone)"
+Rhino.AddAlias "ClearUnusedCloneDefs", "_NoEcho _-Runscript (ClearUnusedCloneDefs)"
+
+
+'Call Clone()
+Sub Clone()
+	
+	Dim aObj: aObj = Rhino.GetObjects("Select objects to clone",,, True)
+	If Not isArray(aObj) Then Exit Sub
+	Dim B: B = False
+	
+	If Ubound(aObj) = 0 Then
+		If Rhino.IsBlockInstance(aObj(0)) Then B = True
+	End If
+'	
+	Dim aPt: aPt = Rhino.GetPoint("Point to copy from")
+	If Not isArray(aPt) Then Exit Sub
+	
+	If B = False Then
+		Dim sBlock: sBlock = Rhino.AddBlock(aObj, aPt,, True) 
+		Rhino.RenameBlock sBlock, sBlock & "_Clone"
+		sBlock = sBlock & "_Clone"
+		Rhino.BlockDescription sBlock, "Clone"
+		Dim sInst: sInst = Rhino.InsertBlock(sBlock, apt)
+	
+	Else
+		sInst = aobj(0)
+	End If	
+
+	If B = False Then	Rhino.ObjectName sInst, (Rhino.ObjectName(sInst) & "Cloned")
+	
+	Rhino.Selectobject sInst	
+	Rhino.command "_Copy " & Rhino.Pt2Str(aPt,, True)
+	
+	If Rhino.LastCommandResult() = 0 Then ClearUnusedCloneDefs()
+	
+End Sub
+
+Sub ClearUnusedCloneDefs()
+	
+	Dim aNames: aNames = Rhino.BlockNames()
+	If Not isArray(aNames) Then Exit Sub
+	
+	Dim sName
+	For Each sName In aNames
+		
+			If Not Rhino.IsBlockinUse(sName, 1) Then
+			If lcase(Rhino.BlockDescription(sName)) = "clone" Then
+				Rhino.DeleteBlock sName
+			End If
+		End If
+		
+	Next
+	
+End Sub

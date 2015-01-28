@@ -1,0 +1,31 @@
+Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version Tuesday, August 10, 2010
+
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "MoveD","_-Runscript (MoveD)"
+'Call MoveD()
+
+Sub MoveD()
+	
+	Dim aObj: aObj = Rhino.GetObjects("Select objects to move",,,true,true)
+	If not isArray(aObj) then exit sub
+	
+	Dim aBase: aBase = Rhino.GetPoint("Point to move from.")
+	If not IsArray(abase) then exit sub
+	
+	Dim aDist: aDist = Rhino.GetPoints(True,false,"First distance point","Second distance point",2)
+	If not IsArray(aDist) then exit sub
+	If UBound(aDist) <> 1 then exit sub
+	Dim DblDist: DblDist = Rhino.Distance(aDist(0), aDist(1))
+	
+	DblDist = Rhino.GetReal("Press Enter to accept the current distance or enter a new distance ",dblDist)
+	
+	If isNull(dblDist) then exit sub
+
+	
+	Rhino.Command "_Move W" &Rhino.Pt2Str(aBase,,True) & cStr(dblDist) & " _Enter"
+	
+End Sub

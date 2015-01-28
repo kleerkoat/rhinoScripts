@@ -1,0 +1,147 @@
+Option Explicit
+'Script written and copyrighted by Jaroslaw Bieda
+'Script version Monday, October 13, 2009 12:28:00 AM
+
+Private dbPreviousPercentage
+If IsEmpty(dbPreviousPercentage) Then
+	dbPreviousPercentage = 50
+End If
+
+'Call ShrinkGrowFillets()
+Sub ShrinkGrowFillets()
+
+	On Error Resume Next
+
+	'get line
+	Dim idCurve : idCurve=Rhino.GetObject("Closed planar curve?",4)
+	if isnull(idCurve) then Exit Sub
+	'check planarity and if closed
+	if not Rhino.IsCurveClosed(idCurve) or not Rhino.IsCurvePlanar(idCurve)	then 
+		Call Rhino.Print("The curve must be closed and planar.")
+		Exit Sub
+	End If
+	'exploding curve to segments
+	Dim arrSegments : arrSegments=Rhino.ExplodeCurves(idCurve,False)
+	If Ubound(arrSegments)<2 then Exit Sub
+
+	'looking for arcs	and creating selection dots
+	Rhino.EnableRedraw False
+	Dim i,arrArcs,arrDots
+	ReDim arrArcs(-1): ReDim arrDots(-1)
+	Dim a : a=0
+	for i=0 to Ubound(arrSegments)
+		if Rhino.IsArc(arrSegments(i)) then
+			ReDIm Preserve arrArcs(a)
+			ReDim Preserve arrDots(a)
+			arrArcs(a)=arrSegments(i)
+			'create selection dots
+			arrDots(a)=Rhino.AddTextDot(Cstr(a+1),Rhino.CurveMidpoint(arrArcs(a)))
+			If Rhino.PointInPlanarClosedCurve(Rhino.ArcCenterPoint(arrArcs(a)),idCurve,Rhino.CurvePlane(idCurve)) then
+				Call Rhino.ObjectColor(arrDots(a),vbMagenta)
+			Else
+				Call Rhino.ObjectColor(arrDots(a),vbCyan)
+			End If
+			'adding arc segment order index data to dots
+			Call Rhino.SetObjectData(arrDots(a),"DotData","index",Cstr(i))
+			'--------------------------------------
+			a=a+1
+		End If
+	next
+	if a=0 then 'no arcs to adjust found
+		Rhino.Print"No fillet corners found."
+		Call Rhino.DeleteObjects(arrSegments)
+		Exit Sub
+	End if
+	Rhino.EnableRedraw True
+
+	'getting arcs to change?
+	Dim arrSelected
+	arrSelected=Rhino.GetObjects("Fillets to adjust?",8192,,,True,arrDots)
+	if isnull(arrSelected) then 'exit and delete all temp geometry on cancel
+		Call Rhino.DeleteObjects(arrDots)
+		Call Rhino.DeleteObjects(arrSegments)
+		Exit Sub
+	End If
+	'getting percentage
+	Dim dbPercent : dbPercent=Rhino.GetReal("Percentage to adjust fillet radius?(100=sharp corners)",dbPreviousPercentage,0.001,100)
+	if isnull(dbPercent) then 'exit and delete all temp geometry on cancel
+		Call Rhino.DeleteObjects(arrDots)
+		Call Rhino.DeleteObjects(arrSegments)
+		Exit Sub
+	End If
+	dbPreviousPercentage=dbPercent
+
+	'changing  fillets
+	Call Rhino.EnableRedraw(False)
+	for i=0 to Ubound(arrSelected)
+		if Rhino.ObjectColor(arrSelected(i))=vbMagenta then 'reduce fillet
+			Call ReduceFillet(arrArcs(Rhino.TextDotText(arrSelected(i))-1),dbPercent)
+		Else 'grow fillet
+			Call GrowFillet(arrSegments,arrArcs(Rhino.TextDotText(arrSelected(i))-1),dbPercent,arrSelected(i))
+		End If
+	next
+
+	'joining final result
+	Call Rhino.UnselectAllObjects
+	Call Rhino.SelectObjects(arrSegments)
+	Call Rhino.SelectObjects(arrArcs)
+	Dim idResult : idResult=Rhino.JoinCurves(Rhino.SelectedObjects,True)
+	Call Rhino.DeleteObjects(arrDots)
+	Call Rhino.EnableRedraw(True)
+	'selecting original curve
+	Call Rhino.SelectObject(idCurve)
+
+End Sub
+
+Sub ReduceFillet(ByRef idArc,dbPercent)
+	'arc start and end
+	Dim S : S=Rhino.CurveStartPoint(idArc)
+	DIm E : E=Rhino.CurveEndPoint(idArc)
+	'arc endpoints tangent vectors
+	Dim arrTan1 : arrTan1=Rhino.CurveTangent(idArc,Rhino.CurveClosestPoint(idArc,S))
+	Dim arrTan2 : arrTan2=Rhino.CurveTangent(idArc,Rhino.CurveClosestPoint(idArc,E))
+	'arc corner - tangent lines intersection
+	Dim P : P=Rhino.LineLineIntersection(array(S,Rhino.PointAdd(S,arrTan1)),array(E,Rhino.PointAdd(E,arrTan2)))
+	'add corner lines
+	Dim L1 : L1=Rhino.AddLine(P,S)
+	Dim L2 : L2=Rhino.AddLine(P,E)
+
+	if dbPercent<100 then
+		'new fillet arc between corner lines
+		Dim idNewArc : idNewArc=Rhino.AddFilletCurve(L1,L2,(Rhino.ArcRadius(idArc)/100)*(100-dbPercent))
+		Call Rhino.DeleteObjects(array(L1,L2))
+		'connecting lines
+		L1=Rhino.AddLine(Rhino.CurveStartPoint(idNewArc),S)
+		L2=Rhino.AddLine(Rhino.CurveEndPoint(idNewArc),E)
+		Call Rhino.DeleteObject(idArc)
+		'connecting new segments
+		idArc=Rhino.JoinCurves(array(L1,L2,idNewArc),True)(0)
+	Else 'sharp corner case
+		Call Rhino.DeleteObject(idArc)
+		idArc=Rhino.JoinCurves(array(L1,L2),True)(0)
+	End If
+
+End Sub
+
+Sub GrowFillet(ByRef arrSegments,ByRef idArc,dbPercent,idDot)
+
+	Dim intIndex : intIndex=CInt(Rhino.GetObjectData(idDot,"DotData","index"))
+	'arc segment index
+	'detecting previous/next curve segments
+	Dim intPrev, intNext
+	if intIndex=Ubound(arrSegments) then intNext=0 Else intNext=intIndex+1
+	if intIndex=0 then intPrev=Ubound(arrSegments) Else intPrev=intIndex-1
+	'adding fillet
+	Dim idNewArc : idNewArc=Rhino.AddFilletCurve(arrSegments(intPrev),arrSegments(intNext),(Rhino.ArcRadius(idArc)/100)*(100+dbPercent))
+	Call Rhino.DeleteObject(idArc)
+	idArc=idNewArc
+	'trimming adjacent curves
+	Dim P1, P2
+	P1=Rhino.CurveClosestPoint(arrSegments(intPrev),Rhino.CurveStartPoint(idArc))
+	P2=Rhino.CurveDomain(arrSegments(intPrev))(0)
+	arrSegments(intPrev)=Rhino.TrimCurve(arrSegments(intPrev),array(P2,P1))
+	P1=Rhino.CurveClosestPoint(arrSegments(intNext),Rhino.CurveEndPoint(idArc))
+	P2=Rhino.CurveDomain(arrSegments(intNext))(1)
+	arrSegments(intNext)=Rhino.TrimCurve(arrSegments(intNext),array(P1,P2))
+
+End Sub

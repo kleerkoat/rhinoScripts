@@ -1,0 +1,23 @@
+Option Explicit
+'Call SelPlanarSrfs()
+Sub SelPlanarSrfs()
+	Dim arrAllObjs,strObj,entity,i : i=0
+	arrAllObjs=Rhino.NormalObjects
+	If Not IsArray(arrAllObjs) Then Exit Sub
+	Call Rhino.EnableRedraw(False)
+	'Call Rhino.UnselectAllObjects
+	For Each strObj In arrAllObjs
+		If Rhino.IsSurface(strObj) And Rhino.IsSurfacePlanar(strObj) Then
+			Call Rhino.SelectObject(strObj)
+			i=i+1
+		End If
+	Next
+	entity="planar surface"	
+	If i<>1 Then entity=entity&"s"
+	If i>0 Then		
+		Call Rhino.Print(i&" "&entity&" added to selection")
+	Else
+		Call Rhino.Print("No "&entity&" found, nothing added to selection")
+	End If	
+	Call Rhino.EnableRedraw(True)
+End Sub

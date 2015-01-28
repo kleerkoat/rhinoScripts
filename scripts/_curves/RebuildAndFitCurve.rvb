@@ -1,0 +1,32 @@
+'Script written by Jørgen Holo, copyrighted by Holografisk AS, Script version 1,01
+
+
+'Option Explicit
+
+'Call RebuildAndFitCurve()
+Sub RebuildAndFitCurve()
+
+	strObject = Rhino.GetObject("Select a curve",4,True)
+	If Not Rhino.IsCurve(strObject) Then Exit Sub
+	bolClosed=Rhino.IsCurveClosed (strObject)
+	dblAbsTol = Rhino.UnitAbsoluteTolerance
+	dblDegree = Rhino.CurveDegree(strObject)
+	dblTolerance=(Rhino.GetReal ("select tolerance", 0.1, dblAbsTol))
+	arrPoints = Rhino.DivideCurveLength(strObject, dblTolerance)
+	
+	If bolClosed= True Then 
+		ReDim Preserve arrPoints(ubound(arrPoints)+1)
+		arrPoints(ubound(arrPoints))=arrPoints(0)
+	End If
+	
+	strObject2=Rhino.AddCurve (arrPoints ,2)
+	strObject3=Rhino.FitCurve (strObject2 , dblDegree , dblTolerance ,0.0)
+	Rhino.deleteobject strObject2
+	
+	Rhino.UnselectAllObjects
+	Rhino.selectobject strObject3
+	
+	arrDeviation=Rhino.CurveDeviation (strObject, strObject3)
+	Rhino.print "Max deviation is "&round(CStr(arrDeviation(2)),2)
+
+End Sub

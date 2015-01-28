@@ -1,0 +1,724 @@
+'Script by: Thomas Anagnostou
+'RhinoScript version: 20060906
+'Sep/14/2006
+
+'Function List
+'	GearGen
+'	DoGetDefaults
+'	DoVersionCheck
+'	DoTell
+'	DoAskUser
+'	TiltedPoint
+'	CrossProduct
+'	xFormRotate
+'	InvCos
+'	InvSin
+'	DoAskString
+
+'All functions (should) return a zero based array of at least (2) elements
+'position 0 contains the result arrays/data (or Null on error)
+'position 1 contains other arrays/data returned (or an error code on error)
+
+Option Explicit
+GearGen
+sub GearGen ()
+
+const version	=20060906
+
+'for the gear() array
+const PD			=0	'Pitch diameter
+const PA			=1	'Pressure angle
+const MDL			=2	'Module
+const N			=3	'Number of teeth
+const BC			=4	'Base circle
+const ADD1		=5	'Addendum
+const DED			=6	'Dedendum
+const OD			=7	'Outside diameter
+const RD			=8	'Root diameter
+const Tc			=9	'Chordal thickness
+const CP			=10	'Circular pitch
+const CA			=11	'Cone angle
+const origin		=12	'Pitch circle origin
+const smpl		=13	'Involute point samples
+
+const Circle		=0
+const show		=7
+const summary		=13
+
+const PDcircle		=0
+const BCcircle		=1
+const ODcircle		=2
+const RDcircle		=3
+
+'for the Math() array
+const InvlstartAngle	=1
+const InvlendAngle		=2
+const InvlHeight		=3
+const InvlHeightAngle	=4
+const InvlAngleMod		=5
+
+'For the cplane() array
+const user	=0	'Array of 3d points
+const temp	=1	'Array of 3d points
+
+'for the Dotell() array
+const success	=0
+const fail	=40
+
+'Dim
+dim ask
+dim UserSays
+dim tell		(40)	'Array
+dim gear
+dim default	(20)	'Array
+dim Math		(10)	'Array
+dim cplane	(10)	'Array
+dim result	(01)
+
+dim pi
+dim arrInvo		'An array of 3D points for the involute curve
+dim LoopOdo		'Loop counter (odometer)
+dim loopStep
+dim ObjectID
+dim TempID
+dim pointTemp
+dim point			'Miscelleneous "basket" for points
+
+if DoVersionCheck(version)=false then exit sub
+
+'Data Harvest
+ask=DoAskUser()
+if isnull(ask(0)) then
+	rhino.print ask(1)
+	exit sub
+end if
+gear=ask(0)
+userSays=ask(1)
+'<--
+
+loopStep=0.1		'This defines the accuracy of the involute (needs to be automated some day... use the document tolerance values)
+arrinvo=Array()
+objectID=Array()
+pi=atn(1)*4
+
+'-->obtain pitch-circle Cplane
+cplane(user)=rhino.viewcplane 'world coordinates defining cplane
+cplane(temp)=rhino.curveplane(userSays(Circle))
+'<--End Obtain pitch-circle cplane
+
+'gear(MDL)=gear(PD)/gear(N) defined earlier during user input
+gear(BC)=gear(PD)*cos(gear(PA)*pi/180)
+gear(ADD1)=gear(MDL)
+gear(DED)=1.157*gear(MDL) 'need to find the analytical method that generates this 1.157 value
+gear(OD)=gear(PD)+2*gear(MDL)
+gear(RD)=gear(PD)-2*gear(DED)
+gear(tc)=gear(PD)*sin((pi/2)/gear(N))
+
+if (usersays(Show)(BCcircle)=vbtrue) then rhino.addcircle cplane(temp),gear(bc)/2 'consider asking user to include
+if (usersays(Show)(ODcircle)=vbtrue) then rhino.addcircle cplane(temp),gear(od)/2 'consider asking user to include
+if (usersays(Show)(RDcircle)=vbtrue) then rhino.addcircle cplane(temp),gear(RD)/2 'consider asking user to include
+if (usersays(Show)(PDcircle)=vbtrue) then
+	result(1)=rhino.addcircle (cplane(temp),gear(PD)/2)
+	rhino.selectObject result(1)
+end if
+
+'-->generate first involute
+Math(InvlstartAngle)=(pi/2+invsin(gear(Tc)/gear(pd))) - (gear(PA)*pi/180) + sqr((gear(PD)/gear(BC))^2-1)
+Math(InvlEndAngle)=Math(invlStartAngle)-sqr((gear(OD)/gear(bc))^2-1)
+if (gear(RD)>Gear(BC)) then Math(invlAngleMod)=sqr((gear(rd)/gear(BC))^2-1) else Math(invlAngleMod)=0
+'Math(invlAngleMod)=0
+
+'Prepare to use Cplane(temp) coordinates
+gear(origin)=rhino.xformworldtocplane(gear(origin),cplane(temp))
+
+loopStep=(Math(InvlstartAngle)-Math(invlAngleMod)-Math(InvlendAngle))/gear(SMPL)
+for loopodo=0 to gear(SMPL)
+	Math(invlHeight)=sqr((loopodo*loopstep+Math(invlAngleMod))^2*(gear(bc)/2)^2+(gear(bc)/2)^2)
+	Math(InvlHeightAngle)=(math(invlstartAngle)-Math(invlAngleMod)-loopOdo*loopstep)+atn((loopOdo*loopstep+Math(invlAngleMod)))
+	point=array(gear(origin)(0)+Math(invlHeight)*cos(Math(InvlHeightAngle)),Gear(origin)(1)+Math(invlHeight)*sin(Math(InvlHeightAngle)),gear(origin)(2)+0)
+	Point=tiltedPoint(point,gear(CA),gear(PD))
+	point=rhino.xformcplanetoworld (point,cplane(temp))
+	redim preserve arrinvo(ubound(arrinvo)+1)
+	arrinvo(ubound(arrinvo))=point
+
+next
+'<--End generate involute
+
+'-->Generate gear profile
+Rhino.EnableRedraw vbfalse
+redim tempID(2)
+'tempID(0)=rhino.addcurve (arrinvo) 'Do not use
+tempID(0)=rhino.addinterpcurveEx (arrinvo,3,1) 'Do not use the regular addInterpCurve
+
+'mirror the first involute (the rhino.mirror command will not work in every orientation)
+for loopOdo = 0 to ubound(arrinvo)
+	point=rhino.xformworldtocplane (arrinvo(loopOdo),cplane(temp))
+	arrinvo(loopOdo)=array(-point(0),point(1),point(2))
+	arrinvo(loopOdo)=rhino.xformcplanetoworld (arrinvo(loopOdo),cplane(temp))
+next
+
+'tempID(1)=rhino.addcurve (arrinvo) 'Do not use
+tempID(1)=rhino.addinterpcurveEx (arrinvo,3,1) 'Do not use the regular addInterpCurve
+
+point=Array(gear(origin)(0),gear(OD)/2,gear(origin)(2))
+PointTemp=tiltedPoint(point,gear(CA),gear(PD))
+point=pointTemp
+tempID(2)=rhino.addarc3pt(rhino.curveendpoint(tempID(0)),rhino.curveendpoint(tempID(1)),rhino.xformcplanetoworld (point,cplane(temp)))
+
+'add line segments to the dedendum
+if (gear(RD)<gear(BC)) then
+	redim preserve tempID(4)
+	point=array(gear(origin)(0)+gear(RD)/2*cos(math(invlstartangle)),gear(origin)(1)+gear(RD)/2*sin(math(invlstartangle)),gear(origin)(2)+0)
+	Point=tiltedPoint(point,gear(CA),gear(PD))
+	point=rhino.xformcplanetoworld (point,cplane(temp))
+	tempID(3)=rhino.addline (rhino.curvestartpoint(tempID(0)),point)
+	
+	point=array(gear(origin)(0)-gear(RD)/2*cos(math(invlstartangle)),gear(origin)(1)+gear(RD)/2*sin(math(invlstartangle)),gear(origin)(2)+0)
+	Point=tiltedPoint(point,gear(CA),gear(PD))
+	point=rhino.xformcplanetoworld (point,cplane(temp))
+	tempID(4)=rhino.addline (rhino.curvestartpoint(tempID(1)),point)
+end if
+
+redim point(1)
+objectID=rhino.joincurves (tempID,vbtrue) 'returns an array of IDs (only the first is needed in this case)
+tempID(0)=objectID
+redim objectID(1)
+objectID(0)=TempID(0)(0)
+point(0)=Array(gear(origin)(0),gear(RD)/2,gear(origin)(2),cplane(temp))
+point(0)=xformrotate(point(0),-pi/gear(N))
+for loopOdo=1 to gear(N)
+	if (loopOdo<=gear(N)-1) then
+		redim preserve objectID(ubound(objectID)+2) 'in the beginning ObjectID only has the 0th element (each iteration adds two new object IDs)
+		objectID(ubound(objectID)-1)=rhino.rotateobject (ObjectID(0),cplane(temp)(0),loopOdo*360/gear(N),(cplane(temp)(3)),vbtrue)
+		point(1)=xformrotate(point(0),loopOdo*pi*2/gear(N))
+		Point(1)=tiltedPoint(point(1),gear(CA),gear(PD))
+		point(1)=rhino.xformcplanetoworld (point(1),cplane(temp))
+		objectID(ubound(objectID))=rhino.addarc3pt (rhino.curvestartpoint(objectID(ubound(objectID)-3)),rhino.curveendpoint(objectID(ubound(objectID)-1)),point(1))
+	else 'add the last arc element connecting the last tooth to the first tooth
+		point(1)=xformrotate(point(0),loopOdo*pi*2/gear(N))
+		Point(1)=tiltedPoint(point(1),gear(CA),gear(PD))
+		point(1)=rhino.xformcplanetoworld (point(1),cplane(temp))
+		objectID(1)=rhino.addarc3pt (rhino.curveendpoint(objectID(0)),rhino.curvestartpoint(objectID(ubound(objectID)-1)),point(1))
+	end if
+next
+Rhino.EnableRedraw vbtrue
+result(0)=rhino.joincurves (objectID,vbtrue)(0)
+rhino.unselectobject usersays(circle)
+rhino.selectobject result(0)
+'<--End generate gear profile
+
+rhino.print doTell(success)(0)
+rhino.print usersays(summary)
+
+end sub
+
+
+
+'Receives
+'	-Nothing
+'Returns
+'	-the default values for the <UserSays> array
+function DoGetDefaults(choice)
+
+const user		=-3
+const generic		=-2
+const every		=-1
+
+const Circle		=0
+const ManyTeeth	=1
+const module		=2
+const CircPitch	=3
+const PressAngle	=4
+const ConeAngle	=5
+const Samples		=6
+const show		=7
+const angles		=9
+const angleRange	=10
+const bevelRange	=11
+const samplesRange	=12
+
+dim SuggestDefault	(20)
+
+if (choice=every or choice=user or choice=circle) then _
+	SuggestDefault(circle)=Null
+
+if (choice=every or choice=user or choice=manyTeeth) then _
+	SuggestDefault(ManyTeeth)=13
+	
+if (choice=every or choice=user or choice=module) then _
+	SuggestDefault(Module)=null
+
+if (choice=every or choice=user or choice=CircPitch) then _
+	SuggestDefault(CircPitch)=null
+
+if (choice=every or choice=user or choice=PressAngle) then _
+	SuggestDefault(PressAngle)=20
+
+if (choice=every or choice=user or choice=ConeAngle) then _
+	SuggestDefault(ConeAngle)=0
+
+if (choice=every or choice=user or choice=Samples) then _
+	SuggestDefault(Samples)=5
+
+'[PDcircle,BCcircle,ODcircle,RDcircle]
+if (choice=every or choice=user or choice=Show) then _
+	SuggestDefault(Show)=Array(false,false,false,false)
+
+'[PA1,minteeth,maxteeth],[PA2,minteeth,maxteeth],[PA3,minteeth,maxteeth]
+if (choice=every or choice=generic or choice=angles) then _
+	SuggestDefault(angles)=array(	array(14.5,16,400), _
+							array(20.0,13,400), _ 
+							array(-1,7,400))
+
+if (choice=every or choice=generic or choice=angleRange) then _
+	SuggestDefault(angleRange)=array(0,90)
+
+if (choice=every or choice=generic or choice=bevelRange) then _
+	SuggestDefault(bevelRange)=array(0,90)
+
+if (choice=every or choice=generic or choice=SamplesRange) then _
+	SuggestDefault(SamplesRange)=array(3,40)
+
+if (choice=every or choice=user or choice=generic) _
+then DoGetDefaults=SuggestDefault else DoGetDefaults=SuggestDefault(choice)
+
+end function
+
+
+
+'Receives
+'	-Version number to check
+'Returns
+'	-True or False if current version is newer (or the same).
+function DoVersionCheck(desiredVersion)
+
+If (clng(Rhino.Version) < clng(desiredVersion)) then
+	Rhino.print DoTell(40)(0)&DoTell(41)(0)&" <"&clng(desiredVersion)&"> "&DoTell(41)(1)&"("&DoTell(41)(2)&Rhino.Version&")."
+	DoVersionCheck=false
+else
+	Rhino.print DoTell(22)(0)&" "&Rhino.Version
+	DoVersionCheck=True
+end if
+
+End function
+
+
+
+'Receives
+'	-an integer
+'Returns
+'	-an array of strings 
+'(messages are thematically grouped)
+function DoTell(what)
+dim Say(80)
+
+'Messages
+Say(00)=array("Script completed successfully.")
+Say(01)=array("Teeth", "Module", "Pitch", "PressAngle", "Bevel", "Accuracy")
+Say(02)=array("Main Menu", _
+			"Select the pitch circle ", _
+			"Number of teeth", _
+			"Gear Module=", _
+			"Circular Pitch=", _
+			"Choose the pressure angle (14.5 or 20.0 degrees)", _
+			"Pitch Cone Angle=", _
+			"Involute point samples", _
+			"Maintain:")
+Say(03)=array("Choice of zero (0) angle for spur gear. Choices other than zero (0) will result bevel gear profiles", _
+			"Recommend for 14.5 degree pressure angle: min 16 teeth with at least 40 teeth in a meshing pair", _
+			"Recommend for 20 degree pressure angle: min 13 teeth with at least 26 teeth in a meshing pair", _
+			"Metric gear profile calculation")
+Say(04)=array("New module number required slight adjustment of pitch diameter.", _
+			"New circular pitch required slight adjustment of pitch diameter.", _
+			"Both options will affect the pitch diameter. The pitch-circle option will choose a diameter close to the original.")
+Say(05)=array("Pitch Diameter=", "Adjusted ", "Base circle diameter=", "Root circle diameter=", "Outside diameter=", _
+			"Module range for the given Pitch Circle: <"," to ",">", _
+			"Pitch range for the given Pitch Circle: <", "Summary:")
+Say(06)=array("PitchCircle", "TeethNumber")
+Say(07)=array("Pitch Diam=", "Teeth=","Module=","CircPitch=","Pressure Angle=","Cone Angle=","Samples=")
+
+'Internal Errors (debug session)
+Say(20)=array("Requested error string ("&what&") not found for display. ",1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20)
+Say(21)=array("Internal error. ","Prerequisites not met for the ","function")
+Say(22)=array("Installed version of RhinoScript is accepted. Version found:")
+
+'User abort/error
+Say(40)=array("Script not successful. ","Script aborted. ")
+Say(41)=array("Please update to RhinoScript","or later. ","Version found: ")
+Say(42)=array("(Custom pressure angles not supported at this time)", _
+			"(No pitch circle selected)", _
+			"(Selected object was not a circle)", _
+			"(Invalid input for pressure angle)", _
+			"(Invalid input for number of teeth)", _
+			"(Minimum number of teeth requirement not met)", _
+			"(Invalid input for point samples)", _
+			"(Invalid input for module number)", _
+			"(Invalid input for Cone Angle)", _
+			"(Invalid Input)")
+
+if (ubound(Say)<what or lbound(Say)>what ) then
+	doTell=Say(20)
+	exit function
+elseif vartype(Say(what))<8000 then
+	doTell=Say(20)
+	exit function
+end if
+
+DoTell=Say(what)
+end function
+
+
+
+'Receives
+'	-Nothing
+'Returns
+'	-an array (gear info)
+'	-an array (userSays)
+function DoAskUser ()
+
+'For the userSays() array
+const Circle		=0
+const ManyTeeth	=1
+const module		=2
+const CircPitch	=3
+const PressAngle	=4
+const ConeAngle	=5
+const Samples		=6
+const show		=7
+const angles		=9
+const angleRange	=10
+const bevelRange	=11
+const samplesRange	=12
+const summary		=13
+
+const PDcircle		=0
+const BCcircle		=1
+const ODcircle		=2
+const RDcircle		=3
+
+'for the gear() array
+const PD			=0	'Pitch diameter
+const PA			=1	'Pressure angle
+const MDL			=2	'Module
+const N			=3	'Number of teeth
+const BC			=4	'Base circle
+const ADD1		=5	'Addendum
+const DED			=6	'Dedendum
+const OD			=7	'Outside diameter
+const RD			=8	'Root diameter
+const Tc			=9	'Chordal thickness
+const CP			=10	'Circular pitch
+const CA			=11	'Cone angle
+const origin		=12	'Pitch circle origin
+const smpl		=13	'Involute point samples
+
+const min			=0
+const max			=1
+
+const user		=-3
+const generic		=-2
+const every		=-1
+
+const Fail		=40
+const mainMenu		=01
+
+'Dim
+Dim pi
+Dim temp
+Dim Default
+Dim options
+Dim valueRange
+Dim UserSays
+Dim toReturn
+Dim OneResponse
+
+UserSays=DoGetDefaults(user)
+pi=atn(1)*4
+
+redim temp(20)
+ToReturn=Array(0,0)
+ToReturn(0)=temp
+ValueRange=Array(0,0)
+
+'-->Start user section
+'Input pitch diameter
+rhino.print DoTell(3)(3)
+UserSays(Circle)=rhino.getobject(DoTell(2)(1),4,vbtrue,vbfalse)
+if isnull(UserSays(Circle)) then
+	ToReturn(0)=Null
+	ToReturn(1)=DoTell(Fail)(0)&DoTell(42)(1)
+	DoAskUser=toReturn
+	exit function
+elseif (not rhino.iscircle(UserSays(Circle))) then
+	ToReturn(0)=Null
+	rhino.print DoTell(Fail)(0)&DoTell(42)(2)
+	DoAskUser=toReturn
+	exit function
+end if
+
+toReturn(0)(origin)	=rhino.circlecenterpoint(UserSays(Circle))
+toReturn(0)(PD)	=rhino.circleradius(UserSays(Circle))*2
+userSays(module)	=toReturn(0)(PD)/UserSays(ManyTeeth)
+userSays(CircPitch)	=pi*toReturn(0)(PD)/UserSays(ManyTeeth)
+toReturn(0)(CP)	=UserSays(CircPitch)
+toReturn(0)(MDL)	=UserSays(Module)
+toReturn(0)(PA)	=usersays(PressAngle)
+toReturn(0)(N)		=UserSays(ManyTeeth)
+toReturn(0)(CA)	=usersays(coneAngle)
+toReturn(0)(SMPL)	=userSays(samples)
+
+do
+if usersays(show)(PDcircle)=true then temp=doTell(5)(1) else temp=""
+
+usersays(summary)= doTell(5)(9)&"["&temp&doTell(07)(0)&round(toReturn(0)(PD),3)&"] ["& _
+			doTell(07)(1)&toReturn(0)(N)&"] ["&doTell(07)(2)&round(toReturn(0)(MDL),3)&"] ["& _
+			doTell(07)(3)&round(toReturn(0)(CP),3)&"] ["& _
+			doTell(07)(4)&round(toReturn(0)(PA),3)&"] ["& _
+			doTell(07)(5)&round(toReturn(0)(CA),3)&"] ["& _
+			doTell(07)(6)&toReturn(0)(smpl)&"]"
+rhino.print usersays(summary)
+
+default=""
+options=DoTell(01)
+OneResponse=array("","")
+oneResponse(0)=rhino.getstring(DoTell(02)(0),Default,Options) 'Main menu
+oneResponse(0)=lcase(oneresponse(0))
+select case oneResponse(0)
+	case lcase (DoTell(MainMenu)(0))	'Teeth
+		ValueRange(min)=DoGetDefaults(angles)(2)(1)
+		ValueRange(max)=DoGetDefaults(angles)(2)(2)
+		if usersays(pressangle)=DoGetDefaults(Angles)(0)(0) then rhino.print Dotell(03)(1) else rhino.print Dotell(03)(2)
+		Default=userSays(ManyTeeth)
+		oneResponse(0)=Rhino.GetInteger(DoTell(2)(2),Default,ValueRange(min),ValueRange(max))
+		if isnull(oneResponse(0)) then exit do
+		userSays(ManyTeeth)=oneResponse(0)
+		toReturn(0)(N)	=UserSays(ManyTeeth)
+		toReturn(0)(MDL)=toReturn(0)(PD)/toReturn(0)(N)
+		toReturn(0)(CP)=pi*toReturn(0)(PD)/toReturn(0)(N)
+		UserSays(Module)=toReturn(0)(MDL)
+		UserSays(CircPitch)=toReturn(0)(CP)
+	case lcase (DoTell(MainMenu)(1))	'Module
+		ValueRange(min)=toReturn(0)(PD)/DoGetDefaults(angles)(2)(2)
+		ValueRange(max)=toReturn(0)(PD)/DoGetDefaults(angles)(2)(1)
+		Default=usersays(module)
+		if isnull(default) then Default=ValueRange(max)
+		rhino.print DoTell(5)(5)&round(ValueRange(min),4)&DoTell(5)(6)&round(ValueRange(max),4)&DoTell(5)(7)
+		oneResponse(0)=rhino.GetReal (DoTell(2)(3),Default,valueRange(min),ValueRange(max))
+		if isnull(oneResponse(0)) then exit do
+		userSays(Module)=oneResponse(0)
+		default=DoTell(06)(1)
+		options=DoTell(06)
+		rhino.print doTell(04)(2)
+		oneResponse=DoAskString(DoTell(2)(8),default,options,true)
+		if isnull(oneResponse(0)) then exit do
+		toReturn(0)(MDL)=UserSays(Module)
+		if (oneResponse(0)=options(0)) then 'pitchCircle
+			toReturn(0)(N)=toReturn(0)(PD)/toReturn(0)(MDL)
+			if (int(toReturn(0)(N))<>toReturn(0)(N)) then
+				toReturn(0)(N)=cint(toReturn(0)(N))
+				toReturn(0)(PD)=toReturn(0)(N)*toReturn(0)(MDL)
+				rhino.print DoTell(4)(0)&" "&DoTell(5)(1)&DoTell(5)(0)&round(toReturn(0)(PD),4)
+				userSays(Show)(PDcircle)=vbtrue
+			end if
+		elseif (oneResponse(0)=options(1)) then 'teethNumber
+			toReturn(0)(PD)=toReturn(0)(N)*toReturn(0)(MDL)
+			rhino.print DoTell(5)(1)&DoTell(5)(0)&round(toReturn(0)(PD),4)
+			userSays(Show)(PDcircle)=vbtrue
+		end if
+		toReturn(0)(CP)=pi*toReturn(0)(PD)/toReturn(0)(N)
+		userSays(manyTeeth)=toReturn(0)(N)
+		userSays(CircPitch)=toReturn(0)(CP)
+	case lcase (DoTell(MainMenu)(2))	'Pitch
+		ValueRange(min)=pi*toReturn(0)(PD)/DoGetDefaults(angles)(2)(2)
+		ValueRange(max)=pi*toReturn(0)(PD)/DoGetDefaults(angles)(2)(1)
+		Default=usersays(CircPitch)
+		if isnull(default) then Default=ValueRange(max)
+		rhino.print DoTell(5)(8)&round(ValueRange(min),4)&DoTell(5)(6)&round(ValueRange(max),4)&DoTell(5)(7)
+		oneResponse(0)=rhino.GetReal (DoTell(2)(4),Default,valueRange(min),ValueRange(max))
+		if isnull(oneResponse(0)) then exit do
+		userSays(CircPitch)=oneResponse(0)
+		default=DoTell(06)(1)
+		options=DoTell(06)
+		rhino.print doTell(04)(2)
+		oneResponse=DoAskString(DoTell(2)(8),default,options,true)
+		if isnull(oneResponse(0)) then exit do
+		toReturn(0)(CP)=UserSays(CircPitch)
+		if (oneResponse(0)=options(0)) then 'pitchCircle
+			toReturn(0)(N)=pi*toReturn(0)(PD)/toReturn(0)(CP)
+			if (int(toReturn(0)(N))<>toReturn(0)(N)) then
+				toReturn(0)(N)=cint(toReturn(0)(N))
+				toReturn(0)(PD)=toReturn(0)(N)*toReturn(0)(CP)/pi
+				rhino.print DoTell(4)(1)&" "&DoTell(5)(1)&DoTell(5)(0)&round(toReturn(0)(PD),4)
+				userSays(Show)(PDcircle)=vbtrue
+			end if
+			userSays(manyTeeth)=toReturn(0)(N)
+		elseif (oneResponse(0)=options(1)) then 'teethNumber
+			toReturn(0)(PD)=toReturn(0)(N)*toReturn(0)(CP)/pi
+			rhino.print DoTell(5)(1)&DoTell(5)(0)&round(toReturn(0)(PD),4)
+			userSays(Show)(PDcircle)=vbtrue
+		end if
+		toReturn(0)(MDL)=toReturn(0)(PD)/toReturn(0)(N)
+		userSays(manyTeeth)=toReturn(0)(N)
+		userSays(Module)=toReturn(0)(MDL)
+	case lcase (DoTell(MainMenu)(3))	'PressAngle
+		ValueRange(min)=DoGetDefaults(angleRange)(min)
+		ValueRange(max)=DoGetDefaults(angleRange)(max)
+		Default=usersays(PressAngle)
+		oneResponse(0)=Rhino.getReal(DoTell(2)(5),Default,valueRange(min),ValueRange(Max))
+		if isnull(oneResponse(0)) then exit do
+		if (oneResponse(0)<>DoGetDefaults(angles)(0)(0) and oneResponse(0)<>DoGetDefaults(angles)(1)(0)) then
+			oneResponse(0)=null
+			oneResponse(1)=doTell(42)(0)
+			exit do
+		end if
+		userSays(PressAngle)=oneResponse(0)
+		toReturn(0)(PA)=usersays(PressAngle)
+	case lcase (DoTell(MainMenu)(4))	'Bevel
+		ValueRange(min)=DoGetDefaults(bevelRange)(min)
+		ValueRange(max)=DoGetDefaults(bevelRange)(max)
+		Default=usersays(ConeAngle)
+		rhino.print DoTell(03)(0)
+		oneResponse(0)=Rhino.getReal(DoTell(2)(6),Default,valueRange(min),ValueRange(Max))
+		if isnull(oneResponse(0)) then exit do
+		usersays(coneAngle)=oneResponse(0)
+		toReturn(0)(CA)=usersays(coneAngle)
+	case lcase (DoTell(MainMenu)(5))	'Accuracy
+		ValueRange(min)=DoGetDefaults(samplesRange)(min)
+		ValueRange(max)=DoGetDefaults(samplesRange)(max)
+		Default=usersays(samples)
+		oneResponse(0)=Rhino.getInteger(DoTell(2)(7),Default,valueRange(min),ValueRange(Max))
+		if isnull(oneResponse(0)) then exit do
+		usersays(samples)=oneResponse(0)
+		toReturn(0)(smpl)=usersays(samples)
+	case else
+		'Do nothing
+end select
+
+loop while (oneResponse(0)<>"" and (not isnull(oneresponse(0))) )
+
+if (isnull (oneresponse(0))) then
+	toReturn(0)=Null
+	toReturn(1)= DoTell(40)(1)&oneresponse(1)
+	DoAskUser=toReturn
+	exit function
+end if
+
+toReturn(0)(BC)	=toReturn(0)(PD)*cos(toReturn(0)(PA)*pi/180)
+toReturn(0)(ADD1)	=toReturn(0)(MDL)
+toReturn(0)(DED)	=1.157*toReturn(0)(MDL) 'need to find the analytical method that generates this 1.157 value
+toReturn(0)(OD)	=toReturn(0)(PD)+2*toReturn(0)(MDL)
+toReturn(0)(RD)	=toReturn(0)(PD)-2*toReturn(0)(DED)
+toReturn(0)(tc)	=toReturn(0)(PD)*sin((pi/2)/toReturn(0)(N))
+toReturn(1)		=userSays
+DoAskUser=toReturn
+end function
+
+
+
+'Receives
+'	-a 3D point
+'	-a real: the cone angle (in degrees)
+'	-a real: the pitch diameter
+'Returns
+'	-a 3D point adjusted
+'origin is assumed to be 0,0,0
+function TiltedPoint(OldPoint,coneAngle, PD)
+const x	=0
+const y	=1
+const z	=2
+
+dim NewPoint (2)
+dim delta(1)
+dim pi
+dim epsilon
+
+if coneAngle=0 then 
+	TiltedPoint=oldPoint
+	exit function
+end if
+epsilon=rhino.unitabsolutetolerance
+pi=atn(1)*4
+
+delta(1)=sqr(OldPoint(x)^2+OldPoint(y)^2)-(PD/2)
+NewPoint(z)=delta(1)*sin(ConeAngle*pi/180)
+delta(0)=delta(1)*cos(ConeAngle*pi/180)
+NewPoint(x)=(PD/2+delta(0))/(PD/2+delta(1))*OldPoint(x)
+NewPoint(y)=(PD/2+delta(0))/(PD/2+delta(1))*OldPoint(y)
+
+TiltedPoint=NewPoint
+end function
+
+
+
+function xFormRotate(ThisPoint,Angle)
+dim TempPoint
+If (isarray(ThisPoint) and angle<>vbnull) then
+	tempPoint=Array(thispoint(0)*cos(angle)-thispoint(1)*sin(angle),thispoint(0)*sin(angle)+thispoint(1)*cos(angle),0)
+	xFormRotate=tempPoint
+else
+	xformrotate=vbnull
+end if
+end function
+
+
+
+function InvCos (x)
+dim pi
+pi=atn(1)*4
+if (x<>1 and x<>-1) then InvCos=Atn(-X / Sqr(-(X^2) + 1)) + 2 * Atn(1)
+if (x=1) then InvCos=0
+if (x=-1) then InvCos=pi
+end function
+
+
+
+function InvSin (x)
+dim pi
+pi=atn(1)*4
+if (x<>1 and x<>-1) then InvSin=Atn(X / Sqr(-(X^2) + 1))
+if (x=1) then InvSin=pi/2
+if (x=-1) then InvSin=-pi/2
+end function
+
+
+
+'Receives
+'	-a string (prompt)
+'	-a string (default value)
+'	-an array of strings (clickable options)
+'	-a boolean (on true, repeat asking user if input was invalid
+'Returns
+'	-a string (user response) or null if user aborted
+function DoAskString (Prompt,default,options,loopifinvalid)
+Dim toReturn
+Dim Prerequisites
+Dim Loopodo,howmany
+Dim ready
+
+'->Check Prerequisites
+if (vartype(prompt)<>8 or vartype(default)<>8 or vartype(options)<8000 or vartype(loopIfInvalid)<>11) then
+	toReturn(0)=null
+	toReturn(1)=DoTell(21)(1)&"DoAskString"&DoTell(21)(2)
+end if
+'<--
+
+toReturn=Array(0,0)
+howmany=ubound(options)
+ready=false
+
+do
+toReturn(0)=rhino.getString(Prompt,default,options)
+for loopodo=0 to howmany
+	if lcase(toReturn(0))=lcase(options(loopodo)) then ready=true
+next
+if (loopIfInvalid=false and ready=false) then
+	toReturn(0)=null
+	toReturn(1)=DoTell(42)(9)
+	ready=true
+elseif (loopIfInvalid=true and ready=false and (not isnull(toReturn(0)))) then
+	Rhino.print DoTell(42)(9)
+end if
+loop while (ready=false and (not isnull(toReturn(0))))
+
+DoAskString=toReturn
+end function

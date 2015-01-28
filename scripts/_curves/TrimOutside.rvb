@@ -1,0 +1,74 @@
+
+'Purpose: This script will trim lines going through a closed curve.
+
+Option Explicit
+Sub TrimOutside()
+	Dim arrToTrim, arrMethod, strMethod, iniMethod
+	Dim strTrimCurve, i, arrX, t0, t1, s, p, arrPt1, arrPt2,arrPt3,arrPt4
+	Dim r1, r2, r3, r4
+	Dim arrPoints, strObject
+	arrToTrim = Rhino.GetObjects("Select curves to trim", 4,,false)
+	If IsArray (arrToTrim) Then
+		iniMethod = Rhino.GetSettings(GetApplicationDataFolder & "RhinoScripts.ini", "TrimOutside", "Method")
+		If IsNull(iniMethod) Then iniMethod = "Points"
+		arrMethod = Array ("Points","Object")
+		strMethod = Rhino.GetString("Choose the method for trimming",iniMethod,arrMethod)
+		If strMethod = "Points" Then
+			Call Rhino.OsnapMode (1024)
+			arrPoints = Rhino.GetPoints(True,True,"Pick points to define the closed curve","Keep picking points. The last point must close the curve. Press Enter when done.")
+			If IsArray(arrPoints) Then
+				strTrimCurve = Rhino.AddPolyline (arrPoints)
+			End If
+		ElseIf strMethod = "Object" Then
+			strTrimCurve = Rhino.GetObject("Select the object to trim to")
+		End If
+		If Vartype(strMethod) <> vbstring Then Exit Sub
+		Call Rhino.EnableRedraw(False)
+		For i = 0 To UBound(arrToTrim)
+			arrX = Rhino.CurveCurveIntersection(arrToTrim(i), strTrimCurve)
+			If IsArray (arrX) Then
+				If IsArray(arrX) And UBound(arrX) = 1 Then
+					t0 = arrX(0,5)
+					t1 = arrX(1,5)
+					Rhino.TrimCurve arrToTrim(i), Array(t0,t1)
+				ElseIf Ubound(arrX) = 0 Then
+					p = arrX(0,5)
+					s = Rhino.SplitCurve(arrToTrim(i),p,True)
+					arrPt1 = Rhino.CurveStartPoint(s(0))
+					arrPt2 = Rhino.CurveStartPoint(s(1))
+					arrPt3 = Rhino.CurveEndPoint(s(0))
+					arrPt4 = Rhino.CurveEndPoint(s(1))
+					If IsArray(arrPt1) And IsArray(arrPt2)And IsArray(arrPt3)And IsArray(arrPt4)Then
+						r1 = Rhino.PointInPlanarClosedCurve(arrPt1, strTrimCurve)
+						r2 = Rhino.PointInPlanarClosedCurve(arrPt2, strTrimCurve)
+						r3 = Rhino.PointInPlanarClosedCurve(arrPt3, strTrimCurve)
+						r4 = Rhino.PointInPlanarClosedCurve(arrPt4, strTrimCurve)
+						If (r1 = 0)Or (r2 = 0) Then
+							Call Rhino.DeleteObject(s(0))
+						ElseIf (r3 = 0)Or (r4 = 0) Then
+							Call Rhino.DeleteObject(s(1))
+						End If
+					End If	
+				End If
+			End If
+		Next
+		If strMethod = "Points" Then
+			Call Rhino.DeleteObject(strTrimCurve)
+		End If
+		Call Rhino.EnableRedraw(True)
+		If Vartype(strMethod) = vbstring Then
+			Call Rhino.SaveSettings (GetApplicationDataFolder & "RhinoScripts.ini", "TrimOutside", "Method", strMethod)
+		End If
+	End If
+End Sub
+
+Function GetApplicationDataFolder()
+	Const APPLICATION_DATA = &H1a&
+		Dim objShell, objFolder, objFolderItem
+	Set objShell = CreateObject("Shell.Application")
+	Set objFolder = objShell.Namespace(APPLICATION_DATA)
+	Set objFolderItem = objFolder.Self
+	GetApplicationDataFolder = objFolderItem.Path
+End Function
+
+'TrimOutside

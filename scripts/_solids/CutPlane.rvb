@@ -1,0 +1,18 @@
+﻿Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version Wednesday, November 02, 2011 10:55:04 AM
+
+'Call CutPlane()
+Sub CutPlane()
+	Dim arrObjects, arrPt0, arrPt1
+	Dim arrNormal
+       
+	arrObjects      = Rhino.getobjects("Select objects for cut plane")
+	arrPt0          = Rhino.GetPoint("Start of cut plane")
+	arrPt1          = Rhino.GetPoint("End of cut plane", arrPt0)
+
+	arrNormal = Rhino.VectorCreate(Array(0,0,0), Array(5,5,1))
+       
+	Call Rhino.AddCutPlane (arrObjects, arrPt0, arrPt1, arrNormal)
+End Sub

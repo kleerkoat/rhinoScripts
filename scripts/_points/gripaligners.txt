@@ -1,0 +1,27 @@
+Hi bg- align how? In a straight line?  If you feel adventurous you can try the attached 'AlignGrips' script, and the  CVtoCP script, and and see if they do anything useful.
+
+They are a little weird, to say the least, I was experimenting with some different ideas, but maybe they will help a little or you can tell me how you'd like them to work...
+
+AlignGrips has two scripts:
+
+AlignGrips and AlignGripCrv
+
+In the first one, you select grips and then two points to define a line- the selected grips are sucked over the the (infinite) line.
+
+In AlignGripsCrv, you select grips, then a target curve, then tell the script whether you want the grips to mover in a plane (you set the plane direction) or to the closest point on the curve.
+
+
+CvToCP does this: Select some control vertices (the CV part) and then click on a segment of control polygon (the CP part. The CV's are sucked to the infinite linde defined by the control polygon segment. The objects you select to edit are the ones that have eligible 'target' control polygon segments, the CV's can come from any object.
+
+This 'command' keeps running- you can keep selecting points and control polygon segments.
+
+To use the script,  extract and save the rvb files, then drag and drop over an open V4 window to add the following aliases:
+
+AlignGrips
+
+AlignGripCrv
+
+CvToCP
+
+This can be used as a 'command' by typing or by adding it to a button.
+

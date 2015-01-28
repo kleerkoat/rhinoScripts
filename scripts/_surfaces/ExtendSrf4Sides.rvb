@@ -1,0 +1,89 @@
+﻿'--------------------------------------------------------------
+'Command   :  exsf4 (Extend surface 4 boundaries)
+'Date      :  2011/02/08
+'Version   :  1.0
+'Organization   :  Rhino+
+'--------------------------------------------------------------
+
+Option Explicit
+
+'Call SrfExtend4Sides
+
+Sub ExtendSrf4Sides
+  
+	Dim arrParameter,arrDomV,arrDomU,tmp,length ,exType ,arrItems
+	Dim strObject,arrDefaults, str, arrObjects
+
+	'strObject = Rhino.SelectedObjects 
+	Rhino.command "_selnone"
+
+	'If IsNull(strObject) Then   
+	arrObjects = Rhino.GetObjectsEx("Select surfaces to extend", 8,, True)
+	If Not IsArray(arrObjects) Then Exit Sub
+	'End If
+
+	arrItems = Array("Type", "Liner", "Smooth")
+	arrDefaults = Array(True)
+
+ 
+	str = Rhino.GetDocumentData("ExSrf4", "exType")
+	If IsNull(str) Then 
+		exType = Rhino.GetBoolean("Extend Type ?", arrItems, arrDefaults)
+		If IsNull(exType) Then Exit Sub
+		Else
+			exType = Rhino.GetBoolean("Extend Type ?", arrItems, Array(CBool(str)))
+		If IsNull(exType) Then Exit Sub
+	End If
+	Rhino.SetDocumentData "ExSrf4", "exType", CStr(exType(0))
+
+
+ 
+	str = Rhino.GetDocumentData("ExSrf4", "Length")
+	If IsNull(str) Then 
+		length = Rhino.GetReal("Length ? ", 10)
+		If IsNull(length) Then Exit Sub 
+		Else
+			length = Rhino.GetReal("Length ? ", CDbl(str)) 
+		If IsNull(length) Then Exit Sub 
+	End If 
+	Rhino.SetDocumentData "ExSrf4", "Length", CStr(length)
+
+
+
+
+  
+	Rhino.EnableRedraw False
+	For Each strObject In arrObjects
+		
+	arrDomU = Rhino.SurfaceDomain(strObject(0), 0)
+	arrDomV = Rhino.SurfaceDomain(strObject(0), 1)
+
+	tmp = midValue(arrDomU(1), arrDomU(0))
+	Rhino.ExtendSurface strObject(0), Array(tmp, arrDomV(0)), length, exType(0)
+
+	arrDomU = Rhino.SurfaceDomain(Rhino.FirstObject, 0)
+	arrDomV = Rhino.SurfaceDomain(Rhino.FirstObject, 1)
+	tmp = midValue(arrDomU(1), arrDomU(0))
+	Rhino.ExtendSurface Rhino.FirstObject, Array(tmp, arrDomV(1)), length, exType(0)
+
+	arrDomU = Rhino.SurfaceDomain(Rhino.FirstObject, 0)
+	arrDomV = Rhino.SurfaceDomain(Rhino.FirstObject, 1)
+	tmp = midValue(arrDomV(1), arrDomV(0))
+	Rhino.ExtendSurface Rhino.FirstObject, Array(arrDomU(0), tmp), length, exType(0)
+
+	arrDomU = Rhino.SurfaceDomain(Rhino.FirstObject, 0)
+	arrDomV = Rhino.SurfaceDomain(Rhino.FirstObject, 1)
+	tmp = midValue(arrDomV(1), arrDomV(0))
+		Rhino.ExtendSurface Rhino.FirstObject, Array(arrDomU(1), tmp), length, exType(0)
+	Next
+	
+		
+
+	Rhino.EnableRedraw True
+
+End Sub
+
+
+Function midValue(a, b)
+	midValue = (a - b) / 2 + b
+End Function

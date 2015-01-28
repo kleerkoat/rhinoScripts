@@ -1,0 +1,713 @@
+Option Explicit
+
+'Script written by <Matthew Lutz>
+
+'Script version Monday, October 06, 2008 11:47:41 PM
+
+ 
+
+
+ 
+
+Call SpiculeGenerator()
+
+Sub SpiculeGenerator()
+	Dim triangleCrv, vertexPts, endpt1, endpt2, endpt0, newSpicule, gens, origPt, origPtCoord, objArr
+
+	Dim attractorPt, threshDist, strLeg, strSphere, scaleFact, testSphere1, testSphere2, testSphere3
+
+	Rhino.EnableRedraw False
+
+	gens = Rhino.GetReal("How many generations?", 50)
+
+	'threshDist = Rhino.GetReal("What is the threshold distance?", 20)
+
+	origPt = Rhino.GetObject("choose a starting point", 1)
+
+	attractorPt = Rhino.GetObject("choose an attractor point", 1)
+
+	scaleFact = Rhino.GetReal("Unit scale factor?", 1)
+
+	testSphere1 = Rhino.GetObject("choose the first sphere", 8)
+
+	testSphere2 = Rhino.GetObject("choose the second sphere", 8)
+
+	testSphere3 = Rhino.GetObject("choose the third sphere", 8)
+
+	origPtCoord = Rhino.PointCoordinates(origPt)
+
+	attractorPt = Rhino.PointCoordinates(attractorPt)
+
+	endPt0 = Rhino.AddPoint(Array(origPtCoord(0), origPtCoord(1) + (scaleFact * 1.5), origPtCoord(2)))
+
+	endPt1 = Rhino.RotateObject(endPt0, origPtCoord, 120.0, , True)
+
+	endPt2 = Rhino.RotateObject(endPt1, origPtCoord, 120.0, , True)
+
+ 
+
+	endPt0 = Rhino.PointCoordinates(endPt0)
+
+	endPt1 = Rhino.PointCoordinates(endPt1)
+
+	endPt2 = Rhino.PointCoordinates(endPt2)
+
+	Call Rhino.AddLayer("spicules")
+
+	Call Rhino.AddLayer("lines")
+
+	Call Rhino.AddLayer("points")
+
+	Call Rhino.AddLayer("circles")
+
+	Call Rhino.AddLayer("spheres")
+
+	Call Rhino.AddLayer("trajectory1")
+
+	Call Rhino.AddLayer("trajectory2")
+
+	Call Rhino.AddLayer("trajectory3")
+
+ 
+
+	objArr = AddNewSpicule(endPt0, endPt1, endPt2, 0)
+
+	Call RecursiveGrowth(objArr, gens, origPtCoord, attractorPt, scaleFact, testSphere1, testSphere2, testSphere3)
+
+ 
+
+End Sub
+
+ 
+
+Function RecursiveGrowth(objArr, gens, origPtCoord, attractorPt, scaleFact, testSphere1, testSphere2, testSphere3)
+
+ 
+
+	Dim i, currentType1, currentType2, currentType3, arrTypes, Rand1, Rand2, Rand3, RadS, RadSM, RadM, RadML, RadL, RadXL, arrAllSpicules()
+
+	Dim newEndPt0(), newEndPt1(), newEndPt2(), newEndPt3()
+
+	Dim sphereTest1(), sphereTest2(), sphereTest3()
+
+	Dim sphereColor1(), sphereColor2(), sphereColor3()
+
+	Dim sphereCtrPt(), trajLine1a, trajLine2a, trajLine3a, trajLine1b, trajLine2b, trajLine3b, trajLine1c, trajLine2c, trajLine3c,trajLine1d, trajLine2d, trajLine3d, trajLine1e, trajLine2e, trajLine3e
+
+	Dim sphereObj1(), sphereObj2(), sphereObj3()
+
+	Dim objArr1(), objArr2(), objArr3(), labelSphere1, labelSphere2, labelSphere3
+
+	Dim startPts1(), startPts2(), startPts3(), craneLine1, craneLine2, craneLine3, testPt1, testPt2, testPt3
+
+ 
+
+	For i = 1 To gens
+
+		ReDim Preserve objArr1(i)
+
+		ReDim Preserve objArr2(i)
+
+		ReDim Preserve objArr3(i)
+
+		ReDim Preserve sphereTest1(i)
+
+		ReDim Preserve sphereTest2(i)
+
+		ReDim Preserve sphereTest3(i)
+
+		ReDim Preserve sphereColor1(i)
+
+		ReDim Preserve sphereColor2(i)
+
+		ReDim Preserve sphereColor3(i)
+
+		ReDim Preserve sphereObj1(i)
+
+		ReDim Preserve sphereObj2(i)
+
+		ReDim Preserve sphereObj3(i)
+
+		ReDim Preserve startPts1(i)
+
+		ReDim Preserve startPts2(i)
+
+		ReDim Preserve startPts3(i)
+
+		If i < 2 Then
+
+			objArr1(i) = AddNewSpicule(endPt0, endPt1, endPt2, i)
+
+			objArr2(i) = AddNewSpicule(endPt0, endPt1, endPt2, i)
+
+			objArr3(i) = AddNewSpicule(endPt0, endPt1, endPt2, i)
+
+		Else 
+
+			RadS = scaleFact * .75
+
+			RadSM = scaleFact * 1.15
+
+			RadM = scaleFact * 1.25
+
+			RadML = scaleFact * .95
+
+			RadL = scaleFact * .65
+
+			RadXL = scaleFact * .85
+
+			arrTypes = Array(RadS, RadSM, RadM, RadML, RadL, RadXL)
+
+			Rand1 = Random(2, 5)
+
+			currentType1 = arrTypes(Rand1)
+
+			sphereTest1(i) = Rhino.AddSphere(objArr1(i - 1)(1)(4), currentType1)
+
+			'sphereColor1(i) = Rhino.AddSphere(objArr1(i - 1)(1)(4), currentType1 * .25)
+
+			'Call Rhino.ObjectColor (sphereColor1(i), RGB(200, 20+(i*3), 64))
+
+			startPts1(i) = SphereIntersect(objArr1(i - 1), sphereTest1(i))
+
+			objArr1(i) = ClosestSpicule(startPts1(i), attractorPt, i)
+
+			If Rhino.IsPointInSurface(testSphere1, objArr1(i)(1)(4)) Then
+
+				objArr1(i) = objArr1(i - 2)
+
+			ElseIf Rhino.IsPointInSurface(testSphere2, objArr1(i)(1)(4)) Then
+
+				objArr1(i) = objArr1(i - 2)
+
+			ElseIf Rhino.IsPointInSurface(testSphere3, objArr1(i)(1)(4)) Then
+
+				objArr1(i) = objArr1(i - 2)
+
+			End If
+
+			Rand2 = Random(0, 3)
+
+			currentType2 = arrTypes(Rand2)
+
+			sphereTest2(i) = Rhino.AddSphere(objArr2(i - 1)(1)(4), currentType2)
+
+			'sphereColor2(i) = Rhino.AddSphere(objArr2(i - 1)(1)(4), currentType2 * .25)
+
+			'Call Rhino.ObjectColor (sphereColor2(i), RGB(209, 4.25*i, 64))
+
+			startPts2(i) = SphereIntersect(objArr2(i - 1), sphereTest2(i))
+
+			objArr2(i) = ClosestSpicule(startPts2(i), attractorPt, i)
+
+			If Rhino.IsPointInSurface(testSphere1, objArr2(i)(1)(4)) Then
+
+				objArr2(i) = objArr2(i - 2)
+
+			ElseIf Rhino.IsPointInSurface(testSphere2, objArr2(i)(1)(4)) Then
+
+				objArr2(i) = objArr2(i - 2)
+
+			ElseIf Rhino.IsPointInSurface(testSphere3, objArr2(i)(1)(4)) Then
+
+				objArr2(i) = objArr2(i - 2)
+
+			End If
+
+			Rand3 = Random(0, 5)
+
+			currentType3 = arrTypes(Rand3)
+
+			sphereTest3(i) = Rhino.AddSphere(objArr3(i - 1)(1)(4), currentType3)
+
+			'sphereColor3(i) = Rhino.AddSphere(objArr3(i - 1)(1)(4), currentType3 * .25)
+
+			'Call Rhino.ObjectColor (sphereColor3(i), RGB(209, 2.5*i, 64))
+
+			startPts3(i) = SphereIntersect(objArr3(i - 1), sphereTest3(i))
+
+			objArr3(i) = ClosestSpicule(startPts3(i), attractorPt, i)
+
+			If Rhino.IsPointInSurface(testSphere1, objArr3(i)(1)(4)) Then
+
+				objArr3(i) = objArr3(i - 2)
+
+			ElseIf Rhino.IsPointInSurface(testSphere2, objArr3(i)(1)(4)) Then
+
+				objArr3(i) = objArr3(i - 2)
+
+			ElseIf Rhino.IsPointInSurface(testSphere3, objArr3(i)(1)(4)) Then
+
+				objArr3(i) = objArr3(i - 2)
+
+			End If
+
+			If currentType1 = RadS Then
+
+				Call Rhino.ObjectColor(objArr1(i)(0), RGB(235, 91, 46))
+
+			ElseIf currentType1 = RadSM Then
+
+				Call Rhino.ObjectColor(objArr1(i)(0), RGB(235, 164, 26))
+
+			ElseIf currentType1 = RadM Then
+
+				Call Rhino.ObjectColor(objArr1(i)(0), RGB(231, 229, 34))
+
+			ElseIf currentType1 = RadML Then
+
+				Call Rhino.ObjectColor(objArr1(i)(0), RGB(179, 206, 32))
+
+			ElseIf currentType1 = RadL Then
+
+				Call Rhino.ObjectColor(objArr1(i)(0), RGB(122, 165, 19))
+
+			ElseIf currentType1 = RadXL Then
+
+				Call Rhino.ObjectColor(objArr1(i)(0), RGB(31, 157, 159))
+
+			End If
+
+			If currentType2 = RadS Then
+
+				Call Rhino.ObjectColor(objArr2(i)(0), RGB(215, 71, 25))
+
+			ElseIf currentType2 = RadSM Then
+
+				Call Rhino.ObjectColor(objArr2(i)(0), RGB(215, 144, 6))
+
+			ElseIf currentType2 = RadM Then
+
+				Call Rhino.ObjectColor(objArr2(i)(0), RGB(210, 209, 14))
+
+			ElseIf currentType2 = RadML Then
+
+				Call Rhino.ObjectColor(objArr2(i)(0), RGB(179, 206, 32))
+
+			ElseIf currentType2 = RadL Then
+
+				Call Rhino.ObjectColor(objArr2(i)(0), RGB(122, 165, 19))
+
+			ElseIf currentType2 = RadXL Then
+
+				Call Rhino.ObjectColor(objArr2(i)(0), RGB(31, 157, 159))
+
+			End If
+
+			If currentType3 = RadS Then
+
+				Call Rhino.ObjectColor(objArr3(i)(0), RGB(235, 91, 46))
+
+			ElseIf currentType3 = RadSM Then
+
+				Call Rhino.ObjectColor(objArr3(i)(0), RGB(235, 164, 26))
+
+			ElseIf currentType3 = RadM Then
+
+				Call Rhino.ObjectColor(objArr3(i)(0), RGB(231, 229, 34))
+
+			ElseIf currentType3 = RadML Then
+
+				Call Rhino.ObjectColor(objArr3(i)(0), RGB(179, 206, 32))
+
+			ElseIf currentType3 = RadL Then
+
+				Call Rhino.ObjectColor(objArr3(i)(0), RGB(122, 165, 19))
+
+			ElseIf currentType3 = RadXL Then
+
+				Call Rhino.ObjectColor(objArr3(i)(0), RGB(31, 157, 159))
+
+			End If
+
+			Rhino.DeleteObject(sphereTest1(i))
+
+			Rhino.DeleteObject(sphereTest2(i))
+
+			Rhino.DeleteObject(sphereTest3(i))
+
+			trajLine1a = Rhino.AddLine(objArr1(i)(1)(4), objArr1(i - 1)(1)(4))
+
+			' trajLine1b = Rhino.AddLine (objArr1(i)(1)(0), objArr1(i-1)(1)(0))
+
+			' trajLine1c = Rhino.AddLine (objArr1(i)(1)(1), objArr1(i-1)(1)(1))
+
+			' trajLine1d = Rhino.AddLine (objArr1(i)(1)(2), objArr1(i-1)(1)(2))
+
+			' trajLine1e = Rhino.AddLine (objArr1(i)(1)(5), objArr1(i-1)(1)(5))
+
+			'craneLine1 = Rhino.AddLine (objArr1(i)(1)(4), cranePt)
+
+			'testPt1 = Call Rhino.AddPoint (objArr1(i)(1)(3)(0), objArr1(i)(1)(3)((1)+3), objArr1(i)(1)(3)(2))
+
+			'Call Rhino.AddLine (objArr1(i)(1)(4), testPt1)
+
+			Call Rhino.ObjectLayer(trajLine1a, "trajectory1")
+
+			trajLine2a = Rhino.AddLine(objArr2(i)(1)(4), objArr2(i - 1)(1)(4))
+
+			' trajLine2b = Rhino.AddLine (objArr2(i)(1)(0), objArr2(i-1)(1)(0))
+
+			' trajLine2c = Rhino.AddLine (objArr2(i)(1)(1), objArr2(i-1)(1)(1))
+
+			' trajLine2d = Rhino.AddLine (objArr2(i)(1)(2), objArr2(i-1)(1)(2))
+
+			' trajLine2e = Rhino.AddLine (objArr2(i)(1)(5), objArr2(i-1)(1)(5))
+
+			'craneLine2 = Rhino.AddLine (objArr2(i)(1)(4), cranePt)
+
+			Call Rhino.ObjectLayer(trajLine2a, "trajectory2")
+
+			trajLine3a = Rhino.AddLine(objArr3(i)(1)(4), objArr3(i - 1)(1)(4))
+
+			' trajLine3b = Rhino.AddLine (objArr3(i)(1)(0), objArr3(i-1)(1)(0))
+
+			' trajLine3c = Rhino.AddLine (objArr3(i)(1)(1), objArr3(i-1)(1)(1))
+
+			' trajLine3d = Rhino.AddLine (objArr3(i)(1)(2), objArr3(i-1)(1)(2))
+
+			' trajLine3e = Rhino.AddLine (objArr3(i)(1)(5), objArr3(i-1)(1)(5))
+
+			'craneLine3 = Rhino.AddLine (objArr3(i)(1)(4), cranePt)
+
+			Call Rhino.ObjectLayer(trajLine3a, "trajectory3")
+
+		End If
+
+	Next
+
+	Rhino.EnableRedraw True
+
+End Function
+
+ 
+
+Function ClosestSpicule(startPts, attractorPt, i)
+
+	Dim TestSpicule1, TestSpicule2, TestSpicule3, AllTestArr, RandArr
+
+	Dim ClosestDist, ClosestDist1, ClosestDist2, ClosestDist3
+
+	Dim RandTest
+
+	TestSpicule1 = AddNewSpicule(startPts(0), startPts(1), startPts(3), i)
+
+	TestSpicule2 = AddNewSpicule(startPts(2), startPts(0), startPts(3), i)
+
+	TestSpicule3 = AddNewSpicule(startPts(1), startPts(2), startPts(3), i)
+
+	If i Mod 4 = 0 Then
+
+		RandTest = Random(0, 2)
+
+		If RandTest = 0 Then
+
+			ClosestSpicule = TestSpicule1
+
+		ElseIf RandTest = 1 Then
+
+			ClosestSpicule = TestSpicule2
+
+		ElseIf RandTest = 2 Then
+
+			ClosestSpicule = TestSpicule3
+
+		End If
+
+	Else If i Mod 5 = 0 Then
+
+		ClosestSpicule = TestSpicule3
+
+	ElseIf i Mod 6 = 0 Then
+
+		ClosestSpicule = TestSpicule2
+
+	Else
+
+		ClosestDist1 = Rhino.Distance(TestSpicule1(1)(5), attractorPt)
+
+		ClosestDist2 = Rhino.Distance(TestSpicule2(1)(5), attractorPt)
+
+		ClosestDist3 = Rhino.Distance(TestSpicule3(1)(5), attractorPt)
+
+		If ClosestDist1 < ClosestDist2 Then
+
+			ClosestDist = ClosestDist1
+
+		Else
+
+			ClosestDist = ClosestDist2
+
+		End If
+
+		If ClosestDist > ClosestDist3 Then
+
+			ClosestDist = ClosestDist3
+
+		End If
+
+		If ClosestDist = ClosestDist1 Then
+
+			ClosestSpicule = TestSpicule1
+
+		ElseIf ClosestDist = ClosestDist2 Then
+
+			ClosestSpicule = TestSpicule2
+
+		ElseIf ClosestDist = ClosestDist3 Then
+
+			ClosestSpicule = TestSpicule3
+
+		End If
+
+	End If
+
+	End If
+
+End Function
+
+ 
+
+Function SphereIntersect(objArr, sphereTest)
+
+	Dim ptOnBaseLineA, ptOnBaseLineB, ptOnBaseLineC, ptOnTopLine
+
+	Dim newEndPtA, newEndPtB, newEndPtC, newEndPtTop
+
+	ptOnBaseLineA = Rhino.CurveSurfaceIntersection(objArr(0)(2), sphereTest)
+
+	If IsArray(ptOnBaseLineA) Then
+
+		Call Rhino.AddPoint(ptOnBaseLineA(0, 1))
+
+		newEndPtA = Rhino.FirstObject
+
+		newEndPtA = Rhino.PointCoordinates(newEndPtA)
+
+	Else
+
+		newEndPtA = Rhino.AddPoint(objArr(1)(1))
+
+		newEndPtA = Rhino.PointCoordinates(newEndPtA)
+
+	End If
+
+	ptOnBaseLineB = Rhino.CurveSurfaceIntersection(objArr(0)(0), sphereTest)
+
+	If IsArray(ptOnBaseLineB) Then
+
+		Call Rhino.AddPoint(ptOnBaseLineB(0, 1))
+
+		newEndPtB = Rhino.FirstObject
+
+		newEndPtB = Rhino.PointCoordinates(newEndPtB)
+
+	Else
+
+		newEndPtB = Rhino.AddPoint(objArr(1)(2))
+
+		newEndPtB = Rhino.PointCoordinates(newEndPtB)
+
+	End If
+
+	ptOnBaseLineC = Rhino.CurveSurfaceIntersection(objArr(0)(1), sphereTest)
+
+	If IsArray(ptOnBaseLineC) Then
+
+		Call Rhino.AddPoint(ptOnBaseLineC(0, 1))
+
+		newEndPtC = Rhino.FirstObject
+
+		newEndPtC = Rhino.PointCoordinates(newEndPtC)
+
+	Else
+
+		newEndPtC = Rhino.AddPoint(objArr(1)(0))
+
+		newEndPtC = Rhino.PointCoordinates(newEndPtC)
+
+	End If
+
+	
+
+	ptOnTopLine = Rhino.CurveSurfaceIntersection(objArr(0)(3), sphereTest)
+
+	If IsArray(ptOnTopLine) Then    
+
+		Call Rhino.AddPoint(ptOnTopLine(0, 1))
+
+		newEndPtTop = Rhino.FirstObject
+
+		newEndPtTop = Rhino.PointCoordinates(newEndPtTop)
+
+	Else
+
+		newEndPtTop = Rhino.AddPoint(objArr(1)(5))
+
+		newEndPtTop = Rhino.PointCoordinates(newEndPtTop)
+
+	End If
+
+	SphereIntersect = Array(newEndPtA, newEndPtB, newEndPtC, newEndPtTop)
+
+End Function
+
+ 
+
+Function Random(min, max)
+
+	Randomize()
+
+	Random = Int((max - min) * Rnd + min)
+
+End Function
+
+ 
+
+Function AddNewSpicule(startPt0, startPt1, startPt2, i)
+
+	AddNewSpicule = Null
+
+	Dim centerPt, newCenterPt, topCenterPt, strLabel 
+
+	Dim baseLine1, baseLine2, baseLine3, baseLine4Top, dblRadius, crvNormal
+
+	Dim triangle, offTriangle, offTriangle2
+
+	Dim strCircle, CirclePlane, offCirclePlane1, offCirclePlane2, offCircleCurve1, offCircleCurve2
+
+	Dim arrPlane1, arrPlane2, arrPlane3, arrPlane4Top, newCirc1, newCirc2, newCirc3, newCirc4Top, pipeSurf1, pipeSurf2, pipeSurf3, pipeSurf4Top
+
+	Dim baseLine1Ext, baseLine2Ext, baseLine3Ext, baseLine4ExtTop, ExtPt1, ExtPt2, ExtPt3, ExtPt4
+
+	strCircle = Rhino.AddCircle3Pt(startPt0, startPt1, startPt2)
+
+	centerPt = Rhino.CircleCenterPoint(strCircle) 
+
+	CirclePlane = Rhino.AddPlanarSrf(Array(strCircle))
+
+	crvNormal = Rhino.CurveNormal(strCircle)
+
+	dblRadius = Rhino.CircleRadius(strCircle) 
+
+	offCirclePlane1 = Rhino.OffsetSurface(CirclePlane(0), dblRadius * 0.707)
+
+	newCenterPt = Rhino.SurfaceAreaCentroid(offCirclePlane1)
+
+	offCirclePlane2 = Rhino.OffsetSurface(offCirclePlane1, dblRadius * 1.25)
+
+	topCenterPt = Rhino.SurfaceAreaCentroid(offCirclePlane2)
+
+	baseLine1 = Rhino.AddLine(newCenterPt(0), startPt0)
+
+	baseLine1Ext = Rhino.ExtendCurveLength(baseLine1, 0, 1, dblRadius * .45)
+
+	ExtPt1 = Rhino.CurveEndPoint(baseLine1Ext)
+
+	pipeSurf1 = Rhino.AddCylinder(newCenterPt(0), ExtPt1, dblRadius * 0.07)
+
+	Call Rhino.ObjectLayer(baseLine1, "lines")
+
+	Call Rhino.ObjectLayer(pipeSurf1, "spicules")
+
+	'Call Rhino.ObjectColor (pipeSurf1, RGB(209, 2.5*i, 64))
+
+	'Call Rhino.ObjectColor (baseLine1, RGB(209, 2.5*i, 64))
+
+ 
+
+	baseLine2 = Rhino.AddLine(newCenterPt(0), startPt1)
+
+	baseLine2Ext = Rhino.ExtendCurveLength(baseLine2, 0, 1, dblRadius * .45)
+
+	ExtPt2 = Rhino.CurveEndPoint(baseLine2Ext)
+
+	pipeSurf2 = Rhino.AddCylinder(newCenterPt(0), ExtPt2, dblRadius * 0.07)
+
+	Call Rhino.ObjectLayer(baseLine2, "lines")
+
+	Call Rhino.ObjectLayer(pipeSurf2, "spicules")
+
+	'Call Rhino.ObjectColor (pipeSurf2, RGB(20+(i*3), 200, 64))
+
+	'Call Rhino.ObjectColor (baseLine2, RGB(20+(i*3), 200, 64))
+
+	baseLine3 = Rhino.AddLine(newCenterPt(0), startPt2)
+
+	baseLine3Ext = Rhino.ExtendCurveLength(baseLine3, 0, 1, dblRadius * .45)
+
+	ExtPt3 = Rhino.CurveEndPoint(baseLine3Ext)
+
+	pipeSurf3 = Rhino.AddCylinder(newCenterPt(0), ExtPt3, dblRadius * 0.07)
+
+	Call Rhino.ObjectLayer(baseLine3, "lines")
+
+	Call Rhino.ObjectLayer(pipeSurf3, "spicules")
+
+	'Call Rhino.ObjectColor (pipeSurf3, RGB(150, 20+(i*2), 64))
+
+	'Call Rhino.ObjectColor (baseLine3, RGB(150, 20+(i*2), 64))
+
+ 
+
+	baseLine4Top = Rhino.AddLine(newCenterPt(0), topCenterPt(0))
+
+	baseLine4ExtTop = Rhino.ExtendCurveLength(baseLine4Top, 0, 1, dblRadius * .45)
+
+	ExtPt4 = Rhino.CurveEndPoint(baseLine4ExtTop)
+
+	pipeSurf4Top = Rhino.AddCylinder(newCenterPt(0), ExtPt4, dblRadius * 0.07)
+
+	Call Rhino.ObjectLayer(baseLine4Top, "lines")
+
+	Call Rhino.ObjectLayer(pipeSurf4Top, "spicules")
+
+	'Call Rhino.ObjectColor (pipeSurf4Top, RGB(175, i*4, 64))
+
+	'Call Rhino.ObjectColor (baseLine4Top, RGB(175, i*4, 64))
+
+	Dim arrSpiculeLines, arrSpiculePoints, arrSpiculeVectors
+
+	'Dim CapShere1 : CapShere1 = Rhino.AddSphere(newCenterPt(0), dblRadius*.25)
+
+	Dim CapShere2 : CapShere2 = Rhino.AddSphere(ExtPt4, dblRadius * .07)
+
+	Dim CapShere3 : CapShere3 = Rhino.AddSphere(ExtPt1, dblRadius * .07)
+
+	Dim CapShere4 : CapShere4 = Rhino.AddSphere(ExtPt2, dblRadius * .07)
+
+	Dim CapShere5 : CapShere5 = Rhino.AddSphere(ExtPt3, dblRadius * .07)
+
+	Call Rhino.ObjectLayer(CapShere2, "spicules")
+
+	Call Rhino.ObjectLayer(CapShere3, "spicules")
+
+	Call Rhino.ObjectLayer(CapShere4, "spicules")
+
+	Call Rhino.ObjectLayer(CapShere5, "spicules")
+
+	Rhino.DeleteObject strCircle
+
+	Rhino.DeleteObject CirclePlane(0)
+
+	Rhino.DeleteObject offCirclePlane1
+
+	Rhino.DeleteObject offCirclePlane2
+
+ 
+
+	'arrSpiculeLines = Array(baseLine1Ext, baseLine2Ext, baseLine3Ext, baseLine4ExtTop)
+
+	arrSpiculeLines = Array(baseLine1, baseLine2, baseLine3, baseLine4Top)
+
+	arrSpiculePoints = Array(startPt0, startPt1, startPt2, centerPt, newCenterPt(0), topCenterPt(0))
+
+	arrSpiculeVectors = Array(crvNormal, dblRadius)
+
+	Call Rhino.ObjectLayer(strCircle, "circles")
+
+	AddNewSpicule = Array(arrSpiculeLines, arrSpiculePoints, arrSpiculeVectors)
+
+ 
+
+End Function

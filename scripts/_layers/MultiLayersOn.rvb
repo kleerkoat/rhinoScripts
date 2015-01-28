@@ -1,0 +1,68 @@
+﻿Option Explicit
+'Script written by Pascal
+'Company: RMA
+
+'Turns on layers of sselected objects, and the others off.
+
+
+Sub MultiLayersOn()
+
+	Dim aObj : aObj = Rhino.GetObjects("Select objects",,True,True,True)
+	Dim aAll: aAll = Rhino.LayerNames
+	If isArray(aObj) Then
+		Dim alayers(), temp, sObj, i
+		
+		For Each sobj In aObj
+			temp = Rhino.Objectlayer (SObj)
+			ReDim Preserve aLayers(i)
+			aLayers(i) = temp
+			i = i + 1	
+		Next
+		
+	Else Exit Sub
+	End If
+	
+	
+	If isUpperBound (aLayers)	Then 
+	
+		Dim aFinal : aFinal = Rhino.CullDuplicateStrings(aLayers)
+	Else Exit Sub
+	
+	End If
+	
+	Rhino.CurrentLayer (aFinal(0))
+	Dim slayer
+	Rhino.EnableRedraw(False)
+	For Each slayer In aAll
+		Rhino.LayerVisible slayer, False	
+	Next
+	
+	
+	
+	For Each sLayer In aFinal
+		rhino.LayerVisible slayer, True
+	Next
+	
+	Rhino.EnableRedraw(True)
+	
+End Sub
+
+Rhino.AddAlias "MultiLayersOn", "_-Runscript MultiLayersOn"
+Rhino.AddStartUpScript Rhino.LastLoadedScriptFile
+
+
+Function IsUpperBound(ByRef arr)
+
+	IsUpperBound = False
+
+	If IsArray(arr) Then
+
+		On Error Resume Next
+
+		UBound arr
+
+		If Err.Number = 0 Then IsUpperBound = True
+
+	End If
+
+End Function

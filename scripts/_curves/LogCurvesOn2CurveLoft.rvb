@@ -1,0 +1,24 @@
+﻿Option Explicit
+
+
+Call Main()
+Sub Main()
+	
+	Dim arrObjects,dblStep,strObject,intUDir,intVDir,arrDomain,i,arrParameter
+	arrObjects=Rhino.GetObjects("Pick two curves to create loft.",4,,,,,,2)
+	
+	dblStep=Rhino.GetReal("Enter a number for the step size (0.1 to 1.0).",0.5,0.1,1.0)
+	strObject=Rhino.AddLoftSrf(arrObjects)
+	
+	intUDir=0 'U-Dir
+	intVDir=1 'V-Dir
+	
+	arrDomain=Rhino.SurfaceDomain(strObject(0), intUDir)
+
+
+	For i=0 To arrDomain(1) Step dblStep
+		arrParameter=Array(arrDomain(1)/(Rhino.E)^i,0)
+		Call Rhino.ExtractIsoCurve(strObject(0), arrParameter, intVDir)
+	Next
+	
+End Sub

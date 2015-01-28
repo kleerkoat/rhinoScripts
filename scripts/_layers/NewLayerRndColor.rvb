@@ -1,0 +1,62 @@
+Option Explicit
+'Script written by Simon Aulis Kallioinen
+'Call NewLayerRndColor()
+Sub NewLayerRndColor()
+	Dim arrLayers 
+	
+	arrLayers=Rhino.LayerNames()
+	
+	Dim strLayer, strNewLayer, s, j, strDefault, strNumber
+	
+	j = 1
+	
+	strNumber = ""
+	If j<10 Then strNumber = "0"
+	strNumber = strNumber + CStr(j)	
+	strDefault = "Layer " + strNumber
+	
+	For Each strLayer In arrLayers
+		If strDefault=strLayer Then
+			
+			j=j+1
+		
+			strNumber = ""
+			If j<10 Then strNumber = "0"
+			strNumber = strNumber + CStr(j)	
+			strDefault = "Layer " + strNumber
+	
+		End If
+	Next
+	
+	
+	Do
+		s=0
+		
+		strNewLayer=Rhino.StringBox("New Layer Name?",strDefault,"Add New Layer")
+		
+		If isnull(strNewLayer) Then Exit Sub
+	
+		For Each strLayer In arrLayers
+			If strNewLayer=strLayer Then
+				Call Rhino.Print("Layer "&strLayer&" already exist. Select another name.")
+				s=1
+				Exit For
+			End If
+		Next
+		If s=0 Then Exit Do
+	Loop
+	Dim red,green,blue,intRnd
+	
+	red = CInt(rnd*180)+76
+	green = CInt(rnd*180)+76
+	blue = CInt(rnd*180)+76
+	
+	intRnd = CInt(rnd*2)
+	
+	If intRnd = 0 Then red = 0
+	If intRnd = 1 Then green = 0
+	If intRnd = 2 Then blue = 0
+	
+	Call Rhino.AddLayer(strNewLayer,RGB(red,green,blue))
+	Call Rhino.CurrentLayer(strNewLayer)
+End Sub

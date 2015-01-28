@@ -1,0 +1,53 @@
+Option Explicit
+'Script by Mitch Heynick, based off original script written by Don Lewis
+'Version 9 September, 2011
+
+Call ReverseCurvesChangeLayer()
+Sub ReverseCurvesChangeLayer()
+	
+	Dim arrObjs,strObj,strObjLayer,strChkLayer,blnMatch,ub,i
+	
+	arrObjs=Rhino.GetObjects("Select ROUTE curves to process, Make sure they are running CLOCKWISE (CW)..",4,,True)
+	If Not IsArray(arrObjs) then Exit Sub
+	ub=Ubound(arrObjs)
+	
+	strObjLayer=Rhino.ObjectLayer(arrObjs(0))
+	blnMatch=True
+	'check to see all objects are on same layer
+	If ub>0 Then		
+		For i=1 to ub
+			strChkLayer=Rhino.ObjectLayer(arrObjs(i))
+			If strChkLayer<>strObjLayer Then
+				blnMatch=False : Exit For
+			End If			
+		Next	
+	End If
+
+	Dim strParent,strPrompt,strLayer,dupCrv
+	strParent=Rhino.ParentLayer(strObjLayer)
+
+	If blnMatch And Not IsNull(strParent) Then
+		If Rhino.IsLayer(strParent&"::KNIFE") Then
+			strLayer=strParent&"::KNIFE"		
+		Else 'need to ask user for destination layer
+			strLayer=Rhino.AddLayer("KNIFE",RGB (0,0,255),,,strParent)
+		End If
+	End If	
+	
+	If Not IsNull(strLayer) Then
+		Dim msg
+		If ub=0 then msg=" curve" Else msg=" curves"
+		msg=msg&" reversed and sent to "
+		Call ReverseChangeLayer(arrObjs,strLayer)		
+		Call Rhino.Print(Cstr(ub+1)&msg&strLayer&" layer")
+	End If
+End Sub
+
+Sub ReverseChangeLayer(objs,layer)
+	Dim obj,dupCrv
+	For each obj in objs
+		dupCrv = Rhino.CopyObject(obj)
+		Call Rhino.ReverseCurve(dupCrv)
+		Call Rhino.ObjectLayer(obj,layer)
+	Next	
+End Sub

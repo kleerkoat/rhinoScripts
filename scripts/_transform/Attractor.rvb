@@ -1,0 +1,63 @@
+Option Explicit
+
+'Call attractor()
+
+' sub routine
+Sub Attractor()
+
+	Dim attArr, objArr, attXYZArr(), i, xyzPt, thresholdDistance
+	
+	attArr = Rhino.GetObjects("select the attractor points", 1)	
+	objArr = Rhino.GetObjects("select the objects to scale", 12)
+	thresholdDistance = Rhino.GetReal("threshold distance", 100)
+	
+	' loop through all the attractors
+	For i = 0 To UBound(attArr)
+		' extract xyz coords
+		xyzPt = Rhino.PointCoordinates(attArr(i))
+		
+		' add xyz's to an array
+		ReDim Preserve attXYZArr(i)
+		attXYZArr(i) = xyzPt
+		
+	Next
+
+
+	Dim centerPt, closestPtIndex, dist
+	' loop through all the objects
+	For i = 0 To UBound(objArr)
+		' find the center point
+		centerPt = bBoxCenter(objArr(i))
+		
+		' find the closest attractor
+		closestPtIndex = Rhino.PointArrayClosestPoint(attXYZArr, centerPt)
+		
+		' find distance to closest attractor
+		dist = Rhino.Distance(attXYZArr(closestPtIndex), centerPt) 
+		
+		' scale the obj
+		Dim adjAmount
+		
+		If (dist < thresholdDistance) Then
+
+			adjAmount = 1 - ( (thresholdDistance - dist) / thresholdDistance )
+			Rhino.ScaleObject objArr(i), centerPt, Array(adjAmount, adjAmount, adjAmount)
+			
+		End If
+	Next
+	
+End Sub
+
+
+Function bBoxCenter(obj)
+
+	Dim bbox
+	
+	' get the bounding box
+	bbox = Rhino.BoundingBox(obj)
+	
+	' return the center
+	bBoxCenter = Array((bbox(0)(0) + bbox(6)(0)) / 2 , (bbox(0)(1) + bbox(6)(1)) / 2 ,  (bbox(0)(2) + bbox(6)(2)) / 2 )
+	
+End Function
+		

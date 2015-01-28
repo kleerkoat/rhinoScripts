@@ -1,0 +1,325 @@
+' Script for Rhinoceros 3.0 Sr3 - revolve crv around crv axis
+' © clement greiner / 2003
+
+' 12092005 - try to add support for Rhino 4
+
+Option Explicit
+Sub RevolveAroundCrv
+
+Dim StrObject, StrAxisCrv
+Dim Ready, Result
+Dim blnRebuild, dblAngle, UPtCount, VPtCount, UDegree, VDegree, arrScale, StrMode
+Dim StrResult : StrResult = vbNull
+
+' define source objects
+StrObject = Rhino.GetObject("Select a curve to revolve", 4, vbTrue, vbFalse)
+If IsNull(StrObject) Then Exit Sub
+StrAxisCrv = Rhino.GetObject("Select a revolve axis curve", 4, vbFalse, vbTrue)
+If IsNull(StrAxisCrv) Then Exit Sub
+If StrAxisCrv = StrObject Then Rhino.Print "Revolve/Axis Curve cannot be the same object. Command aborted." : Exit Sub
+
+' define command defaults
+blnRebuild = vbFalse : dblAngle = 360
+' define rebuild defaults
+UPtCount = 10 : VPtCount = 10
+' check if the degree along u need some correction (linear 2pt curve => 1 degree surface)
+UDegree = Rhino.CurveDegree(StrObject)
+VDegree = 2
+' define axis scaling defaults (X,Y)
+arrScale = Array(1,1)
+StrMode = "Circular"
+
+' start command line options
+Do While Ready = 0
+If blnRebuild = vbTrue Then
+	Result = Rhino.GetString("RevolveAroundCrv", , Array("RevolveAngle","UDegree","VDegree","UPointCount","VPointCount","Scale","NoRebuild","Preview") )
+ElseIf blnRebuild = vbFalse Then
+	Result = Rhino.GetString("RevolveAroundCrv", , Array("RevolveAngle","Scale","Weights","Rebuild","Preview") )
+End If
+
+If IsNull(Result) Then Exit Sub
+
+Select Case Result
+	Case "RevolveAngle"
+		dblAngle = Rhino.GetReal("Enter revolve angle", dblAngle, -360 , 360) ' CStr(Rhino.UnitAbsoluteTolerance)
+		If IsNull(dblAngle) Then dblAngle = 360
+	Case "UPointCount"
+		UPtCount = Rhino.GetInteger("Number of points along revolve axis (U)", UPtCount, UDegree + 1)
+		If IsNull(UPtCount) Then UPtCount = 10
+		If UPtCount > 20 Then UDegree = 3 : If UPtCount > 30 Then UDegree = 5
+		If UPtCount > 40 Then UDegree = 7 : If UPtCount > 50 Then UDegree = 11
+	Case "VPointCount"
+		VPtCount = Rhino.GetInteger("Number of points around revolve axis (V)", VPtCount, VDegree + 1)
+		If IsNull(VPtCount) Then VPtCount = 10
+		If VPtCount > 20 Then VDegree = 3 : If VPtCount > 30 Then VDegree = 5
+		If VPtCount > 40 Then VDegree = 7 : If VPtCount > 50 Then VDegree = 11
+	Case "UDegree"
+		UDegree = Rhino.GetInteger("U degree (along axis)", UDegree, 1, UPtCount + 1)
+		If IsNull(UDegree) Then UDegree = 3
+	Case "VDegree"
+		VDegree = Rhino.GetInteger("V degree (around axis)", VDegree, 1, VPtCount + 1)
+		If IsNull(VDegree) Then VDegree = 3
+	Case "Scale"
+		arrScale = GET_ScaleMultipliers(arrScale)
+		If Not IsArray(arrScale) Then arrScale = Array(1,1)
+	Case "Weights"
+		StrMode = GET_CreationMode(StrMode)
+		If IsNull(StrMode) Then StrMode = "Circular"
+	Case "Rebuild"
+		blnRebuild = vbTrue
+	Case "NoRebuild"
+		blnRebuild = vbFalse
+	Case "Preview"
+		Rhino.UnselectObject(StrAxisCrv)
+		If Not IsNull(StrResult) Then Rhino.DeleteObject StrResult
+		Rhino.Prompt "Preview in progress ... please wait."
+		StrResult = ADD_RevolveAroundCrv(StrObject, StrAxisCrv, dblAngle, UPtCount, VPtCount, UDegree, VDegree, arrScale, StrMode, blnRebuild)
+		If IsNull(StrResult) Then
+			If Rhino.IsCurveClosed(StrObject) Then Rhino.Print "No surface created, split closed input curve and revolve seperately."
+			If Not Rhino.IsCurveClosed(StrObject) Then Rhino.Print "No surface created, please try to change U/V Degree and retry."
+		End If
+	Case "x", "X"
+		If Not IsNull(StrResult) Then Rhino.DeleteObject StrResult
+		Rhino.Print "Exit" : Ready = 1
+	Case Else
+		Ready = 1
+		If Not IsNull(StrResult) Then Rhino.SelectObject StrResult
+	End Select
+Loop
+
+Rhino.Print "Ready."
+
+End Sub
+
+Private Function ADD_RevolveAroundCrv(StrObject, StrAxisCrv, dblAngle, UPtCount, VPtCount, UDegree, VDegree, arrAxisScale, StrRevMode, blnRebuild)
+Dim arrCurvePts, count, arrPoint, dblParam, arrTangent, arrYAxis, arrPlane
+Dim arrTransformPt, Index, Phi, theta, dblRadius
+Dim X,Y,Z, dblIncrement, arrRot, SrfPtCount, arrSrfPts()
+Dim blnUClosed, blnVClosed
+Dim arrCurveWeights, arrWeights(), wcount, arrKnotU, arrKnotV(), dblNRadius, i, blnWeights
+Dim DMulti, dblDefaultWeight, DivisionAngle, RemoveLast, n, val, ncount
+
+Rhino.Prompt "Creating points from input curve ... Press ESC to cancel."
+' get the points along u
+If blnRebuild = vbFalse Then
+	' get control / edit points and weights along U (along crv)
+	arrCurvePts = Rhino.CurvePoints(StrObject)
+	arrCurveWeights = Rhino.CurveWeights(StrObject)
+	UDegree = Rhino.CurveDegree(StrObject)
+	VDegree = 2
+
+	' define default density multipliers
+	If StrRevMode = "Circular" Or StrRevMode = "Rectangular" Then DMulti = 1
+	If StrRevMode = "Hexagonal" Then DMulti = 1.5
+	If StrRevMode = "Octagonal" Then DMulti = 2
+
+	' Define pointcount along V based on the angle (around crv)
+	If Abs(dblAngle) <= 90 Then
+		VPtCount = 2 * DMulti
+	ElseIf Abs(dblAngle) > 90 And Abs(dblAngle) <= 180 Then
+		VPtCount = 4 * DMulti
+	ElseIf Abs(dblAngle) > 180 And Abs(dblAngle) <= 270 Then
+		VPtCount = 6 * DMulti
+	ElseIf Abs(dblAngle) > 180 Then
+		VPtCount = 8 * DMulti
+	End If
+
+ElseIf blnRebuild = vbTrue Then
+	' get uniform division points in rebuild mode
+	arrCurvePts = Rhino.DivideCurve(StrObject, UPtCount, vbFalse)
+End If
+
+' since vb starts counting at zero .... define the number of points along U
+UPtCount = Int(UBound(arrCurvePts)+ 1)
+
+' remove last point if curve to revolve is closed and rebuild is enabled (Rhino 3 only / not for Rhino 4)
+If Clng(Rhino.Version) <= Clng(20050615) And blnRebuild And Rhino.IsCurveClosed(StrObject) Then Redim Preserve arrCurvePts(UBound(arrCurvePts)-1) : UPtCount = UPtCount -1
+Rhino.Prompt "Revolving input points around axis ... Press ESC to cancel"
+
+' define the weight values to apply in circular, rectangular, hexagonal or octagonal mode
+If StrRevMode = "Circular" Then dblDefaultWeight = 1
+If StrRevMode = "Rectangular" Then dblDefaultWeight = 0.1
+If StrRevMode = "Hexagonal" Then dblDefaultWeight = 0.1
+If StrRevMode = "Octagonal" Then dblDefaultWeight = 0.1
+
+' define loop defaults, (Rowcount, srf pointcount, weightcount, angle beetween control points)
+count = 0 : SrfPtCount = 0 : wcount = 0 : DivisionAngle = Abs(dblAngle)/VPtCount
+' define the transformation plane, transform, rotate and retransform
+For Each arrPoint In arrCurvePts
+	' Rhino.AddTextDot count, arrPoint
+	' find the closest pt from each pt to the non linear axis
+	dblParam = Rhino.CurveClosestPoint(StrAxisCrv, arrPoint)
+	' find the rotation axis (x) for each point
+	arrTangent = Rhino.CurveTangent(StrAxisCrv, dblParam)
+	' define the point for the y - axis
+	arrYAxis = Rhino.XFormCPlaneToWorld(Str2Pt("0,1,0"), Array(arrTangent(0),arrTangent(1),arrPoint))
+	' do something if the curve to revolve starts / ends ON the revolve axis
+	If IsNull(arrYAxis) Then arrYAxis = Array(0,0,0)
+	' Rhino.AddTextDot "Y", arrYAxis : Rhino.AddTextDot "0", arrTangent(0) : Rhino.AddTextDot "X", arrTangent(1)
+	' define the plane, the point will be on the y axis
+	arrPlane = Array(arrTangent(0),arrTangent(1),arrYAxis)
+	' transform the point to set on the world y axis to get radius from y coordinate eg: 0,10,0 => radius 10
+	arrTransformPt = Rhino.XFormWorldToCPlane(arrPoint, arrPlane)
+	If IsNull(arrTransformPt) Then arrTransformPt = Str2Pt("1000,1,1000")
+	'Rhino.AddPoint arrTransformPt
+
+	phi = 2 * Atn(1)
+	dblRadius = arrTransformPt(1)
+
+	' rotate the point located on the world y axis around world x axis
+	RemoveLast = 0
+	If blnRebuild = vbTrue Then
+		If dblAngle = 360 Then RemoveLast = 1 Else RemoveLast = 0
+	End If
+
+	For Index = 0 To VPtCount - RemoveLast
+		' define the increment angle (eg 360° / 8 = 45°)
+		dblIncrement = dblAngle / VPtCount * Index
+		' define the rotation ANGLE(theta) in respect to the increment
+		theta = dblIncrement/45 * Atn(1)
+		'Rhino.Print "Increment (" & Index & ") = " & dblIncrement & "°   theta = " & theta & "   Radius = " & dblRadius
+
+		i = Index ' check if the point needs a weight and radius adjustment (every second pt in non rebuild mode)
+		If i=1 Or i=3 Or i=5 Or i=7 Or i=9 Or i=11 Or i=13 Or i=15 Or i=17 Or i=19 Or i=21 Or i=21 Or i=23 Or i=25 Or i=27 Or i=29 Or i=31 Then blnWeights = vbTrue Else blnWeights = vbFalse
+
+		If blnWeights = vbTrue And blnRebuild = vbFalse Then
+				' weightened point radius (allways bigger than dblradius !!) ' dblNRadius = Sqr( ((dblRadius^2)+(dblRadius^2)) )
+				dblNRadius = GET_CPtDist(DivisionAngle, dblRadius)
+				' Rhino.Print "OldRadius: " & dblRadius & " / NewRadius: " & dblNRadius
+				Redim Preserve arrWeights(wcount)
+				arrWeights(wcount) = GET_CPtWeight(DivisionAngle) * arrCurveWeights(count)
+				wcount = wcount + 1
+		Else
+				' point On circle radius
+				dblNRadius = dblRadius
+				Redim Preserve arrWeights(wcount)
+				If blnRebuild = vbFalse Then arrWeights(wcount) = dblDefaultWeight * arrCurveWeights(count) Else arrWeights(wcount) = dblDefaultWeight
+				wcount = wcount + 1
+		End If
+
+        X = 0 ' rotate a pt on y axis around x axis
+   	    Y = Sin(phi) * Cos(theta) * (dblNRadius) * arrAxisScale(0)
+       	Z = Sin(phi) * Sin(theta) * (dblNRadius) * arrAxisScale(1)
+
+        arrRot = Rhino.XFormCPlaneToWorld(Array(X,Y,Z), arrPlane)
+		If IsNull(arrRot) Then arrRot = arrPoint ' singularity (point on axis)
+
+		Redim Preserve arrSrfPts(SrfPtCount), arrWeights(SrfPtCount)
+		' create the surface points, count points
+		arrSrfPts(SrfPtCount) = arrRot
+		'Rhino.AddTextDot CStr(count+1 & "/" & Index+1), arrSrfPts(SrfPtCount)
+		SrfPtCount = SrfPtCount + 1
+		Rhino.StatusbarMessage SrfPtCount & " Surface points created."
+	Next
+		' count to the next point of curve to revolve (along u)
+	count = count + 1
+
+Next
+
+' define if the resulting srf will be closed along u(along axis crv) or v(around axis crv)
+blnUClosed = vbFalse
+If Rhino.IsCurveClosed(StrObject) Then blnUClosed = vbTrue Else blnUClosed = vbFalse
+If Abs(dblAngle) = 360 Then blnVClosed = vbTrue Else blnVClosed = vbFalse
+
+Rhino.Prompt "Surface creation in progress ... Press ESC to cancel"
+
+' create the surface from points (regular, rebuild enabled)
+If blnRebuild Then
+	If Abs(dblAngle) = 360 Then
+		ADD_RevolveAroundCrv = Rhino.AddSrfPtGrid(Array(UPtCount,VPtCount), arrSrfPts, Array(UDegree,VDegree), Array(blnUClosed,blnVClosed))
+	Else
+		ADD_RevolveAroundCrv = Rhino.AddSrfPtGrid(Array(UPtCount,VPtCount+1), arrSrfPts, Array(UDegree,VDegree), Array(blnUClosed,blnVClosed))
+	End If
+	' exit preview if rebuild is enabled
+	Exit Function
+End If
+
+' create a weighted nurbs surface from points and curve weights (no rebuild)
+arrKnotU = Rhino.CurveKnots(StrObject)
+
+' create double knot values eg 0,0,1,1,3,3,5,5....
+For n = 0 To (VPtCount) + VDegree - 1 Step 2
+	val = (Atn(1) / 2) * n * 2
+	' Rhino.Print "arrKnot(" & n & ") = " & val
+	' Rhino.Print "arrKnot(" & n+1 & ") = " & val
+	Redim Preserve arrKnotV(ncount), arrKnotV(ncount+1)
+	arrKnotV(ncount) = val : arrKnotV(ncount+1) = val
+	ncount = ncount + 2
+	val = val + val
+Next
+
+' create a surface from all values
+ADD_RevolveAroundCrv = Rhino.AddNurbsSurface (Array(UPtCount,VPtCount+1), arrSrfPts, arrKnotU, arrKnotV, Array(UDegree,VDegree), arrWeights)
+End Function
+
+' function to get the radius to a weight point
+Private Function GET_CPtDist(nAngle,nDistance)
+Dim psi, Result, nOutput
+psi = Atn(1) * 4
+Result = nAngle * (psi/180)
+' Print "<<DEG2RAD>> Deg: " & nAngle & " / Rad:" & Result
+nOutput = nDistance / Cos(Result)
+Get_CPtDist = nOutput
+End Function
+
+' function to derive the weight from an angle < 45°
+Private Function GET_CPtWeight(nAngle)
+Dim phi, Result, psi
+psi = Atn(1) * 4
+Result = nAngle * (psi/180)
+' Print "<<DEG2RAD>> Deg: " & nAngle & " / Rad:" & Result
+If Round(Cos(Result),4) = 0 Then Print "Weight error ! Angle: " & nAngle & "° degrees."
+GET_CPtWeight = Cos(Result)
+End Function
+
+Private Function  GET_ScaleMultipliers(arrScales)
+Dim XFactor, YFactor, StrChooseAxis, Ready
+If Not IsArray(arrScales) Then
+	MsgBox "Assigned default scale factor values.", vbOkOnly, "GET_ScaleMultipliers(?)"
+	GET_ScaleMultipliers = Array(1,1)
+	Exit Function
+Else
+	XFactor = arrScales(0) : YFactor = arrScales(1)
+	Do While Ready = 0
+		StrChooseAxis = Rhino.GetString("Choose Axis direction to apply scale factor", , Array("XScaleFactor","YScaleFactor","Default"))
+		If IsNull(StrChooseAxis) Then
+			Ready = 1
+		Else
+			If StrChooseAxis = "XScaleFactor" Then
+				XFactor = Rhino.GetReal("Enter X-Axis scale factor", XFactor, (Rhino.UnitAbsoluteTolerance), 10)
+				If IsNull(XFactor) Then XFactor = 1
+			ElseIf StrChooseAxis = "YScaleFactor" Then
+				YFactor = Rhino.GetReal("Enter Y-Axis scale factor", YFactor, (Rhino.UnitAbsoluteTolerance), 10)
+				If IsNull(YFactor) Then YFactor = 1
+			ElseIf StrChooseAxis = "Default" Then
+				GET_ScaleMultipliers = Array(1,1)
+				Exit Function
+			Else
+				Ready = 1
+			End If
+		End If
+	Loop
+End If
+GET_ScaleMultipliers = Array(XFactor,YFactor)
+End Function
+
+Private Function GET_CreationMode(StrOldMode)
+Dim StrNewMode
+If IsNull(StrOldMode) Then StrOldMode = "Circular"
+StrNewMode = Rhino.GetString("Choose a weight style", StrOldMode, Array("Circular","Rectangular","Hexagonal","Octagonal"))
+If IsNull(StrNewMode) Then StrNewMode = StrOldMode
+If StrNewMode = "Circular" Then
+	Rhino.Print "Circular revolve enabled."
+ElseIf StrNewMode = "Rectangular" Then
+	Rhino.Print "Rectangular revolve enabled."
+ElseIf StrNewMode = "Hexagonal" Then
+	Rhino.Print "Hexagonal revolve enabled."
+ElseIf StrNewMode = "Octagonal" Then
+	Rhino.Print "Octagonal revolve enabled."
+Else
+	StrNewMode = "Circular"
+End If
+GET_CreationMode = StrNewMode
+End Function
+
+RevolveAroundCrv

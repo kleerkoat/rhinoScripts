@@ -1,0 +1,98 @@
+' ****************************** RhinoScript.org ******************************
+'
+'   Rhinoscript connection to Open Office Calc, version 0.1
+'
+'   by Luis Fraguada, published Sep 24, 2009
+'
+'
+'   These scripts demonstrate how to connect and import/export data from a Open Office Calc file (as an alternative to MS Office Excel).
+'
+'
+'
+'
+'   This RhinoScript Tool has been downloaded from RhinoScript.org.
+'
+'   Rhino versions: Rhino 4 (at least service release 6)
+'   Other requirements:
+'   Requires OpenOffice.org 3.1 (http://www.openoffice.org)
+'
+'   LICENSE INFORMATION:
+'   This script is published under the GNU General Public License, version 3
+'   or any later version, and thus comes WITHOUT ANY WARRANTY. You can get
+'   the complete license text here: www.rhinoscript.org/gpl
+'
+' ****************************** RhinoScript.org ******************************
+
+
+
+Option Explicit
+'Script written by Luis E. Fraguada
+'Script copyrighted by LaN | Live Architecture Network
+'http://www.livearchitecture.net
+'code@livearchitecture.net
+'Script version Tuesday, September 22, 2009 3:08:08 PM
+
+Sub subOOoINPts()
+ 
+ Dim objServiceManager   
+ Set objServiceManager = CreateObject("com.sun.star.ServiceManager")
+ 
+ 'Create the Desktop
+ Dim objDesktop
+ Set objDesktop= objServiceManager.createInstance("com.sun.star.frame.Desktop")
+ 
+ 'Get FileName and convert to URL for OOo
+ Dim strFileName
+ strFileName = Rhino.OpenFileName("Open", "OpenOffice Calc Files (*.ods)|*.ods||")
+ strFileName = Replace(strFileName, "\", "/")
+ strFileName = "file:///" & strFileName
+ 'Call Rhino.Print(strFileName)
+ 
+ 'Open a calc document
+ Dim dummy()
+ Dim objDocument
+ Set objDocument= objDesktop.loadComponentFromURL(strFileName, "_hidden", 0, dummy)		 '_hidden to not show the doc or _blank for a new window
+ 
+ Dim objSheet
+ Set objSheet = objDocument.Sheets.getByIndex(0)
+
+ 'Get the used range of the sheet
+ Dim arrEndPos
+ arrEndPos = funcLastUsedCell(objSheet)
+
+Dim i
+Dim arrPt(2)
+For i = 0 to arrEndPos(0)	 'rows
+
+   arrPt(0) =  objSheet.getCellByPosition(0, i).Value
+   arrPt(1) =  objSheet.getCellByPosition(1, i).Value
+   arrPt(2) =  objSheet.getCellByPosition(2, i).Value
+   
+   Call Rhino.AddPoint(arrPt)
+
+Next
+ 
+ objDocument.Close True
+
+End Sub	
+Call subOOoINPts()
+
+Function funcLastUsedCell(objSheet)
+
+Dim objCursor
+Set objCursor = objSheet.createCursor()
+objCursor.gotoEndOfUsedArea TRUE
+
+Dim objEnd
+Set objEnd = objCursor.getRangeAddress
+
+Dim vLastUsedCell(1)
+
+vLastUsedCell(0) = objEnd.EndRow
+vLastUsedCell(1) = objEnd.EndColumn
+
+Call Rhino.Print(vLastUsedCell(0))
+Call Rhino.Print(vLastUsedCell(1))
+
+funcLastUsedCell = vLastUsedCell
+End Function

@@ -1,0 +1,19 @@
+Option Explicit
+'Call MovePlanarSrfAlongNormal()
+Sub MovePlanarSrfAlongNormal()
+	
+	Dim strObj,dblDist
+	strObj=Rhino.GetObject("Select planar surface to move normal",8,True)
+	If IsNull(strObj) Then Exit Sub
+	If Not Rhino.IsSurfacePlanar(strObj) Then 
+		Call Rhino.Print("Surface is not planar") : Exit Sub
+	End If
+	dblDist=Rhino.GetReal("Distance to move?")
+	If IsNull(dbldist) Then Exit Sub
+	
+	Dim arrDom(1),normVec
+	arrDom(0)=Rhino.SurfaceDomain(strObj,0)(0)
+	arrDom(1)=Rhino.SurfaceDomain(strObj,1)(0)	
+	normVec=Rhino.SurfaceNormal(strObj,arrDom)	
+	Call Rhino.MoveObject(strObj,Rhino.VectorScale(normVec,dblDist))	
+End Sub

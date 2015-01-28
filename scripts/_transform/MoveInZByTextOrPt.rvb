@@ -1,0 +1,67 @@
+' ****************************** RhinoScript.org ******************************
+'
+'   Move Vertically By Text or Point, version 1
+'
+'   by Damon Sidel, published May 21, 2011
+'
+'
+'   Tool to help with surveys. Moves a curve in the Z-direction to the correct height. Uses either the number in a text object from the elevation marker annotation or a point that is already elevated to the correct height. In both cases, it assumes the curve is at z=0.
+'   
+'   The next version will fix this and check the z location of the curve.
+'
+'
+'
+'
+'   This RhinoScript Tool has been downloaded from RhinoScript.org.
+'
+'   Rhino versions: Rhino 4
+'
+'   LICENSE INFORMATION:
+'   This script is published under the GNU General Public License, version 3
+'   or any later version, and thus comes WITHOUT ANY WARRANTY. You can get
+'   the complete license text here: www.rhinoscript.org/gpl
+'
+' ****************************** RhinoScript.org ******************************
+
+
+
+Option Explicit
+'Script written by Damon Sidel
+'Script copyrighted by Damon Sidel
+'Script version Wednesday, May 18, 2011 4:25:33 PM
+
+'Tool to help with surveys. Moves a curve in the Z-direction to the correct height.
+'Uses either the number in a text object from the elevation marker annotation or
+'a point that is already elevated to the correct height.
+
+'Call MoveVerticallyByTextOrPoint()
+Sub MoveInZByTextOrPt()
+
+	Dim strObjs : strObjs = Rhino.GetObjects("Select the curves to move in Z",4,True,True)
+	If IsNull(strObjs) Then Exit Sub
+	
+	Dim strHeight : strHeight = Rhino.GetObject("Select the Z reference",,False)
+	If IsNull(strHeight) Then Exit Sub
+	
+	Dim dblHeight
+	If Rhino.IsPoint(strHeight) Then
+		Dim arrPt : arrPt = Rhino.PointCoordinates(strHeight)
+		dblHeight = arrPt(2)
+	ElseIf Rhino.IsText(strHeight) Then
+		Dim strTxt : strTxt = Rhino.TextObjectText(strHeight)
+		dblHeight = CDbl(strTxt)
+	Else
+		Call Rhino.Print("The Z reference you chose is not valid.")
+		Exit Sub
+	End If
+
+	Dim arrStart, arrEnd, strLayer
+	arrStart = Array(0,0,0)
+	arrEnd = Array(0,0,dblHeight)
+		
+	strLayer = Rhino.CurrentLayer()
+	
+	Call Rhino.MoveObjects(strObjs,arrStart,arrEnd)
+	Call Rhino.ObjectLayer(strObjs,strLayer)
+	
+End Sub

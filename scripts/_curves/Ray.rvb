@@ -1,0 +1,25 @@
+Option Explicit
+
+Sub Ray()
+
+Dim ArrPoints
+Dim ArrLine
+Dim ExtStart
+Dim ExtEnd
+
+ArrPoints = Rhino.GetPoints(vbtrue, , "Start of line", "End of line", 2)
+
+Rhino.EnableRedraw vbfalse
+
+ArrLine = Rhino.AddLine(ArrPoints(0), ArrPoints(1))
+
+ExtStart = Rhino.ExtendCurveLength(ArrLine, 0, 0, 100)
+'To Extend Lines further change                    ^this number
+
+ExtEnd =  Rhino.ExtendCurveLength(ArrLine, 0, 1, 100)
+'To Extend Lines further change                   ^this number
+
+Rhino.EnableRedraw vbtrue
+
+End Sub
+'Ray 

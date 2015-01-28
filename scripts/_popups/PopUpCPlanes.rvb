@@ -1,0 +1,44 @@
+Option Explicit
+
+'Call PopUpCPlanes
+
+Sub PopUpCPlanes
+
+	Dim arrItems(8), arrModes(8), intResult
+	
+	arrItems(0) = "Top"    : arrModes(0) = 0 ' item 0
+	arrItems(1) = "Bottom"     : arrModes(1) = 0 ' item 1
+	arrItems(2) = "Front"     : arrModes(2) = 0 ' item 1
+	arrItems(3) = "Back"     : arrModes(3) = 0 ' item 1
+	arrItems(4) = "Right"    : arrModes(4) = 0 ' item 2
+	arrItems(5) = "Left"    : arrModes(5) = 0 ' item 2
+	arrItems(6) = "3 Point"    : arrModes(6) = 0 ' item 2
+	arrItems(7) = "Object"    : arrModes(7) = 0 ' item 2
+	arrItems(8) = "Surface"    : arrModes(8) = 0 ' item 2
+	
+	
+
+	intResult = Rhino.PopupMenu(arrItems, arrModes)
+	If (intResult = 0) Then
+		Rhino.Command "'_CPlane _World _Top _Enter"
+	ElseIf (intResult = 1) Then
+		Rhino.Command "'_CPlane _World _Bottom _Enter"
+	ElseIf (intResult = 2) Then
+		Rhino.Command "'_CPlane _World _Front _Enter"
+	ElseIf (intResult = 3) Then
+		Rhino.Command "'_CPlane _World _Back _Enter"
+	ElseIf (intResult = 4) Then
+		Rhino.Command "'_CPlane _World _Right _Enter"
+	ElseIf (intResult = 5) Then
+		Rhino.Command "'_CPlane _World _Left _Enter"
+	ElseIf (intResult = 6) Then
+		Rhino.Command "'_CPlane _3Point _Pause _Pause _Pause"
+		ElseIf (intResult = 7) Then
+		Rhino.Command "'_CPlane _Object"
+		ElseIf (intResult = 8) Then
+		Rhino.Command "'_CPlane _Surface _Pause _Pause _Pause"
+
+	End If
+	
+End Sub
+

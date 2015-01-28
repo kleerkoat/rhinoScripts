@@ -1,0 +1,98 @@
+Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version Tuesday, March 29, 2011 1:09:47 PM
+
+'Call ShingleSurface()
+Sub ShingleSurface()
+	Dim strSurface : strSurface = Rhino.GetObject("Select Surface",8)
+	Dim arrDomU, arrDomV
+	arrDomU = Rhino.SurfaceDomain(strSurface, 0)
+	arrDomV = Rhino.SurfaceDomain(strSurface, 1)
+	Dim strDivU : strDivU = Rhino.GetReal("Please enter number of divisions in u direction",20)
+	Dim strDivV : strDivV = Rhino.GetReal("Please enter number of divisions in V direction",20)
+	Dim n,t,p
+	Dim dblParameterU,dblParameterUGap
+	Dim dblParameterV
+	Dim dblParameterVLap
+	Dim arrPtU(),arrPtUOffset(),arrPtOverlap(),arrPtUGap()
+	Dim arrPtUV(),arrPtUVOffset(),arrPtUVOverlap(),arrPtUVGap()
+	Dim arrCtrPt()
+	Dim strLoft1,strLoft2
+	Dim arrObjects
+	Dim arrVecNorm
+	Dim arrKnot, arrKnotOffset,arrVectilt,arrKnotOverLap,arrKnotGap,arrKnotOffsetGap
+	Dim strSrfShingle,strShingleExtrudePath
+	Dim dblOverLap: dblOverLap = 0.2
+	Call Rhino.EnableRedraw(False)
+	For n=0 To strDivV
+		Dim dblVPercent: dblVPercent = ((arrDomV(1)-arrDomV(0))/strDivV)*0.3*rnd
+		dblParameterV=arrDomV(0)+((arrDomV(1)-arrDomV(0))/strDivV)*n + dblVPercent
+		dblParameterVLap=dblParameterV+((arrDomV(1)-arrDomV(0))/strDivV)*dblOverLap
+		For t=0 To strDivU
+			Dim dblUPercent : dblUPercent = (arrDomU(1)-arrDomU(0))/strDivU*0.3*rnd
+			dblParameterU=arrDomU(0)+((arrDomU(1)-arrDomU(0))/strDivU)*t + dblUPercent
+			dblParameterUGap=dblParameterU-((arrDomU(1)-arrDomU(0))/strDivU)*0.04'>>>>> gap dimension
+			arrKnot = Rhino.EvaluateSurface(strSurface,Array(dblParameterU,dblParameterV))
+			arrKnotOverLap = Rhino.EvaluateSurface(strSurface,Array(dblParameterUGap,dblParameterVLap))
+			arrKnotGap = Rhino.EvaluateSurface(strSurface,Array(dblParameterUGap,dblParameterV))
+			arrVecNorm = Rhino.SurfaceNormal(strSurface,Array(dblParameterUGap,dblParameterV))
+			If isarray(arrVecNorm)Then
+				Dim dblSlateTilt : dblSlateTilt = (10+5*rnd)
+				arrVectilt = Rhino.VectorScale(arrVecNorm,dblSlateTilt)
+				arrKnotOffset= Rhino.PointAdd(arrKnot,arrVectilt)
+				arrKnotOffsetGap= Rhino.PointAdd(arrKnotGap,arrVectilt)
+			End If
+			ReDim Preserve arrPtU(t)
+			arrPtU(t)= arrKnot
+			ReDim Preserve arrPtOverLap(t)
+			arrPtoverLap(t)= arrKnotOverLap
+			ReDim Preserve arrPtUOffset(t)
+			arrPtUOffset(t)=arrKnotOffset
+			ReDim Preserve arrPtUGap(t)
+			arrPtUGap(t)=arrKnotOffsetGap
+			'Call Rhino.AddPoint(arrPtV(t))
+		Next
+		ReDim Preserve arrPtUV(n)
+		arrPtUV(n)=arrPtU
+		ReDim Preserve arrPtUVOffset(n)
+		arrPtUVOffset(n)=arrPtUOffset
+		ReDim Preserve arrPtUVOverLap(n)
+		arrPtUVOverLap(n) = arrPtoverLap
+		ReDim Preserve arrPtUVGap(n)
+		arrPtUVGap(n)=arrPtUGap
+		'Call Rhino.AddCurve(arrPtV,2)
+	Next
+	'———-n row of shingles surfaces———————————-
+		For n = 0 To (strDivV-1) Step 2
+	For p=0 To (strDivU-1)Step 2
+		strLoft1 = Rhino.AddCurve(array(arrPtUVOffset(n)(p),arrPtUVGap(n)(p+2)))
+		strLoft2 = Rhino.AddCurve(array(arrPtUVOverLap(n+1)(p),arrPtUVOverLap(n+1)(p+2)))
+		arrObjects = Array(strLoft1,strLoft2)
+		strSrfShingle = Rhino.AddLoftSrf(arrObjects)
+		strShingleExtrudePath=rhino.AddLine(arrPtUV(n)(p),arrPtUVOffset(n)(p))
+		Call rhino.ExtrudeSurface(strSrfShingle(0),strShingleExtrudePath)
+		Call Rhino.DeleteObject(strLoft1)
+		Call Rhino.DeleteObject(strLoft2)
+		Call Rhino.DeleteObjects(strSrfShingle)
+		Call Rhino.DeleteObject(strShingleExtrudePath)
+	Next
+	Next
+	'———-n+1 row of shingles surfaces——————————–
+	For n = 1 To (strDivV-1) Step 2
+		For p=1 To (strDivU-2) Step 2
+			strLoft1 = Rhino.AddCurve(array(arrPtUVOffset(n)(p),arrPtUVGap(n)(p+2)))
+			strLoft2 = Rhino.AddCurve(array(arrPtUVOverLap(n+1)(p),arrPtUVOverLap(n+1)(p+2)))
+			arrObjects = Array(strLoft1,strLoft2)
+			strSrfShingle = Rhino.AddLoftSrf(arrObjects)
+			strShingleExtrudePath=rhino.AddLine(arrPtUV(n)(p),arrPtUVOffset(n)(p))
+			Call rhino.ExtrudeSurface(strSrfShingle(0),strShingleExtrudePath)
+			Call Rhino.DeleteObject(strLoft1)
+			Call Rhino.DeleteObject(strLoft2)
+			Call Rhino.DeleteObjects(strSrfShingle)
+			Call Rhino.DeleteObject(strShingleExtrudePath)
+		Next
+	Next
+	Call Rhino.HideObject(strSurface)
+	Call Rhino.EnableRedraw(True)
+End Sub

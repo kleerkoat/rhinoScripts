@@ -1,0 +1,37 @@
+Option Explicit
+'Script written by Ryan Gilmore
+'Script version Wednesday, July 25, 2012 12:57:58 PM
+
+'Call GrabRadius()
+Sub GrabRadius()
+	Dim strObject, radius, fso, MyFile, msg, arrPoint
+	
+	strObject = Rhino.GetObject("Select a curve")
+
+	If Rhino.IsCurve(strObject) Then
+
+		arrPoint = Rhino.GetPointOnCurve(strObject, "Pick a test point")
+
+		If IsArray(arrPoint) Then
+			radius = Rhino.CurveRadius(strObject, arrpoint)
+			Set fso = CreateObject("Scripting.FileSystemObject")
+			Set MyFile = fso.CreateTextFile("C:\radius01.txt", True)
+			MyFile.WriteLine(CStr(radius))
+			MyFile.Close
+			Rhino.ClipboardText(radius)
+			MsgBox CStr(radius)
+			Rhino.Print("Radius copied to clipboard.")
+
+		End If
+
+	End If
+
+End Sub
+
+'Call UseRadius
+'Sub UseRadius
+'	Rhino.Command("-_readcommandfile C:\radius01.txt")
+'End Sub
+
+
+

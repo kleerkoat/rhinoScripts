@@ -1,0 +1,32 @@
+Option Explicit
+
+'Call PopupTransforms()
+Sub PopupTransforms()
+	
+	Dim aTransforms(10)
+	
+	aTransforms(0)  = "Trim"
+	aTransforms(1)  = "Join"
+	aTransforms(2)  = "Explode"
+	aTransforms(3)  = "Move"
+	aTransforms(4)  = "Rotate"
+	aTransforms(5)  = "Rotate3D"
+	aTransforms(6)  = "Orient"    
+	aTransforms(7)  = "Orient3pt" 
+	aTransforms(8)  = "Scale"     
+	aTransforms(9)  = "ScaleByPlane"   
+	aTransforms(10) = "Mirror"   
+  
+
+
+
+
+	Dim intTransform: intTransform = Rhino.PopupMenu(aTransforms)
+	
+	If isnull (intTransform) Or intTransform = -1 Then Exit Sub
+	
+	Dim sTransform: sTransform = aTransforms(intTransform)
+	Rhino.SendKeystrokes sTransform
+	
+End Sub
+

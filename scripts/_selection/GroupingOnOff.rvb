@@ -1,0 +1,75 @@
+Option Explicit
+
+'Call GroupingOnOff()
+Sub GroupingOnOff()
+	Dim strReadGrouping
+	strReadGrouping = Rhino.GetDocumentData("ReadGroupingOnOrOff","OnOrOff")
+	
+	If strReadGrouping = "false" Then
+		Call ReadGrouping()
+		Call Rhino.SetDocumentData("ReadGroupingOnOrOff","OnOrOff","true")
+		Call	Rhino.StatusBarMessage ("Read Groups ON")
+		Call Rhino.Print("Read Groups is now ON")
+	Else
+		Call UnreadGrouping()
+		Call Rhino.SetDocumentData("ReadGroupingOnOrOff","OnOrOff","false")
+		Call	Rhino.StatusBarMessage ("Read Groups OFF")
+		Call Rhino.Print("Read Groups is now OFF")
+	End If
+End Sub
+
+
+Sub ReadGrouping()
+	
+	Dim arrAllObjects, arrAllGroups, strGroup, arrGroupObjects, strObject, strGroupName
+	
+	arrAllGroups  = Rhino.GetDocumentData("ReadGrouping")
+	
+	If Isarray(arrAllGroups) Then
+	
+		For Each strGroup In arrAllGroups
+			
+			strObject = Rhino.GetDocumentData("ReadGrouping", strGroup)
+			strGroupName = Left(strGroup,len(strGroup)-8)
+		
+			Call Rhino.AddGroup(strGroupName)
+			Call Rhino.AddObjectToGroup(strObject, strGroupName)
+			Call Rhino.DeleteDocumentData("ReadGrouping", strGroup)
+		Next
+	End If
+End Sub
+
+
+Sub UnreadGrouping()
+	
+	Dim arrAllGroups, strGroup, arrGroupObjects, strObject, i, strCounter
+	
+	arrAllGroups = Rhino.GroupNames()
+	i  = 0
+	If IsArray(arrAllGroups) Then
+		For Each strGroup In arrAllGroups
+			
+			arrGroupObjects = Rhino.ObjectsByGroup (strGroup)
+		
+			If Isarray(arrGroupObjects) Then
+				For Each strObject In arrGroupObjects
+			
+					strCounter = CStr(i)
+			
+					Do
+						If len(strCounter) < 8 Then
+							strCounter = "0" & strCounter
+						Else
+							Exit Do
+						End If
+					Loop
+			
+					Call Rhino.SetDocumentData("ReadGrouping", strGroup & strCounter, strObject)
+					i = i+1
+				Next
+				Call Rhino.RemoveObjectsFromGroup(arrGroupObjects, strGroup)
+				Call Rhino.DeleteGroup(strGroup)
+			End If
+		Next
+	End If
+End Sub

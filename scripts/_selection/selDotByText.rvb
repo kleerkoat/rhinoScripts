@@ -1,0 +1,31 @@
+﻿Option Explicit
+'Script written by Damien Alomar
+'Script copyrighted by [math<->music<->arch]
+'Script version Friday, February 08, 2008
+
+Call SelDotByText()
+Sub SelDotByText()
+	
+	Dim strSearch, arrDots, strDot, strDotText, arrSelect(), i
+	
+	arrDots = Rhino.ObjectsByType (8192)
+	If isNull(arrDots) Then Exit Sub
+		
+	strSearch = Rhino.stringbox ("String to Match Dot")
+	
+	i = -1
+	For Each strDot In arrDots
+		strDotText = Rhino.TextDotText (strDot)
+		
+		If strSearch=strDotText Then 
+			i = i+1
+			ReDim Preserve arrSelect(i)
+			arrSelect(i) = strDot
+		End If                   		
+	Next 
+	
+	If Not i=-1 Then
+		Rhino.SelectObjects arrSelect
+	End If
+
+End Sub

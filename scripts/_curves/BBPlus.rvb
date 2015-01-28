@@ -1,0 +1,129 @@
+'--------------------------------------------------------------
+'Command   :  bbpl (Bounding Box Plus local)
+'Date      :  2011/10/01
+'Version   :  α111001
+'Organization   :  Rhino+
+'--------------------------------------------------------------
+
+Sub BBPlus()
+  
+Dim strObjects, arrBox, arrPoint, intCount ,arrBoxPt(7),arrSize(2),preView1,arrCPlane1,arrCPlane2,Box2,MoveBox2,A,A2,A3,A4,AP,B,B2,B3,B4,BP,C,C2,C3,C4,CP
+
+arrObjects = Rhino.GetObjects("Select objects")
+If IsNull(arrObjects) Then Exit Sub
+
+'--------------------------------------------------------------
+r = Rhino.GetDocumentData("bbpl", "bbpldbLength")
+If IsNull(r) Then 
+ bbpldblength = Rhino.GetReal("Add" ,10)
+ If IsNull(dblength) Then Exit Sub 
+Else
+ bbpldblength = Rhino.GetReal("Add" ,CDbl(r)) 
+ If IsNull(bbpldblength) Then Exit Sub 
+End If 
+Rhino.SetDocumentData "bbpl", "bbpldbLength", CStr(bbpldblength)
+
+  
+'-------------------------------------------------------  
+Rhino.EnableRedraw False  
+preView1 = Rhino.CurrentView
+arrCPlane1 = Rhino.ViewCPlane(preView1) 
+arrCPlane2 = Rhino.WorldXYPlane
+
+
+strObjects=Rhino.RemapObjects(arrObjects, arrCPlane1, arrCPlane2,True)
+
+Rhino.ObjectLayer arrObjects , Rhino.CurrentLayer
+  
+arrBox = Rhino.BoundingBox(strObjects)
+
+'-------------------------------------------------------
+
+If IsArray(arrBox) Then
+
+intCount = 0
+arrPoint = arrBox(intCount)
+
+arrBoxPt(intCount) = Array(arrPoint(0)-r,arrPoint(1)-r,arrPoint(2)-r)
+
+intCount =1
+arrPoint = arrBox(intCount)
+
+arrBoxPt(intCount) = Array(arrPoint(0)+r,arrPoint(1)-r,arrPoint(2)-r)
+
+intCount =2
+arrPoint = arrBox(intCount)
+arrBoxPt(intCount) = Array(arrPoint(0)+r,arrPoint(1)+r,arrPoint(2)-r)
+
+intCount =3
+arrPoint = arrBox(intCount)
+arrBoxPt(intCount) = Array(arrPoint(0)-r,arrPoint(1)+r,arrPoint(2)-r)
+
+intCount =4
+arrPoint = arrBox(intCount)
+arrBoxPt(intCount) = Array(arrPoint(0)-r,arrPoint(1)-r,arrPoint(2)+r)
+
+intCount =5
+arrPoint = arrBox(intCount)
+arrBoxPt(intCount) = Array(arrPoint(0)+r,arrPoint(1)-r,arrPoint(2)+r)
+
+intCount =6
+arrPoint = arrBox(intCount)
+arrBoxPt(intCount) = Array(arrPoint(0)+r,arrPoint(1)+r,arrPoint(2)+r)
+
+intCount =7
+arrPoint = arrBox(intCount)
+arrBoxPt(intCount) = Array(arrPoint(0)-r,arrPoint(1)+r,arrPoint(2)+r)
+
+'-------------------------------------------------------
+
+Box2=Rhino.AddBox (arrBoxPt)
+
+Movebox2=Rhino.RemapObject (Box2,arrCPlane2,arrCPlane1)
+
+Rhino.DeleteObjects strObjects
+
+'-------------------------------------------------------
+
+arrSize(0)=Rhino.Distance ( arrBoxPt(1),arrBoxPt(0))
+arrSize(1)=Rhino.Distance ( arrBoxPt(3),arrBoxPt(0))
+arrSize(2)=Rhino.Distance ( arrBoxPt(4),arrBoxPt(0))
+
+tokens = Rhino.Strtok(Rhino.Pt2Str(arrSize,Rhino.DimStyleLinearPrecision(Rhino.CurrentDimStyle)),",")
+Rhino.print "Length =" & CStr(tokens(0))&" , " & CStr(tokens(1))&" , " & CStr(tokens(2))
+
+'-------------------------------------------------------
+A=Rhino.VectorScale(Rhino.VectorAdd(arrBoxPt(1),arrBoxPt(0)),0.5)
+AP=Rhino.AddPoint(A)
+A2 = Rhino.PointCoordinates(AP)
+A3=Rhino.AddTextDot (CStr(tokens(0)),A2)
+A4=Rhino.RemapObject (A3,arrCPlane2,arrCPlane1)
+Rhino.DeleteObject AP
+
+B=Rhino.VectorScale(Rhino.VectorAdd(arrBoxPt(3),arrBoxPt(0)),0.5)
+BP=Rhino.AddPoint(B)
+B2 = Rhino.PointCoordinates(BP)
+B3=Rhino.AddTextDot (CStr(tokens(1)),B2)
+B4=Rhino.RemapObject (B3,arrCPlane2,arrCPlane1)
+Rhino.DeleteObject BP
+
+C=Rhino.VectorScale(Rhino.VectorAdd(arrBoxPt(4),arrBoxPt(0)),0.5)
+CP=Rhino.AddPoint(C)
+C2 = Rhino.PointCoordinates(CP)
+C3=Rhino.AddTextDot (CStr(tokens(2)),C2)
+C4=Rhino.RemapObject (C3,arrCPlane2,arrCPlane1)
+Rhino.DeleteObject CP
+
+Rhino.UnselectAllObjects
+Rhino.SelectObject (A4)
+Rhino.SelectObject (B4)
+Rhino.SelectObject (C4)
+Rhino.command "group"
+Rhino.UnselectAllObjects
+'-------------------------------------------------------
+
+Rhino.SelectObject Movebox2
+Rhino.EnableRedraw True
+
+End If
+End Sub

@@ -1,0 +1,253 @@
+﻿Option Explicit
+
+'Script written by Pascal
+'Thursday, October 16, 2008 
+
+Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+Rhino.AddAlias "MoveFaceVolume","_NoEcho _-Runscript (MoveFaceVolume)"
+Rhino.AddAlias "Scale2dVolume","_NoEcho _-Runscript (Scale2dVolume)"
+Rhino.AddAlias "MoveEdgeVolume","_NoEcho _-Runscript (MoveEdgeVolume)"
+Rhino.AddAlias "ScaleVolume","_NoEcho _-Runscript (ScaleVolume)"
+Rhino.AddAlias "Scale1DVolume","_NoEcho _-Runscript (Scale1DVolume)"
+Rhino.AddAlias "TaperVolume","_NoEcho _-Runscript (TaperVolume)"
+Rhino.AddAlias "ShearVolume","_NoEcho _-Runscript (ShearVolume)"
+Rhino.AddAlias "RotateFaceVolume","_NoEcho _-Runscript (RotateFaceVolume)"
+Rhino.AddAlias "RotateEdgeVolume","_NoEcho _-Runscript (RotateEdgeVolume)"
+Rhino.AddAlias "ShearFaceVolume","_NoEcho _-Runscript (ShearFaceVolume)"
+Rhino.AddAlias "ExtrudeSrfVolume","_NoEcho _-Runscript (ExtrudeSrfVolume)"
+Private OldOutput
+
+If isEmpty(oldOutput) Then
+	oldOutput = Rhino.UnitSystemName (True,False,False)
+End If
+
+
+Sub MoveFaceVolume
+	Dim Cmd: cmd = "_MoveFace"
+	AdjustVolume(Cmd)
+End Sub
+
+Sub MoveEdgeVolume
+	Dim Cmd: cmd = "_MoveEdge"
+	AdjustVolume(Cmd)
+End Sub
+
+Sub RotateFaceVolume
+	Dim Cmd: cmd = "_RotateFace"
+	AdjustVolume(Cmd)
+End Sub
+
+Sub RotateEdgeVolume
+	Dim Cmd: cmd = "_RotateEdge"
+	AdjustVolume(Cmd)
+End Sub
+
+Sub ShearFaceVolume
+	Dim Cmd: cmd = "_ShearFace"
+	AdjustVolume(Cmd)
+End Sub
+
+Sub ScaleVolume
+	Dim Cmd: cmd = "_Scale"
+	AdjustVolume(Cmd)
+End Sub
+
+Sub Scale1DVolume
+	Dim Cmd: cmd = "_Scale1D"
+	AdjustVolume(Cmd)
+End Sub
+
+Sub Scale2dVolume
+	Dim Cmd: cmd = "_Scale2d"
+	AdjustVolume(Cmd)
+End Sub
+
+
+Sub ExtrudeSrfVolume
+	Dim Cmd: cmd = "_ExtrudeSrf"
+	AdjustVolume(Cmd)
+End Sub
+
+
+Sub TaperVolume
+	Dim Cmd: cmd = "_Taper"
+	AdjustVolume(Cmd)
+End Sub
+
+Sub ShearVolume
+	Dim Cmd: cmd = "_Shear"
+	AdjustVolume(Cmd)
+End Sub
+
+
+
+
+Sub AdjustVolume(Cmd)
+	'Dim aObj: aObj = Rhino.GetObjects("Select objects.",,,True)
+	'If not IsArray(aObj) then exit sub
+	
+	Dim sObj: sObj = Rhino.GetObject("Select object.",8+16,True)
+	If isNull(sObj) Then Exit Sub
+	
+	Dim aOutput: aOutput = array("Microns", "Millimeters", "Centimeters","Milliliters", "Decimeters","Liters", "Meters","MicroInches","Inches","Feet","Yards")
+	Dim sOutput: sOutput = Rhino.GetString("Output units?",oldOutput,aOutput)
+	
+	If isNull(sOutput) Then Exit Sub
+	OldOutput = UCase(left(sOutput,1)) & lCase(Right(sOutput,len(sOutput)-1))
+	
+	Dim TempOutput 
+	
+	If OldOutput = "Liters" Then
+		tempOutPut = "Decimeters"
+	ElseIf OldOutput = "Milliters" Then
+		tempOutput = "Centimeters"
+	Else TempOutput = OldOutput
+	End If
+		
+	Dim intOutput: intOutput = GetUnitsNameInt(tempOutput)
+	If isNull(intOutput) Then Exit Sub
+	
+	
+	Dim ObjVol
+	If cmd <> "_ExtrudeSrf" Then
+	ObjVol = Rhino.SurfaceVolume(sObj)(0)
+	Else
+		objVol = 0
+	End If
+	
+	
+	If cmd<>"_ExtrudeSrf" Then
+		If  Rhino.IsPolySurfaceClosed(sObj) Then
+			Dim dblVol:	dblVol = Round (ConvertVolUnits(ObjVol,Rhino.UnitSystem,intOutput),5)
+		Else
+			MsgBox "The object is not closed"
+			Exit Sub
+		End If
+		
+	Else dblVol = 0
+	End If
+	
+	
+	Dim aBB: aBB = Rhino.BoundingBox(sObj,Rhino.CurrentView)
+	Dim aCent: aCent  = AveragePoints(aBB)
+	Dim sDot
+	
+	If Rhino.IsAttributeData(sObj) Then
+		sDot = Rhino.GetAttributeData(sobj,"VolumeDot")(0)
+	End If
+	
+	If Not Rhino.IsAttributeData(sObj) Or IsNull(sDot) Then
+		sDot = Rhino.AddTextDot(CStr(dblVol),aCent)
+		Dim sGrp: sGrp = Rhino.AddGroup
+		Rhino.AddObjectsToGroup array(sObj, sDot),sGrp
+		Rhino.SetAttributeData sObj,"VolumeDot",sDot,Rhino.TextDotText(sDot)
+	End If
+	
+	Rhino.Print"Volume = " & dblVol
+	
+	Dim str, aObj
+	Do 
+		
+		Rhino.UnselectAllObjects
+		Rhino.SelectObject sObj
+		Rhino.Command Cmd
+		
+		If Rhino.LastCommandResult = 0 Then
+			
+			If cmd = "_ExtrudeSrf" Then
+				aObj = Rhino.LastCreatedObjects
+				sObj = aObj(0)
+			End If
+			
+			aBB = Rhino.BoundingBox(sObj,Rhino.CurrentView)
+			aCent  = AveragePoints(aBB)
+			ObjVol = Rhino.SurfaceVolume(sObj)(0)
+			dblVol = round(ConvertVolUnits(ObjVol,Rhino.UnitSystem,intOutput),5)
+			Rhino.TextDotPoint sDot,aCent
+			Rhino.TextDotText sDot,CStr(dblVol)
+			Rhino.SetAttributeData sObj,"VolumeDot",sDot,Rhino.TextDotText(sDot)
+			
+			If OldOutput = "Liters" Or OldOutput = "Milliliters" Then
+				
+				str = "Volume = " & CStr(dblVol) & " " & OldOutput &"."
+			Else
+				str = "Volume = " & CStr(dblVol) & " Cubic " & OldOutput &"."
+				
+			End If
+				
+			Rhino.Print str
+		End If
+		
+	Loop While Rhino.LastCommandResult = 0
+		
+	
+End Sub
+
+
+Function ConvertVolUnits(Vol, IntUnitsIn, IntUnitsOut)
+	'convert a volume from one set of units to another
+	'input and output are digits corresponding to Rhino's unit system
+	'codes as in Rhino.UnitSystem
+	
+	Dim Factor: Factor = Rhino.UnitScale (intUnitsIn , intUnitsOut)
+	ConvertVolUnits = ((Vol^.333333333334) * (1/Factor))^3
+	
+End Function
+
+Function GetUnitsNameInt(Unitsname)
+
+	If lCase(Unitsname) = "microns" Then
+		GetUnitsNameInt = 1
+	ElseIf lCase(UnitsName) = "millimeters" Then
+		GetUnitsNameInt = 2
+	ElseIf lCase(UnitsName) = "centimeters" Then
+		GetUnitsNameInt = 3
+	ElseIf lCase(UnitsName) = "milliliters" Then
+		GetUnitsNameInt = 3
+	ElseIf lCase(UnitsName) = "liters" Then
+		GetUnitsNameInt = 14
+	ElseIf lCase(UnitsName) = "decimeters" Then
+		GetUnitsNameInt = 14
+	ElseIf lCase(UnitsName) = "meters" Then
+		GetUnitsNameInt = 4
+	ElseIf lCase(UnitsName) = "microinches" Then
+		GetUnitsNameInt = 6
+	ElseIf lCase(UnitsName) = "inches" Then
+		GetUnitsNameInt = 8
+	ElseIf lCase(UnitsName) = "feet" Then
+		GetUnitsNameInt = 9
+	ElseIf lCase(UnitsName) = "yards" Then
+		GetUnitsNameInt = 19
+	End If
+	
+End Function
+
+Function AveragePoints(arrPts)
+	'Finds the average location of an array
+	'of points.
+
+	Dim X, Y, Z
+	Dim i
+	
+	X = 0
+	Y = 0
+	Z = 0
+
+	For i=0 To UBound (arrPts)
+			
+		'add all the X values
+		X = X+arrPts(i)(0)
+	
+		'add all th Y values
+		Y = Y+arrPts(i)(1)			
+	
+		'add all the Z values
+		Z = Z+arrpts(i)(2)
+	Next
+	
+	'Divide by the number of points to
+	'get the average  for each
+	'create the output array from the 3 averages
+	AveragePoints  =array(X/(UBound(arrPts)+1), Y/(UBound(arrPts)+1), Z/(UBound(arrPts)+1))
+
+End Function

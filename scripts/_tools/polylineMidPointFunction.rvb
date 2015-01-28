@@ -1,0 +1,21 @@
+Function PolylineMidPoint(strObject, intIndex)
+
+ Dim arrPoints, arrPt0, arrPt1
+
+ PolylineMidPoint = Null
+
+ If Not Rhino.IsPolyline(strObject) Then Exit Function
+ If Not IsNumeric(intIndex) Then Exit Function
+
+ If (intIndex < 0) Then
+   PolylineMidPoint = Rhino.CurveMidPoint(strObject)
+ Else
+   arrPoints = Rhino.PolylineVertices(strObject)
+   If (intIndex < UBound(arrPoints)) Then
+     arrPt0 = arrPoints(intIndex)
+     arrPt1 = arrPoints(intIndex + 1)
+     PolylineMidPoint = Rhino.PointDivide(Rhino.PointAdd(arrPt0, arrPt1), 2)
+   End If
+ End If
+
+End Function 

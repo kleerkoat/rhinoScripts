@@ -1,0 +1,165 @@
+Option Explicit
+'Script written by Pascal
+'Script version Monday, June 22, 2009 
+'scales  closed objects to have the user set volume
+Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+Rhino.AddAlias "SetVolume", "_NoEcho _-Runscript (SetVolume)"
+
+Private OldVol, oldDim
+
+If IsEmpty(oldVol) Then
+	OldVol = 1
+End If
+
+If IsEmpty(oldDim) Then
+	OldDim = 3
+End If
+
+
+'Call SetVolume2d()
+
+
+Sub SetVolume()
+	
+	Dim sObj: sObj = Rhino.GetObject("Select a closed volume to set.",8+16+32,True)
+	If isnull(sObj) Then Exit Sub
+	
+	Dim aObj: aObj = Rhino.GetObjects("Select other objects to scale. Press Enter for none.",,,False)
+
+	Dim intDim: intDim = Rhino.GetInteger("Dimensions to scale",oldDim,1,3)
+	If isNull(intDim) then exit sub
+	oldDim = intDim
+	Dim aVol,dblVol,aCen, X
+	X = 0
+	
+	Rhino.EnableRedraw(False)
+		
+	aVol = ObjectVolume(sObj)
+	dblVol = aVol(0)
+	
+	If isNull(dblVol) Then
+		MsgBox "The object is not closed."
+		Rhino.EnableRedraw(True)
+		Exit Sub
+	End If
+	
+	aCen = aVol(1)
+	
+	Dim str: str = "Set desired object volume. Current volume is " & CStr(round(dblVol,5))
+	
+	Dim dblTarg: dblTarg = Rhino.GetReal(str,oldVol)
+
+	If Not isNumeric(dblTarg) Then 
+		Rhino.EnableRedraw(True)
+		Exit Sub
+	End if
+	
+	oldVol = dblTarg
+	
+	dim f: f = 	SetObjectVolume (sObj,intDim, aCen, dblVol,dblTarg)(1)
+	
+	dim i
+	
+	If isArray(aObj) then
+		
+		for i = 0 to uBound(aObj)
+			
+			aVol = ObjectVolume(aObj(i))
+			ScaleByFactor aObj(i),intDim, aCen, f
+		
+		Next
+		
+	End If
+	
+	Rhino.EnableRedraw(True)
+		
+End Sub
+
+
+Sub ScaleByFactor(sObj,intDim,aCen,Factor)
+	
+	dim f: f = factor
+	
+	if intDim = 3 then
+		Rhino.ScaleObject sObj,aCen, array(f,f,f)
+	elseIf intDim = 2 then
+		Rhino.ScaleObject sObj,aCen, array(f,f,1)
+	Else
+		Rhino.EnableRedraw(True)
+		Scale1d sObj,aCen,f
+	End if
+		
+			
+End Sub
+
+
+Function SetObjectVolume(sObj,intDim, aCen, dblVol, dblTarg)
+	
+	Dim f:  f = (dblTarg/dblVol)^ VolumeFactor(intDim)	
+	Rhino.EnableRedraw(False)
+	
+	ScaleByFactor sObj,intDim,aCen,f
+		
+	dblVol = ObjectVolume(sObj)(0)
+	
+	If Not isNull(dblVol) Then
+		Rhino.Print "Objects scaled by " & f & " The new volume is " & round(dblVol,5) &","
+	End If
+	
+	SetObjectVolume =array(round(dblVol,5),f)
+	
+End Function
+
+
+Sub Scale1D(sObj,aCen,f)
+	
+	dim CrntPLane: crntplane = Rhino.ViewCPlane()
+	
+	Dim apts: aPts = Rhino.GetPoints(true,false,"Base point","Direction point",2)
+	If not isArray(aPts) then exit sub
+	If Ubound(aPts)<>1 then exit sub
+	
+	Dim VecX: vecX = Rhino.VectorCreate(aPts(1), aPts(0))
+	dim vecY: VecY = Rhino.VectorRotate(vecX,90,CrntPlane(3))
+	Rhino.ViewCPlane ,Rhino.PlaneFromFrame(aPts(0),vecX, VecY)
+	Rhino.ScaleObject sObj,aCen,array(f,1,1)
+	Rhino.ViewCPlane ,crntPlane
+	Rhino.EnableRedraw(true)
+	
+End Sub
+
+Function VolumeFactor(intDim)
+	
+	if intDim = 3 then
+		VolumeFactor = .333333334
+	elseif intDim = 2 then
+		VolumeFactor = .5
+	ElseIf intDim = 1 then
+		VolumeFactor = 1
+	End If
+	
+End Function
+
+Function ObjectVolume(sObj)
+
+	Dim dblVol,aCen
+	
+	If Rhino.IsBrep(sObj) Then
+		If Rhino.IsObjectSolid(sobj) Then
+			dblVol = Rhino.SurfaceVolume(sObj)(0)
+			aCen = Rhino.SurfaceVolumeCentroid(sobj)(0)
+		Else
+			'MsgBox "The object is not closed."
+			Exit Function
+		End If
+			
+	ElseIf Rhino.IsMesh(sObj) Then
+		
+		dblVol = Rhino.MeshVolume(sObj)(0)
+		aCen = Rhino.MeshVolumeCentroid(sobj)(0)
+			
+	End If
+	
+	ObjectVolume = array(dblVol,aCen)
+
+End Function

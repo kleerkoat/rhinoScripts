@@ -1,0 +1,21 @@
+' VB Script Document
+Option Explicit
+Sub SequentialAnnotation()
+    Dim arrPt1, dblNumber
+    dblNumber = Rhino.GetReal ("Enter the starting number",1)
+    If Not IsNumeric (dblNumber) Or dblNumber = "" Then
+        Call Rhino.Print ("The values must be numeric.")
+        Exit Sub
+    End If
+    Do
+        arrPt1 = Rhino.GetPoint("Pick a point to identify")
+        If IsArray(arrPt1) Then
+            Call Rhino.AddTextDot (dblNumber, arrPt1)
+            dblNumber = (dblNumber + 1)
+        Else
+            Exit Do
+            Exit Sub
+        End If
+    Loop While dblNumber <> vbNull
+End Sub
+

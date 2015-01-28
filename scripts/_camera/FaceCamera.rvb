@@ -1,0 +1,142 @@
+Option Explicit
+'Script written by Pascal
+'Script copyrighted by <insert company name>
+'Script version Wednesday, February 23, 2011 
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "FaceCamera","_NoEcho _-Runscript (FaceCamera)"
+
+'Call FaceCamera()
+Sub FaceCamera()
+	
+	Dim aCam: aCam = Rhino.ViewCameraTarget()
+	Dim vecDir
+	Dim CamPt: CamPt = aCam(0)
+	Dim aObj: aObj = Rhino.GetObjects("Select surfaces or meshes to face the camera.",8+16+32,,true)
+	if not isArray(aObj) then exit sub
+	dim sObj, vecNorm, objDir, aCen, Ang
+	
+	Rhino.EnableRedraw False
+	For each sObj in aObj
+		
+		Do
+			If Rhino.IsSurface(sObj) then 
+				VecNorm = BrepPlane(sObj)(3)
+				aCen = Rhino.SurfaceAreaCentroid(sObj)(0)
+			elseif Rhino.IsPolysurface(sObj) then
+				aCen = Rhino.SurfaceAreaCentroid(sObj)(0)
+				VecNorm =BrepPlane(sObj)(3)
+			else
+				aCen = Rhino.MeshAreaCentroid(sObj)
+			
+				VecNorm = meshPlane(sObj)(3)
+		
+			end if
+			vecDir = ProjectVector( Rhino.VectorCreate(CamPt, aCen),Rhino.WorldXYPlane())
+			ObjDir = ProjectVector(vecNorm,Rhino.WorldXYPlane())
+		
+			If QDistance(aCen,Rhino.PointAdd(aCen, ObjDir)) > QDistance(aCen,Rhino.PointAdd(aCen, Rhino.VectorReverse( ObjDir))) then Rhino.VectorReverse(ObjDir)
+			
+			Ang = VectorAngle (VecDir, ObjDir)
+		
+			Rhino.RotateObject sObj,aCen,ang,array(0,0,1)
+			
+		Loop while Rhino.IsVectorParallelTo(ObjDir, vecDir) = 0
+		
+		
+	Next
+	
+	Rhino.EnableRedraw True
+	
+End Sub
+
+
+Function QDistance(aPtA,aPtB)
+	QDistance = Sqr( (aPtA(0 )- aPtB(0))^2 + (aPtA(1)- aPtB(1))^2 + (aPtA(2) - aPtB(2))^2 )
+End Function
+
+Function VectorAngle(Vec1, vec2)
+	
+	Vec1 = Rhino.VectorUnitize(Vec1)
+	Vec2 = Rhino.VectorUnitize (Vec2)
+	
+	Dim DP: DP = Vec1(0) * Vec2(0) + Vec1(1) * Vec2(1) +  Vec1(2) * Vec2(2)
+	
+	If DP  > .999999 then
+		VectorAngle = 0
+	ElseIf DP < -.999999 then  
+		VectorAngle = Rhino.ToDegrees(Rhino.Pi())
+	Else
+		VectorAngle = arcos(DP, False)
+	End If
+	
+End Function
+
+Function Arcos(dblAng, blnRad)
+	'dblAng input in radians
+	
+	If BlnRad = True then 'output in radians
+		Arcos = Atn(-dblAng / Sqr(-dblAng * dblAng + 1)) + 2 * Atn(1)
+	Else 'output in degrees
+		Arcos = Rhino.ToDegrees(  Atn(-dblAng / Sqr(-dblAng * dblAng + 1)) + 2 * Atn(1))
+	End if
+	
+End Function
+
+Function ProjectVector(vec,plane)
+	'Vector will be projected to the plane origin
+	
+	Dim testVec: testVec = Rhino.VectorUnitize(vec)
+	Dim TestPt: Testpt = Rhino.PlaneClosestPoint(Plane, Rhino.PointAdd(Plane(0), vec))
+ 
+	
+	ProjectVector = Rhino.VectorUnitize(Rhino.VectorCreate(TestPt, Plane(0)))
+	
+End Function
+
+Function BrepPlane(sBrep)
+	if Rhino.ExeVersion() >= 5 then
+		dim sMesh: sMesh = Rhino.ExtractRenderMesh(sBrep)
+	Else
+		sMesh = getRenderMesh(sBrep)
+	end if
+		
+	BrepPlane = MeshPlane(sMesh)
+	Rhino.DeleteObject sMesh
+	
+End Function
+
+Function GetRenderMesh(sObj)
+	
+	Rhino.UnselectAllObjects()
+	Rhino.SelectObject sObj
+	Rhino.Command "_ExtractRenderMesh",False 
+	If Rhino.LastCommandResult() = 0 then
+		GetRenderMesh = Rhino.LastCreatedObjects()(0)
+	End If
+	
+End Function
+
+Function MeshPlane(sMesh)
+	
+	Dim aPts: aPts = Rhino.MeshVertices(smesh)
+	MeshPlane = Rhino.PlaneFitFromPoints(aPts)
+	
+End Function
+
+Function MidParam(sSrf)
+	'find the midlle parameter pair of a surface
+	Dim uDom,VDom
+	
+	UDom = Rhino.SurfaceDomain(sSrf,0)
+	VDom = Rhino.SurfaceDomain(sSrf,1)
+	
+	Dim Umid, VMid
+	
+	UMid = UDom(0) + (0.5*(UDom(1)-Udom(0)))
+	
+	VMid =  VDom(0)+ (0.5*(VDom(1)-Vdom(0)))
+	
+	MidParam = array(UMid,Vmid)
+	
+End Function

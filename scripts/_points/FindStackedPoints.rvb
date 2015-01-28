@@ -1,0 +1,182 @@
+Option Explicit
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "StackedPoints", " ! _-Runscript StackedPoints"
+'Rhino.AddAlias "SelStacked", " ! _-Runscript SelStacked"
+
+Sub SelStacked()
+	Dim arrObj, strObj, arrPts,i, arrPt, X, G, o
+	Dim arrSel()
+	X = False
+	G = True
+	arrObj = Rhino.ObjectsByType(4+8)
+	If IsArray(arrObj) Then
+		Rhino.EnableRedraw(False)
+    
+		For Each strObj In arrObj
+			If Not Rhino.ObjectGripsOn(strObj) Then
+				G = False
+				Rhino.EnableObjectGrips strObj, True
+			End If
+       
+			arrPts = Rhino.ObjectGripLocations(strObj)
+      
+			If IsArray(arrPts) Then
+				Dim dups
+				Dups = FindDuplicatePoints(arrPts)
+				If IsArray(Dups) Then
+					ReDim Preserve arrSel(o)
+					arrSel(o) = strObj
+					G = False
+					o = o +1
+				End If
+			End If
+      
+			If G = False Then
+				Rhino.EnableObjectGrips strObj, False
+			End If
+      
+		Next
+    
+		Rhino.EnableRedraw(True)
+	Else Exit Sub
+	End If
+    
+	If isUpperbound(arrSel) Then
+		Rhino.SelectObjects(arrSel)
+	Else
+		Rhino.Print "No stacked control points found"
+	End If
+	
+End Sub
+
+
+
+
+Sub StackedPoints()
+  
+	Dim arrObj, strObj, arrPts,i, arrPt, X, G
+	X = False
+	G = True
+	arrObj = Rhino.GetObjects("Select curves and surfaces",4+8, True, True)
+	
+	dim aStacked, aAllStacked, temp
+	
+	If IsArray(arrObj) Then
+		aStacked = empty
+		dim sGrp
+		Rhino.EnableRedraw(False)
+    
+		For Each strObj In arrObj
+			If Not Rhino.ObjectGripsOn(strObj) Then
+				G = False
+				Rhino.EnableObjectGrips strObj, True
+			End If
+       
+			arrPts = Rhino.ObjectGripLocations(strObj)
+      
+			If IsArray(arrPts) Then
+				Dim dups
+				Dups = FindDuplicatePoints(arrPts)
+				If IsArray(Dups) Then
+					sgrp = Rhino.AddGroup()
+					aStacked =	Rhino.AddPoints (dups)
+					Rhino.AddObjectsToGroup aStacked,sgrp
+					if isEmpty(aAllStacked) then 
+						aAllStacked = aStacked
+					else
+						aAllStacked = Rhino.JoinArrays(aAllStacked, aStacked)
+					End if
+					
+					X = True
+				End If
+			End If
+      
+			If G = False Then
+				Rhino.EnableObjectGrips strObj, False
+			End If
+			
+      
+		Next
+    
+
+
+		
+	Else
+		Rhino.EnableRedraw(true)
+		Exit Sub
+	End If
+    
+	Rhino.UnselectAllObjects()
+		
+	If isArray (aAllStacked) then Rhino.SelectObjects aAllStacked
+		
+	Rhino.EnableRedraw(True)
+	If X = False Then
+		Rhino.Print "No stacked control points found"
+	End If
+  
+    
+End Sub
+  
+'\\\\\\\\\\\\\\\\\\\\\\\\\\
+'//////////////////////////
+  
+Function FindDuplicatePoints(arrPts)
+	Dim Pt1, Pt2, arrDups(), arrDups1(), i, p, q
+  
+	For  p = 0 To UBound(arrPts)
+		For q = 0 To UBound(arrPts)
+			If p <> q Then
+         
+				If Join(arrPts(p)) = Join(arrPts(q)) Then
+					ReDim Preserve arrDups(i)
+					arrDups(i) = p
+					'	Rhino.Print p 
+					i = i + 1
+				End If
+			End If
+		Next
+	Next
+    
+	If isUpperBound(arrDups) Then
+
+		Dim Bound, b
+		Bound = UBound(arrDups) 
+		For b = 0 To Bound
+			ReDim Preserve arrDups1(b)
+			arrDups1(b) = arrPts(arrDups(b))
+		Next
+          
+	End If
+    
+	If isUpperBound(arrDups1) Then
+		Dim arrResult
+		arrResult = Rhino.CullDuplicatePoints(arrDups1)
+	End If
+    
+	FindDuplicatePoints = arrResult
+   
+End Function
+
+'\\\\\\\\\\\\\\\\\\\\\\\\\
+'/////////////////////////
+
+Function IsUpperBound(ByRef arr)
+
+	IsUpperBound = False
+
+	If IsArray(arr) Then
+
+		On Error Resume Next
+
+		UBound arr
+
+		If Err.Number = 0 Then IsUpperBound = True
+
+	End If
+
+End Function
+
+'\\\\\\\\\\\\\\\\\\\\\\\\\
+'/////////////////////////

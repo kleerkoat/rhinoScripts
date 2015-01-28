@@ -1,0 +1,76 @@
+Option Explicit
+'Script written by katieadee
+
+'created / revised on: Sunday, January 27, 2008
+'<<< script explanation goes here>>>
+
+'Call KatieCell()
+Sub KatieCell()
+
+	
+	Dim baseCrv,arrCrvDomain,arrStartPt,arrEndPt,arrMidPt,arrPlane,circle,circRad
+	
+	circRad= 2
+	
+	baseCrv = rhino.GetObject("select base Curve",4)
+	If isNull(baseCrv)Then Exit Sub
+		
+	arrCrvDomain = rhino.CurveDomain(baseCrv)
+	
+	arrStartPt = rhino.EvaluateCurve(baseCrv,arrCrvDomain(0))
+	arrEndPt = rhino.EvaluateCurve(baseCrv,arrCrvDomain(1))
+	arrMidPt = rhino.evaluateCurve(baseCrv,(arrCrvDomain(1)-arrCrvDomain(0))/2)
+	
+	Dim arrXVec,arrYVec, strCircle, arrTanVec,arrUpVec,arrPerpVec
+	
+	arrUpVec = array(0,0,1)
+	arrTanVec = rhino.CurveTangent(baseCrv,(arrCrvDomain(1)-arrCrvDomain(0))/2)
+	arrPerpVec = rhino.vectorScale(rhino.VectorRotate(arrTanVec,90,arrUpVec),circRad)
+	'arrYVec = array(0,1,0)
+	
+	arrPlane = rhino.PlaneFromFrame(arrMidPt,arrTanVec,arrPerpVec)
+	strCircle = rhino.AddCircle(arrPlane,circRad)
+	
+	Dim ptA,ptB,a1,a2,b1,b2,offsetTanVec,startTan,endTan,tipVecScale,a0,a4,midVecScale
+	
+	'''''''''''''''''''''''''''''''
+	'''''''''''''''''''''''''''''''
+	tipVecScale = 1 	
+	midVecScale = 2
+	'''''''''''''''''''''''''''''''
+	'''''''''''''''''''''''''''''''
+	
+	ptA = rhino.PointAdd(arrMidPt,arrPerpVec)
+	ptB = rhino.PointAdd(arrMidPt,rhino.VectorReverse(arrPerpVec))
+	
+									   
+	'Call rhino.AddPoint(ptA)
+	'Call rhino.AddPoint(ptB)
+	
+	'Call rhino.addline(ptA,arrStartPt)
+	'Call rhino.addline(ptA,arrEndPt)
+	'Call rhino.AddPoint(arrEndPt)
+	'call rhino.AddPoint(arrMidPt)
+
+	offsetTanVec = rhino.VectorScale(arrTanVec,midVecScale)
+	
+	a1 = rhino.PointAdd(ptA,offsetTanVec)
+	a2 = rhino.PointAdd(ptA,rhino.VectorReverse(offsetTanVec))
+	
+	b1 = rhino.PointAdd(ptB,offsetTanVec)
+	b2 = rhino.PointAdd(ptB,rhino.VectorReverse(offsetTanVec))
+	
+	startTan = rhino.CurveTangent(baseCrv,arrCrvDomain(0))
+	endTan = rhino.CurveTangent(baseCrv,arrCrvDomain(1))
+	
+	
+	a0 = rhino.PointAdd(arrEndPt,rhino.VectorScale(rhino.VectorReverse(EndTan),tipVecScale))
+	a4 = rhino.PointAdd(arrStartPt,rhino.VectorScale(startTan,tipVecScale)) 
+	
+	
+	Call rhino.AddCurve(array(ptA,a1,a0,arrEndPt))
+	Call rhino.AddCurve(array(ptA,a2,a4,arrStartPt))
+	Call rhino.AddCurve(array(ptB,b1,a0,arrEndPt))
+	Call rhino.AddCurve(array(ptB,b2,a4,arrStartPt))
+	
+End Sub

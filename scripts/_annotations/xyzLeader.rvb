@@ -1,0 +1,36 @@
+'--------------------------------------------------------------
+'Command   :  xyzl (XYZ Leader)
+'Date      :  2011/01/20
+'Version   :  2.0
+'Organization   :  Rhino+
+'--------------------------------------------------------------
+
+Sub xyzLeader
+
+Dim arrPoint ,tokens ,token ,preView ,curView ,arrPlane ,preArrPlane
+
+preView = Rhino.CurrentView
+
+preArrPlane = Rhino.ViewCPlane(preView) 
+
+curView = Rhino.CurrentView
+
+arrPoints = Rhino.GetPoints(True ,False,"Select leader point")
+
+If IsArray(arrPoints) Then
+
+arrPlane = Rhino.ViewCPlane(curView) 
+arrPlane(0) = arrPoints(0)
+Rhino.ViewCplane curView,arrPlane 
+
+tokens = Rhino.Strtok(Rhino.Pt2Str ( arrPoints(0),Rhino.DimStyleLinearPrecision(Rhino.CurrentDimStyle)),",")
+
+Rhino.AddLeader arrPoints,curView,"X " & tokens(0) & VbCrLf & "Y " & tokens(1)& VbCrLf & "Z " & tokens(2)
+
+End If
+
+Rhino.ViewCplane curView,preArrPlane
+
+End Sub
+
+'xyzLeader

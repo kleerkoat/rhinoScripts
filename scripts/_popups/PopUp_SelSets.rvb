@@ -1,0 +1,27 @@
+﻿Option Explicit
+'Script written by Pascal
+'Script version Tuesday, June 10, 2008
+'Dim str: str = "A"
+'Call Main(str)
+Sub PopUpSelSet(str)
+	
+	Dim aItems : aItems = array("Load", "Add", "Subtract","Save")
+	Dim idx: idx = Rhino.PopUpMenu(aItems)
+	
+	If Not isNull(idx) Then
+		
+		If idx = 0 Then
+			Rhino.UnselectAllObjects
+			Rhino.Command "_SelSetname " & chr(34) & str & chr(34)
+		ElseIf idx = 1 Then
+			Rhino.Command "_SelSetname " & chr(34) & str & chr(34)
+		ElseIf idx = 2 Then
+			Rhino.Command "_SubtractSetsName " & chr(34) & str & chr(34)
+		ElseIf idx = 3 Then
+			Rhino.GetObjects ,,True,True,True
+			Rhino.Command "_SelectionSet " & chr(34) & str & chr(34) &" _Enter"
+		End If
+		
+	End If
+	
+End Sub

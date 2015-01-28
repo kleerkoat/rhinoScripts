@@ -1,0 +1,25 @@
+﻿Option Explicit
+'Script  by Mitch Heynick
+'Version Monday, 30 April, 2012
+
+Call MoveObjPointToWorld0Plane()
+Sub MoveObjPointToWorld0Plane()
+	
+	Dim str1,str2,strObj,arrPickPt	
+	str1 = "Select object to move vertically"
+	str2 = "Pick point on the object which will be at 0"
+		
+	strObj = Rhino.GetObject(str1, 4 + 8 + 16 + 32, True, True)
+	If IsNull(strObj) Then Exit Sub
+
+	If Rhino.IsCurve(strObj) Then
+		arrPickPt = Rhino.GetPointOnCurve(strObj, str2)
+	ElseIf Rhino.IsBrep(strObj) Then
+		arrPickPt = Rhino.GetPointOnSurface(strObj, str2)
+	Else
+		arrPickPt = Rhino.GetPointOnMesh(strObj, str2)
+	End If
+	If Not IsArray(arrPickPt) Then Exit Sub
+	
+	Call Rhino.MoveObject(strObj, Array(0, 0, -arrPickPt(2)))	
+End Sub

@@ -1,0 +1,183 @@
+Option Explicit
+'Script written by Pascal
+
+'Script version Thursday, April 07, 2011 
+'Match a curve tangent to a surface at a user specified point on the surface
+'also, adjust the tension and tangent direction.
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile()
+'Rhino.AddAlias "MatchCrvPerpSrf", "_NoEcho _-Runscript (MatchCrvPerpSrf)"
+
+Private oldPres
+oldpres = 1
+If isEmpty(oldPres) Then
+	OldPres = 1
+End If
+
+'Call MatchCrvperpSrf()
+Sub MatchCrvPerpSrf()
+	Dim aCrv:aCrv  = Rhino.GetCurveObject("Select curve near the end to edit.",False,False)
+	If not isArray(aCrv) then exit sub
+	Dim sCrv: sCrv = aCrv(0)
+	dim X: X = Rhino.CurvePointCount (sCrv )
+
+	Dim APres: APres = Array("None", "Position", "Tangency", "Curvature")
+	Dim SPres: SPres = Rhino.GetString("Preserve Other End?", APres(OldPres), APres)
+	If IsNull(SPres) Then Exit Sub
+		
+	Dim IntPres: IntPres = WhereInArray(SPres, APres,0)
+		
+	If IntPres = -1 Then Exit Sub
+		
+	OldPres = (IntPres)
+		
+	If IntPres = 1 Then
+		
+		If X < 3 Then
+			ChangeCurveDegree SCrv,2
+		End If
+			
+	Elseif IntPres = 2 Then
+		If X < 4 Then
+			ChangeCurveDegree SCrv,3
+				
+		End If
+			
+	Elseif IntPres = 3 Then
+		If X < 5 Then
+			ChangeCurveDegree SCrv,4
+				
+		End If
+	End If
+		
+	
+	Dim intGrips: IntGrips = Rhino.CurvePointCount (sCrv) - 1
+	Dim intEnd: intEnd = GetCrvEnd(aCrv(0), aCrv(4))
+	'Rhino.Print intGrips
+	
+	Dim sSrf: sSrf = Rhino.GetObject("Select target surface",8,true)
+	If isNull(sSrf) then exit sub
+		
+	Dim aTarg: aTarg = Rhino.GetPointOnSurface(sSrf,"Set target point")
+	If not isArray(aTarg) then exit sub
+	
+	dim aParam: aParam = Rhino.SurfaceClosestPoint(sSrf, aTarg)
+	Dim VecNorm: VecNorm = Rhino.SurfaceNormal(sSrf,aParam)
+	Dim Axis: Axis = array(aTarg, Rhino.PointAdd(aTarg,VecNorm))
+	
+	'Dim Plane: Plane = Rhino.SurfaceFrame(sSrf,aParam)
+	
+	Rhino.EnableObjectGrips sCrv, True
+
+	dim A, B, C, tempA, tempB, dist
+	
+	If intEnd = 0 then 
+		A = 0
+		B = 1
+		
+		tempA = Rhino.ObjectGripLocation(sCrv,A) 
+		tempB = Rhino.ObjectGripLocation(sCrv,B)
+		
+		Rhino.ObjectGripLocation sCrv,A,aTarg
+ 
+		Dist = qdistance(tempA,tempB)
+		
+		Rhino.ObjectGripLocation sCrv,B ,Rhino.PointAdd(aTarg,Rhino.VectorScale(VecNorm,dist))
+		
+	else
+		
+		A = IntGrips 
+		B = IntGrips - 1
+		
+		tempA = Rhino.ObjectGripLocation(sCrv,A) 
+		tempB = Rhino.ObjectGripLocation(sCrv,B) 
+		
+		Dist = qdistance(tempA,tempB)
+		
+		Rhino.ObjectGripLocation sCrv,A, aTarg
+	
+		Rhino.ObjectGripLocation sCrv,B ,Rhino.PointAdd(aTarg,Rhino.VectorScale(VecNorm,dist))
+		
+
+	End if
+
+	Rhino.UnselectAllObjects()
+	Rhino.SelectObjectGrip sCrv,B
+	C = Rhino.ObjectGripLocation(sCrv, B)
+	
+	If Rhino.Version() > 4 then
+		Dim aPt: aPt = Rhino.GetPoint ("Set tension" , C , Rhino.ObjectGripLocation(sCrv,A)  )
+		If not isArray(aPt) then 
+			apt = C
+		End If
+		Rhino.ObjectGripLocation sCrv, B, aPt
+	Else
+		Rhino.Command "_Move W"  & Rhino.Pt2Str(C,,True) & "_Along " & "W" & Rhino.Pt2Str(C,,True) & "W" &Rhino.Pt2Str(Rhino.ObjectGripLocation(sCrv, A),,True)
+	End if
+	
+	Rhino.EnableObjectGrips sCrv, False
+
+End Sub
+
+
+Sub ChangeCurveDegree(sCrv,intDeg)
+	
+	Rhino.EnableRedraw False
+	Rhino.SelectObject sCrv
+	Rhino.Command "_ChangeDegree " & CStr(intDeg) & " "
+	Rhino.UnselectAllObjects()
+	Rhino.EnableRedraw True
+	
+End Sub
+
+Function GetCrvEnd(crv, t)
+	'0 = Start, 1 = End
+	Dim Dom: dom = Rhino.CurveDomain(crv)
+	If Abs(t-dom(0)) > Abs(t-dom(1)) Then
+		GetCrvEnd = 1
+	Else
+		GetCrvEnd = 0
+	End If
+End Function
+
+Function WhereInArray(item , arr, intCase)
+	'Finds the locaton of a string in an array of strings
+	'if the result is -1 then the item does not
+	'appear in tha array
+
+	Dim sItem, n, i
+	n = False
+	WhereInArray = -1
+
+		
+	For i = 0 To UBound(arr)
+			
+		if intCase = 0 then
+			If arr(i) = Item Then
+				
+				WhereInArray = i
+				n = True
+				Exit For
+		
+				
+			End If
+			
+		else 
+			
+			If lCase(arr(i)) = lCase(Item) Then
+				
+				WhereInArray = i
+				n = True
+				Exit For
+	
+			End If
+			
+		end if
+			
+	Next
+	
+
+	If n = False Then WhereInArray = -1
+	
+End Function
+

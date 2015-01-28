@@ -1,0 +1,578 @@
+'Script: LayerEditor_sr
+'Author: Sam Rice
+'Date: 090121
+'Revision History:
+'v3.1: full command line functionality, updates to copy to child layer
+'v3.0: added Copy to child layer function
+'v2.1: reverted to command line to add macro editing 080331
+'v2.0: combined into one sub with function calls. Moved shade to render or vice versa calls to main sub case calls.
+'v1.5: extended reach to include layer colour functions
+'v1.0: add multiple layers, rename, select objects by layer
+
+Option Explicit
+
+Public Sub LayerEditor_sr()
+
+	Dim arrLayNames :  arrLayNames = Rhino.LayerNames
+
+	Dim arrOptions : arrOptions = Array("AddLayers", "SelectObjectsByLayers", "RenameLayers", "GetShadeColour", "MatchAllLayerRenderColourstoShade"_
+		, "MatchSelectedLayerRenderColourstoShade", "MatchAllLayerShadeColourstoRender"_
+		, "MatchSelectedLayerShadeColourstoRender", "CopyChildLayers")
+	Dim strDo, strScript
+
+
+	strDo = Rhino.GetString("Select Action", "AddLayers", arrOptions)
+
+	Select Case strDo
+		Case "AddLayers"
+			Call AddLayers_SR
+		Case "SelectObjectsByLayers"
+			Call BetterLayerSelect_SR
+		Case "RenameLayers"
+			Call BetterLayerRename_SR
+		Case "GetShadeColour"
+			Call LayerMatchShadeColour_SR
+		Case "MatchAllLayerRenderColourstoShade"
+			Call MatchAllLayerColours_SR(1)
+		Case "MatchSelectedLayerRenderColourstoShade"
+			Call MatchSelectedLayerColours_SR(1)
+		Case "MatchAllLayerShadeColourstoRender"
+			Call MatchAllLayerColours_SR(0)
+		Case "MatchSelectedLayerShadeColourstoRender"
+			Call MatchSelectedLayerColours_SR(0)
+		Case "CopyChildLayers"
+			Call CopyChildLayers_SR
+		Case Else
+			Exit Sub
+	End Select
+
+
+
+End Sub
+'LayerEditor_sr
+
+''''''''''''''''''''''''
+'Function AddLayers
+'''''''''''''''''
+
+Function AddLayers_SR()
+	Dim i
+	Dim allLayers : allLayers = Rhino.LayerNames(True)
+	Dim strParent : strParent = Rhino.ComboListBox(allLayers, "Enter or Pick Parent Layer [cancel for none]", "Existing Layers")
+	Dim strPrefix, blnChk : blnChk = True
+	If IsNull(strParent) Then
+		strPrefix = "Null"
+	Else:
+		strPrefix = UCase(Left(strParent,3))
+		strPrefix = Rhino.StringBox("Child Prefix?", strPrefix, "Prefix")
+		StrPrefix = strPrefix & Chr(95)
+		For i = 0 To UBound(allLayers)
+			If strParent = allLayers(i) Then
+				blnChk = False
+				Exit For
+			End If
+		Next
+		If blnChk Then
+			Call Rhino.AddLayer(strParent)
+		End If			
+	End If
+	Dim arrItems(20), arrValues(20)
+	Dim intIndex
+	For i = 0 To 20
+		arrItems(i) = "Layer_0" & i
+		arrValues(i) = "Null"
+	Next
+	Dim arrNewLayers : arrNewLayers = Rhino.PropertyListBox(arrItems, arrValues, "Add New Layer Names", "Add Layers")
+	If IsNull(arrNewLayers) Then Exit Function
+	Dim newColour : newColour = RGB(0,0,0)
+	For i = 0 To 20
+		If arrNewLayers(i) <> "Null" Then
+			Rhino.Prompt "LayerColour: " & arrNewLayers(i)
+			newColour = Rhino.GetColor(newColour)
+			If Not isNull(strParent) Then
+				arrNewLayers(i) = CStr(strPrefix & arrNewLayers(i))
+				Call Rhino.AddLayer(arrNewLayers(i), newColour, , , strParent)
+			Else:
+				Call Rhino.AddLayer(arrNewLayers(i), newColour)
+			End If
+			Call Rhino.LayerPrintColor(arrNewLayers(i), vbBlack)
+			intIndex = Rhino.AddMaterialToLayer(arrNewLayers(i))
+			Rhino.MaterialColor intIndex, newColour
+			If (InStr(1, CStr(arrNewLayers(i)), "glass", 1) > 0) Or (InStr(1, CStr(arrNewLayers(i)), "glaz", 1) > 0) Then
+				Rhino.MaterialTransparency intIndex, 0.5
+			End If
+		End If
+	Next
+End Function
+
+'''''''''''''''''''''
+'Function select objects by layers
+'''''''''''''''''''''
+
+Public Function BetterLayerSelect_SR()
+
+	Dim arrAllLayers, arrOptions
+	Dim strOption
+
+	arrAllLayers = Rhino.LayerNames
+	arrAllLayers = Rhino.Sort(arrAllLayers)
+	arrOptions = Array("ByPrefix", "BySuffix", "ContainingString")
+	strOption = Rhino.GetString("Choose Selecting Function", "ByPrefix", arrOptions)
+
+	Select Case strOption
+		Case "ByPrefix"
+			ByPrefix_sr(arrAllLayers)
+		Case "BySuffix"
+			BySuffix_sr(arrAllLayers)
+		Case "ContainingString"
+			ContainingString_sr(arrAllLayers)
+		Case Else
+			Exit Function
+	End Select
+
+End Function
+
+Public Function ByPrefix_sr(layers)
+	Dim strPrefix, intLen, layer, layPrefix
+
+	strPrefix = Rhino.StringBox("Prefix", , "Layer Prefix")
+	intLen = Len(strPrefix)
+	Rhino.EnableRedraw vbFalse
+	For Each layer In layers
+		layPrefix = Left(layer, intLen)
+		If (strPrefix = layPrefix) Then
+			Rhino.ObjectsByLayer layer, vbTrue
+		End If
+	Next
+	Rhino.EnableRedraw vbTrue
+
+End Function
+
+Public Function BySuffix_sr(layers)
+	Dim strSuffix, intLen, layer, laySuffix
+
+	strSuffix = Rhino.StringBox("Suffix", , "Layer Suffix")
+	intLen = Len(strSuffix)
+	Rhino.EnableRedraw vbFalse
+	For Each layer In layers
+		laySuffix = Right(layer, intLen)
+		If (strSuffix = laySuffix) Then
+			Rhino.ObjectsByLayer layer, vbTrue
+		End If
+	Next
+	Rhino.EnableRedraw vbTrue
+
+End Function
+
+Public Function ContainingString_sr(layers)
+	Dim strSearch, layer
+
+	strSearch = Rhino.StringBox("String to Find", , "Layers Containing")
+	Rhino.EnableRedraw vbFalse
+	For Each layer In layers
+		If Not (InStr(1, layer, strSearch, 1) = 0) Then
+			Rhino.ObjectsByLayer layer, vbTrue
+		End If
+	Next
+	Rhino.EnableRedraw vbTrue
+
+End Function
+
+'''''''''''''''''''''
+'Function Rename Layers
+''''''''''''''''''''''
+Public Function BetterLayerRename_SR()
+
+	Dim arrAllLayers, arrSelLayers, arrOptions
+	Dim strOption
+
+	arrAllLayers = Rhino.LayerNames
+	arrAllLayers = Rhino.Sort(arrAllLayers)
+	arrSelLayers = Rhino.MultiListBox(arrAllLayers, "Layers To Rename", "Layers")
+	arrOptions = Array("AddPrefix", "AddSuffix", "ReplaceCharactersAtBeginning", "ReplaceCharactersAtEnd", "DeleteCharactersAnywhere", "ReplaceCharactersAnywhere", "ReplaceExportGeneratedUnderscoresWithSpaces")
+	strOption = Rhino.GetString("Select Renaming Function", "AddPrefix", arrOptions)
+
+	Select Case strOption
+		Case "AddPrefix"
+			AddPrefix_sr(arrSelLayers)
+		Case "AddSuffix"
+			AddSuffix_sr(arrSelLayers)
+		Case "ReplaceCharactersAtBeginning"
+			ReplaceCharactersAtBeginning_sr(arrSelLayers)
+		Case "ReplaceCharactersAtEnd"
+			ReplaceCharactersAtEnd_sr(arrSelLayers)
+		Case "DeleteCharactersAnywhere"
+			DeleteCharactersAnywhere_sr(arrSelLayers)
+		Case "ReplaceCharactersAnywhere"
+			ReplaceCharactersAnywhere_sr(arrSelLayers)
+		Case "ReplaceExportGeneratedUnderscoresWithSpaces"
+			ReplaceExportGeneratedUnderscoresWithSpaces_sr(arrSelLayers)
+		Case Else
+			Exit Function
+	End Select
+
+End Function
+
+Public Function AddPrefix_sr(arrLayers)
+	Dim strPrefix, strNewName, layer
+
+	strPrefix = Rhino.StringBox("Prefix", , "Layer Prefix")
+	For Each layer in arrLayers
+		strNewName = strPrefix & CStr(layer)
+		Rhino.RenameLayer layer, strNewName
+	Next
+
+End Function
+
+Public Function AddSuffix_sr(arrLayers)
+	Dim strSuffix, strNewName, layer
+
+	strSuffix = Rhino.StringBox("Suffix", , "Layer Suffix")
+	For Each layer in arrLayers
+		strNewName = CStr(layer) & strSuffix
+		Rhino.RenameLayer layer, strNewName
+	Next
+
+End Function
+
+Public Function ReplaceCharactersAtBeginning_sr(arrLayers)
+	Dim strAdd, strNewName, layer, intNum, intLength, strTempName
+
+	strAdd = Rhino.StringBox("Replacement Characters, Use Space for Blank.", , "Layer Name Replace at Beginning")
+	intNum = Rhino.IntegerBox("Number of characters to replace", , "Replace characters")
+	For Each layer in arrLayers
+		intLength = Len(layer)
+		strTempName = Right(layer, (intLength - intNum))
+		strNewName = strAdd & strTempName
+		Rhino.RenameLayer layer, strNewName
+	Next
+
+End Function
+
+Public Function ReplaceCharactersAtEnd_sr(arrLayers)
+	Dim strAdd, strNewName, layer, intNum, intLength, strTempName
+
+	strAdd = Rhino.StringBox("Replacement Characters, Use Space for Blank.", , "Layer Name Replace at End")
+	intNum = Rhino.IntegerBox("Number of characters to replace", , "Replace characters")
+	For Each layer in arrLayers
+		intLength = Len(layer)
+		strTempName = Left(layer, (intLength - intNum))
+		strNewName = strTempName & strAdd
+		Rhino.RenameLayer layer, strNewName
+	Next
+
+End Function
+
+Public Function DeleteCharactersAnywhere_sr(arrLayers)
+	Dim strDelete, strNewName, layer, strTempName
+	Dim intPos, intLength, intDelLength
+
+	strDelete = Rhino.StringBox("Characters to Remove", , "Remove Characters Anywhere")
+	intDelLength = Len(strDelete)
+
+	For Each layer in arrLayers
+		intLength = Len(layer)
+		intPos = InStr(1, layer, strDelete, 1)
+		If intPos = 0 Then
+			strNewName = layer
+		Else:
+			strNewName = Left(layer, (intPos - 1))
+			strTempName = Right(layer, (intLength - (intPos + intDelLength - 1)))
+			Do
+				intLength = Len(strTempName)
+				intPos = InStr(1, strTempName, strDelete, 1)
+				If intPos = 0 Then
+					strNewName = strNewName & strTempName
+				Else:
+					strNewName = strNewName & Left(strTempName, (intPos - 1))
+					strTempName = Right(strTempName, (intLength - (intPos + intDelLength - 1)))
+				End If
+			Loop Until (intPos = 0)
+		End If
+		Rhino.RenameLayer layer, strNewName
+	Next
+
+End Function
+
+Public Function ReplaceCharactersAnywhere_sr(arrLayers)
+	Dim strDelete, strNewName, layer, strTempName, strAdd
+	Dim intPos, intLength, intDelLength
+
+	strDelete = Rhino.StringBox("Characters to Remove", , "Replace Characters Anywhere")
+	intDelLength = Len(strDelete)
+	strAdd = Rhino.StringBox("Characters to Add", , "Replace Characters Anywhere")
+
+	For Each layer In arrLayers
+		intPos = InStr(1, layer, strDelete, 1)
+		intLength = Len(layer)
+		If intPos = 0 Then
+			strNewName = layer
+		Else:
+			strNewName = Left(layer, intPos - 1) & strAdd
+			strTempName = Right(layer, (intLength - (intPos + intDelLength - 1)))
+			Do
+				intLength = Len(strTempName)
+				intPos = InStr(1, strTempName, strDelete, 1)
+				If intPos = 0 Then
+					strNewName = strNewName & strTempName
+				Else:
+					strNewName = strNewName & Left(strTempName, (intPos - 1)) & strAdd
+					strTempName = Right(strTempName, (intLength - (intPos + intDelLength - 1)))
+				End If
+			Loop Until (intPos = 0)
+		End If
+		Rhino.RenameLayer layer, strNewName
+	Next
+End Function
+
+Public Function ReplaceExportGeneratedUnderscoresWithSpaces_sr(arrLayers)
+
+	Dim strNewName, layer, strDelete, strAdd, strTempName
+	Dim intPos, intlength, startCheck
+
+	strDelete = "_"
+	strAdd = " "
+	For Each layer In arrLayers
+		startCheck = 0
+		intPos = InStr(1, layer, strDelete, 1)
+		If intPos = 0 Then
+			strNewName = layer
+		Else:
+			If intPos = 1 Then
+				startCheck = 1
+			End If
+			intLength = Len(layer)
+			strNewName = Left(layer, intPos - 1) & strAdd
+			strTempName = Right(layer, (intLength - intPos))
+			Do
+				intLength = Len(strTempName)
+				intPos = InStr(1, strTempName, strDelete, 1)
+				If intPos = 0 Then
+					strNewName = strNewName & strTempName
+				Else:
+					strNewName = strNewName & Left(strTempName, (intPos - 1)) & strAdd
+					strTempName = Right(strTempName, (intLength - intPos))
+				End If
+			Loop Until (intPos = 0)
+		End If
+		If startCheck = 1 Then
+			intLength = Len(strNewName)
+			strTempName = Right(strNewName, (intLength - 1))
+			strNewName = "_" & strTempName
+		End If
+		Rhino.RenameLayer layer, strNewName
+	Next
+End Function
+
+'''''''''''''''''''''
+'Match one or more layers' shade colour to an object or layer from list
+'''''''''''''''''''''
+Public Function LayerMatchShadeColour_sr()
+
+	Dim currObjs : currObjs = Rhino.SelectedObjects
+	Dim toLayers(), layersTo, arrLayers
+	Dim i, ub
+	If IsArray(currObjs) Then
+		ub = UBound(currObjs)
+		ReDim toLayers(ub)
+		For i = 0 to ub
+			toLayers(i) = Rhino.ObjectLayer(currObjs(i))
+		Next
+		layersTo = Rhino.CullDuplicateStrings(toLayers)
+	Else:
+		Dim toObjs : toObjs = Rhino.GetObjects("Pick Layers (esc for list)")
+		If IsNull(toObjs) Then
+			arrLayers = Rhino.LayerNames
+			arrLayers = Rhino.Sort(arrLayers)
+			layersTo = Rhino.MultiListBox(arrLayers, "Layers to change", "Layers")
+			If IsNull(layersTo) Then Exit Function
+		Else:
+			ub = UBound(toObjs)
+			ReDim toLayers(ub)
+			For i = 0 to ub
+				toLayers(i) = Rhino.ObjectLayer(toObjs(i))
+			Next
+			layersTo = RHino.CullDuplicateStrings(toLayers)
+		End If
+	End If
+
+	Dim fromLayer
+	Dim fromObj : fromObj = Rhino.GetObject("Pick Object on layer to match from (esc for list)")
+	If IsNull(fromObj) Then
+		If IsEmpty(arrLayers) Then
+			arrLayers = Rhino.LayerNames
+			arrLayers = Rhino.Sort(arrLayers)
+		End If
+		fromLayer = Rhino.ListBox(arrLayers, "Layer with Colour to match from ", "Layers")
+		If IsNull(fromLayer) Then Exit Function
+	Else:
+		fromLayer = Rhino.ObjectLayer(fromObj)
+	End If
+	Dim lngCOlour : lngColour = Rhino.LayerColor(fromLayer)
+
+	ub = UBound(LayersTo)
+	For i = 0 to ub
+		Rhino.LayerColor layersTo(i), lngColour
+	Next
+
+End Function
+
+''''''''''''''''''''''
+'Matches all layers colours in either direction (1 = r2s, 0 = s2r)
+'''''''''''''''''''''''
+Public Function MatchAllLayerColours_SR(intDir)
+
+	Dim arrLayers
+	Dim intMatInd, lngMatColour, lngLayColour
+	Dim layer
+
+	arrLayers = Rhino.LayerNames
+	Rhino.EnableRedraw False
+	For Each layer In arrLayers
+		intMatInd = Rhino.LayerMaterialIndex(layer)
+		If (intMatInd = -1) Then
+			intMatInd = Rhino.AddMaterialToLayer(layer)
+		End If
+		If intDir = 0 Then
+			lngMatColour = Rhino.MaterialColor(intMatInd)
+			Rhino.LayerColor layer, lngMatColour
+		Else:
+			lngLayColour = Rhino.LayerColor(layer)
+			Rhino.MaterialColor intMatInd, lngLayColour
+		End If
+	Next
+	Rhino.EnableRedraw True
+End Function
+
+''''''''''''''''''''''''
+'Matches layer colours, layers picked from list of ones which differ
+''''''''''''''''''''''''
+Public Function MatchSelectedLayerColours_SR(intDir)
+
+	Dim arrLayers, arrSelLayers, arrMisLayers()
+	Dim intMatInd, lngMatColour, lngLayColour
+	Dim layer, i
+
+	ReDim arrMisLayers(0)
+	i = 0
+
+	arrLayers = Rhino.LayerNames
+	arrLayers = Rhino.Sort(arrLayers)
+	For each layer in arrLayers
+		intMatInd = Rhino.LayerMaterialIndex(layer)
+		If (intMatInd = -1) Then
+			Rhino.AddMaterialToLayer(layer)
+			ReDim Preserve arrMisLayers(i)
+			arrMisLayers(i) = layer
+			i = i+1
+		ElseIf (Rhino.LayerColor(layer) <> Rhino.MaterialColor(intMatInd)) Then
+			ReDim Preserve arrMisLayers(i)
+			arrMisLayers(i) = layer
+			i = i+1
+		End If
+	Next
+
+	arrSelLayers = Rhino.MultiListBox(arrMisLayers, "Layers to Sync Colours", "Layers")
+	If IsNull(arrSelLayers) Then Exit Function
+	Rhino.EnableRedraw False
+	For Each layer In arrSelLayers
+		intMatInd = Rhino.LayerMaterialIndex(layer)
+		If intDir = 0 Then
+			lngMatColour = Rhino.MaterialColor(intMatInd)
+			Rhino.LayerColor layer, lngMatColour
+		Else:
+			lngLayColour = Rhino.LayerColor(layer)
+			Rhino.MaterialColor intMatInd, lngLayColour
+		End If
+	Next
+	Rhino.EnableRedraw True
+End Function
+
+'''''''''''''''''''''
+'copies child layers from one parent to another layer
+''''''''''''''''''''''''
+Public Function CopyChildLayers_SR()
+	
+	Dim arrLayers : arrLayers = Rhino.LayerNames
+	Dim i, j, lay, arrParents(), arrBarren()
+	i = 0 : j = 0
+	For Each lay In arrLayers
+		If Not isNull(Rhino.LayerChildren(lay)) Then
+			ReDim Preserve arrParents(i)
+			arrParents(i) = lay
+			i = i + 1
+		Else:
+			ReDim Preserve arrBarren(j)
+			arrBarren(j) = lay
+			j = j + 1
+		End If
+	Next
+
+	Dim fromLayer : fromLayer = Rhino.ListBox(arrParents, "Layer to copy from", "Parent Layers")
+	If IsNull(fromLayer) Then Exit Function
+	Dim arrChildren : arrChildren = Rhino.LayerChildren(fromLayer)
+	Dim copyLayers : copyLayers = Rhino.MultiListBox(arrChildren, "Layers to copy", "Children Layers")
+	If IsNull(copyLayers) Then Exit Function
+	Dim fromPos : fromPos = InStrRev(copyLayers(0), "_")
+	Dim fromPrefix : fromPrefix = Left(copyLayers(0), fromPos)
+
+	Dim toLayer : toLayer = Rhino.ListBox(arrParents, "Layer to copy to (Predictive List, cancel if target not listed)", "New Parent")
+	If IsNull(toLayer) Then
+		toLayer = Rhino.ListBox(arrBarren, "Layer to Copy to", "New Parent")
+	End If
+	If IsNull(toLayer) Then Exit Function
+
+	arrChildren = Rhino.LayerChildren(toLayer)
+	Dim toPrefix, toPos
+	If IsNull(arrChildren) Then
+		toPrefix = Left(toLayer, 3)
+		toPrefix = Rhino.StringBox("Copy Prefix", toPrefix, "New Child prefix")
+		If IsNull(toPrefix) Then Exit Function
+	Else:
+		toPos = InStrRev(arrChildren(0), "_")
+		toPrefix = Left(arrChildren(0), toPos-1)
+	End If
+
+	Dim intLength, strTempName, strNewName, lngCol, newLayer, intIndex, newIndex
+	Dim matCol, matRefCol, matShine, matTrans, matText
+	For Each lay In copyLayers
+		intLength = Len(lay)
+		strTempName = Right(lay, (intLength - fromPos))
+		strNewName = toPrefix & "_" & strTempName
+		lngCol = Rhino.LayerColor(lay)
+		
+		newLayer = Rhino.AddLayer(strNewName, lngCol, , , toLayer)
+		If IsNull(newLayer) Then
+			Call Rhino.Print("Could not add new layer, layername " & Chr(34) & strNewName & Chr(34) & " already in use")
+		Else:
+			lngCol = Rhino.LayerPrintColor(lay)
+			Call Rhino.LayerPrintColor(newLayer, lngCol)
+			lngCol = Rhino.LayerPrintWidth(lay)
+			If lngCol <> 0.0 Then
+				Call Rhino.LayerPrintWidth(newLayer, lngCol)
+			End If
+			lngCol = Rhino.LayerLinetype(lay)
+			Call Rhino.layerLineType(newLayer, lngCol)
+			
+			intIndex = Rhino.LayerMaterialIndex(lay)
+			
+			If Not intIndex = -1 Then
+				newIndex = Rhino.AddMaterialToLayer(newLayer)
+				matCol = Rhino.MaterialColor(intIndex)
+				Call Rhino.MaterialColor(newIndex, matCol)
+				matRefCol = Rhino.MaterialColor(intIndex)
+				Call Rhino.MaterialColor(newIndex, matRefCol)
+				matShine = Rhino.MaterialShine(intIndex)
+				Call Rhino.MaterialShine(newIndex, matShine)
+				matTrans = Rhino.MaterialTransparency(intIndex)
+				Call Rhino.MaterialTransparency(newIndex, matTrans)
+				matText = Rhino.MaterialTexture(intIndex)
+				If Not IsNull(matText) Then
+					Call Rhino.MaterialTexture(newIndex, matText)
+				End If
+			End If
+		End If
+
+	Next
+
+End Function

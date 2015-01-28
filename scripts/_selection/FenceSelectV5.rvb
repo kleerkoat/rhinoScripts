@@ -1,0 +1,30 @@
+Option Explicit
+'Script written by Mitch
+'Script version Friday, September 10, 2010
+'This script will not run in Rhino versions earlier than V5.
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "FenceSelectV5","_-Runscript (FenceSelectV5)"
+
+'Call FenceSelectV5()
+Sub FenceSelectV5()
+	
+	Dim strObj,strMsg,arrAllObjs,arrInObjs,arrOutObjs
+	strMsg="Select closed curve to use as a selection boundary within the viewport"	
+	strObj=Rhino.GetObject(strMsg,4,True,False)
+	If IsNull(strObj) Then Exit Sub
+	arrAllObjs=Rhino.NormalObjects
+	If not IsArray(arrAllObjs) Then Exit Sub
+	
+	Call Rhino.EnableRedraw(False)
+	Call Rhino.Command("_-SelBoundary _SelectionMode=_Window _SelID "&strObj,False)
+	arrInObjs=Rhino.SelectedObjects
+	Call Rhino.UnselectAllObjects
+	Call Rhino.Command("_-SelBoundary _SelectionMode=_InvertWindow _SelID "&strObj,False)
+	arrOutObjs=Rhino.SelectedObjects
+	Call Rhino.SelectObjects(arrInObjs)
+	Call Rhino.SelectObject(strObj)
+	Call Rhino.InvertSelectedObjects
+	Call Rhino.EnableRedraw(True)
+End Sub
+	

@@ -1,0 +1,136 @@
+' ****************************** RhinoScript.org ******************************
+'
+'   MoveGap, version 1.1
+'
+'   by Don Lewis, published Mar 06, 2009
+'
+'
+'   Moves an object(s) from point A to point B with a user defined distance between the two points. There is an option to align up to 2 of the axis. Example: draw 2 cylinders, pick a cylinder to move, select the center of one of the ends as point A , select the center of one of the ends on the other cylinder, enter the gap you want between them (i.e. 10"), Select Yes to align Axis, pick X & Y from the list click OK. The cylinders are aligned in the X & Y Axis with a 10" gap between them in Z.
+'
+'
+'
+'
+'   This RhinoScript Tool has been downloaded from RhinoScript.org.
+'
+'   Rhino versions: Rhino 4
+'   Other requirements:
+'   SR5b
+'
+'   LICENSE INFORMATION:
+'   This script is published under the GNU General Public License, version 3
+'   or any later version, and thus comes WITHOUT ANY WARRANTY. You can get
+'   the complete license text here: www.rhinoscript.org/gpl
+'
+' ****************************** RhinoScript.org ******************************
+
+
+
+Option Explicit
+'Script written by Don Lewis
+'Script copyrighted by Lewis Tool & Engineering llc
+'Script version Thursday, March 6, 2009 1:40:51 PM
+
+'Call MoveGap()
+Sub MoveGap()
+
+	Dim strObject, arrPoint1, arrPoint2, strDistance, strAlign, strAxis, arrAxis, strGapMsg
+	
+	strObject = Rhino.GetObjects("Select objects to move",,,True)
+	If isNull (strObject) Then Exit Sub
+	
+	arrPoint1 = Rhino.GetPoint("Select point to move from")
+	If isNull (arrPoint1) Then Exit Sub
+	
+	arrPoint2 = Rhino.GetPoint("Select destination point")
+	If isNull (arrPoint2) Then Exit Sub
+	
+	Do
+		strDistance = Rhino.GetReal("Enter distance for gap")
+		If Not strDistance = 0 Then Exit Do
+		strGapMsg = Rhino.MessageBox("Please Enter a Value for the gap distance",1,"Move Gap")
+		If strGapMsg = 2 Then Exit Sub
+	Loop
+	
+	
+	strAlign = Rhino.MessageBox("Do you want to align an axis?",4,"Move Gap")
+	If strAlign = 6 Then
+		arrAxis = Array("X","Y","Z")
+		strAxis = Rhino.MultiListBox(arrAxis,"Select axis to align","Move Gap")
+	End If
+	
+	arrPoint2 = WhichWayDidHeGo(arrPoint1,arrPoint2,strDistance,strAxis)
+	
+	Call Rhino.MoveObjects(strObject,arrPoint1,arrPoint2)
+	
+End Sub
+Function WhichWayDidHeGo(arrPoint1,arrPoint2,strDistance, strAxis)
+	
+	Dim strDiff1, strDiff2, strDiff3, X, Y, Z, Axis
+	
+	X = False
+	Y = False
+	Z = False
+	
+	
+	If isArray (strAxis) Then
+		For Each Axis In strAxis
+			If Axis = "X" Then X = True
+			If Axis = "Y" Then Y = True
+			If Axis = "Z" Then Z = True			
+		Next
+	End If
+	
+	strDiff1 = arrPoint1(0) - arrPoint2(0)
+	strDiff2 = arrPoint1(1) - arrPoint2(1)
+	strDiff3 = arrPoint1(2) - arrPoint2(2)
+	
+	If strDiff1>0 And X = False Then
+		If arrPoint1(0) > arrPoint2(0) Then
+			arrPoint2(0) = arrPoint2(0) + strDistance
+		Else
+			arrPoint2(0) = arrPoint2(0) - strDistance
+		End If
+	End If
+	
+	If strDiff2>0 And Y = False Then
+		If arrPoint1(1) > arrPoint2(1) Then
+			arrPoint2(1) = arrPoint2(1) + strDistance
+		Else
+			arrPoint2(2) = arrPoint2(1) - strDistance
+		End If
+	End If
+	
+	If strDiff3>0 And Z = False Then
+		If arrPoint1(2) > arrPoint2(2) Then
+			arrPoint2(2) = arrPoint2(2) + strDistance
+		Else
+			arrPoint2(2) = arrPoint2(2) - strDistance
+		End If
+	End If
+	
+	If strDiff1<=0 And X = False Then
+		If arrPoint1(0) > arrPoint2(0) Then
+			arrPoint2(0) = arrPoint2(0) - strDistance
+		Else
+			arrPoint2(0) = arrPoint2(0) + strDistance
+		End If
+	End If
+	
+	If strDiff2<=0 And Y = False Then
+		If arrPoint1(1) > arrPoint2(1) Then	
+			arrPoint2(1) = arrPoint2(1) - strDistance
+		Else
+			arrPoint2(1) = arrPoint2(1) + strDistance
+		End If
+	End If
+	
+	If strDiff3<=0 And Z = False Then
+		If arrPoint1(2) > arrPoint2(2) Then
+			arrPoint2(2) = arrPoint2(2) - strDistance
+		Else
+			arrPoint2(2) = arrPoint2(2) + strDistance
+		End If
+	End If
+	
+	WhichWayDidHeGo = arrPoint2
+End Function

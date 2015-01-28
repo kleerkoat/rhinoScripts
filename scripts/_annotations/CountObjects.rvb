@@ -1,0 +1,30 @@
+﻿Option Explicit
+'Script written by David Rutten (david@mcneel.com)
+'Script copyrighted by Robert McNeel & Associates
+'Script version Thursday, April 10, 2008 10:35:29
+
+Call CountObjectsByLayer()
+Sub CountObjectsByLayer()
+	Dim sPath : sPath = Rhino.SaveFileName("Layer data", "Text files (*.txt)|*.txt",,"LayerData")
+	If (IsNull(sPath)) Then Exit Sub
+	
+	Dim fso, file
+	Set fso = CreateObject("Scripting.FileSystemObject")
+	Set file = fso.CreateTextFile(sPath, True)
+	
+	Dim idLayer, nObjects, nCount
+	
+	For Each idLayer In Rhino.LayerNames()
+		nObjects = Rhino.ObjectsByLayer(idLayer)
+		
+		If IsNull(nObjects) Then
+			nCount = 0		
+		Else
+			nCount = Ubound(nObjects)+1
+		End If
+		
+		file.WriteLine(idLayer & " - " & nCount)
+	Next
+	
+	file.Close()
+End Sub

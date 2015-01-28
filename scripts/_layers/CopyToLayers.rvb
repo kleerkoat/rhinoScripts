@@ -1,0 +1,29 @@
+Option Explicit
+'Script written by Pascal
+'Script version Tuesday, November 03, 2009
+'110608 - changed line 17 to 18, rg 
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "CopytoLayers", "_NoEcho _-Runscript (CopytoLayers)"
+
+'Call CopytoLayers()
+Sub CopytoLayers()
+
+	Dim aObj: aObj = Rhino.GetObjects("Select objects",,,True)
+	If Not isArray(aObj) Then Exit Sub
+	
+	Dim aLayers: alayers = Rhino.LayerNames
+	
+	'Dim selLayer: Sellayer = Rhino.MultiListBox(alayers,"Select one or more layers","Copy objects to layers")
+	Dim selLayer: selLayer = Rhino.GetLayers("Select one or more layers")
+	
+	If Not isArray(selLayer) Then Exit Sub
+	
+	Dim temp, sLayer
+	For Each sLayer In selLayer
+		temp = Rhino.CopyObjects(aObj)
+		Rhino.ObjectLayer temp,sLayer
+	Next
+	
+	
+End Sub

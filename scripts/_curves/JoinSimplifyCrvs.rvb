@@ -1,0 +1,58 @@
+Option Explicit
+'Script written by willemderks.com
+'Script version 01 | April 15 2010
+'Call JoinSimplifyCrvs()
+Sub JoinSimplifyCrvs()
+	
+	Dim arrCrv,arrNewCrv
+	arrCrv = Rhino.GetObjects("Select objects to Join and simplify", 4)
+	arrNewCrv = Rhino.JoinCurves(arrCrv, True)
+	
+	Dim i
+	
+	For i=0 to Ubound(arrNewCrv)
+		Rhino.SimplifyCurve(arrNewCrv(i),0)
+	Next
+	
+	Dim closed,open
+	closed=0
+	open=0
+	
+	For i=0 to Ubound(arrNewCrv)
+		If	Rhino.IsCurveClosed (arrNewCrv(i))Then
+			closed = closed+1
+		Else
+			open = open+1
+		End If
+	Next
+	
+	Dim strPrompt
+	strPrompt = Cstr(Ubound(arrCrv)+1)&" curves joined and simplified into "
+	
+	If open>0 Then
+		If open>1 Then
+			strPrompt = strPrompt&Cstr(open)&" open curves "
+		Else
+			strPrompt = strPrompt&Cstr(open)&" open curve "
+		End If
+	End If
+	
+	If closed>0 And open>0 Then
+		If closed>1 Then
+			strPrompt = strPrompt&"and " &Cstr(closed)&" closed curves "
+		Else
+			strPrompt = strPrompt&"and " &Cstr(closed)&" closed curve "
+		End If
+	End If
+	
+	If Closed>0 And Not Open>0 Then
+		If Closed>1 Then
+			StrPrompt = StrPrompt&Cstr(Closed)&" Closed Curves "
+		Else
+			StrPrompt = StrPrompt&Cstr(Closed)&" Closed Curve "
+		End If
+	End If
+	
+	Rhino.Print(strPrompt)
+
+End Sub

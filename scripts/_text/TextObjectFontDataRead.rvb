@@ -1,0 +1,21 @@
+Option Explicit
+'Script written and copyrighted by Jaroslaw Bieda
+'Script version Thursday, July 22, 2010 11:30:09 PM
+
+'Call TextObjectFontDataRead()
+Sub TextObjectFontDataRead()
+
+'get object to check
+Dim idObject : idObject=Rhino.GetObject("Object to retrieve font data?",4+8+16,True)
+if not isnull(idObject) then
+	'retrieve font data
+	Dim strData : strData=Rhino.GetObjectData(idObject,"UserData","FontData")
+	if not isnull(strData) then
+		Call Rhino.MessageBox(strData,,"TextObject initial parameters:")
+	Else 'no font data found
+		Rhino.Print "No font information available."
+	End If
+End If
+
+End Sub
+

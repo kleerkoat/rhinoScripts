@@ -1,0 +1,45 @@
+Option Explicit
+'Script written by Ryan Gilmore
+'Script version Monday, September 10, 2012 9:06:25 AM
+
+'Call SelChainJoinAndSimplify()
+Sub SelChainJoinAndSimplify()
+	Dim strObj, arrObjects
+	
+	Rhino.Prompt("Select curve for chain")
+	
+	Rhino.Command("_NoEcho _SelChain _ChainContinuity=Position _Direction=Both _GapTolerance=0.001 _AngleTolerance=1 _Pause _Pause _Enter")
+	
+	arrObjects = Rhino.SelectedObjects
+	
+	If UBound(arrObjects) > 0 Then
+
+		Rhino.JoinCurves arrObjects, True
+	Else
+		Rhino.Print("Curve is joined already.")
+		Exit Sub
+
+	End If
+	
+	strObj = Rhino.FirstObject(True, True)
+	Rhino.Command("_NoEcho _SimplifyCrv")
+	
+	If Rhino.IsCurve(strObj) Then
+
+		If Rhino.IsCurveClosed(strObj) Then
+
+			Rhino.Print "Curve joined and closed."
+
+		Else
+
+			Rhino.Print "Curve joined and open."
+
+		End If
+
+	Else
+
+		Rhino.Print "The object is not a curve."
+
+	End If
+End Sub
+

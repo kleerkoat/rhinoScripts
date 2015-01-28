@@ -1,0 +1,405 @@
+Option Explicit
+
+'This script generates honeycomb strips on a given nurbs surface.
+'in: surface, u divisions, v divisions, offset or curvature scale value
+'out: polysurfaces and curves on separate layers
+'by Andrew Kudless | andrew@materialsystems.org | april, 2005
+
+Sub Honeycomb()
+
+Dim sourceSurf
+Dim uDiv, vDiv, maxDiv
+Dim cellHeight, minHeight, maxHeight, targetMinMax, sourceMinMax, heightOption
+Dim uArray, vArray
+Dim i, index
+Dim uMax, vMax
+Dim uInc, vInc
+Dim uStart, vStart
+Dim arrStrip, borderA, borderB, borderC, borderD, drawBorderA, drawBorderB, drawBorderC, drawBorderD
+Dim heightMethods : heightMethods = Array("Constant","Curvature","Inverse_Curvature")
+
+Rhino.EnableRedraw vbFalse
+
+'Get inputs
+sourceSurf = Rhino.GetObject ("Select a Surface", 8)
+If IsNull(sourceSurf) Then Exit Sub
+
+uDiv = Rhino.GetInteger ("Enter the number of divisions in the U direction")
+If IsNull(uDiv) Then Exit Sub
+
+vDiv = Rhino.GetInteger ("Enter the number of divisions in the V direction")
+If IsNull(vDiv) Then Exit Sub
+
+heightOption = Rhino.GetString ("Choose cell height method", "Constant", heightMethods)
+If IsNull(heightOption) Then Exit Sub
+
+If heightOption = "Constant" Then
+   cellHeight = Rhino.GetReal ("Enter constant cell height")
+   If IsNull(cellHeight) Then Exit Sub
+   targetMinMax = Array(cellHeight, 0)
+Else
+   minHeight = Rhino.GetReal ("Enter minimum cell height")
+   If IsNull(minHeight) Then Exit Sub
+   maxHeight = Rhino.GetReal ("Enter maximum cell height")
+   If IsNull(maxHeight) Then Exit Sub
+   targetMinMax = Array(minHeight, maxHeight)
+End If
+
+ReDim uVal(uDiv)
+ReDim vVal(vDiv)
+ReDim arrStrip(uDiv*vDiv)
+ReDim borderA(uDiv), borderb(vDiv), borderC(uDiv), borderD(vDiv)
+
+sourceMinMax = cuvatureMinMax(sourceSurf)
+
+uMax = Rhino.SurfaceDomain (sourceSurf, 0)
+vMax = Rhino.SurfaceDomain (sourceSurf, 1)
+
+uInc = uMax(1)/uDiv
+vInc = vMax(1)/vDiv
+
+For i = 0 To uDiv
+    uVal(i) = i * uInc
+    Rhino.Print "uVal(" & i & "):" & uVal(i)
+
+Next
+
+For i = 0 To vDiv
+    vVal(i) = i * vInc
+    Rhino.Print "vVal(" & i & "):" & vVal(i)
+Next
+
+Rhino.Print "Calculating honeycomb..."
+
+'Find which direction has more points
+If uDiv >= vDiv Then
+   maxDiv = uDiv
+Else
+    maxDiv = vDiv
+End If
+
+'Begin the drawing loop for first half of surface
+For i = 0 To maxDiv Step 3
+    vStart = i
+    arrStrip(i) = mydrawDVDH(0, (i), uVal, vVal, uDiv, vDiv, sourceSurf, sourceMinMax, targetMinMax, heightOption)
+    If (i+2) <= vDiv Then
+       arrStrip(i+1) = mydrawHDVD(0, (i+2), uVal, vVal, uDiv, vDiv, sourceSurf, sourceMinMax, targetMinMax, heightOption)
+       arrStrip(i+2) = mydrawVDHD(0, (i+2), uVal, vVal, uDiv, vDiv, sourceSurf, sourceMinMax, targetMinMax, heightOption)
+    End If
+Next
+
+index = index+3
+'Begin the drawing loop for second half of surface
+For i = 0 To maxDiv Step 3
+    uStart = i
+    arrStrip(i+index) = mydrawDHDV((i), 0, uVal, vVal, uDiv, vDiv, sourceSurf, sourceMinMax, targetMinMax, heightOption)
+    If (i+2) <= uDiv Then
+       arrStrip(i+index+1) = mydrawVDHD((i+2),0 , uVal, vVal, uDiv, vDiv, sourceSurf, sourceMinMax, targetMinMax, heightOption)
+       arrStrip(i+index+2) = mydrawHDVD((i+2), 0, uVal, vVal, uDiv, vDiv, sourceSurf, sourceMinMax, targetMinMax, heightOption)
+    End If
+Next
+
+For i = 0 To uDiv
+    borderA(i) = Rhino.SurfaceCurvature(sourceSurf, Array(uVal(i),vVal(0)))
+    borderC(i) = Rhino.SurfaceCurvature(sourceSurf, Array(uVal(i),vVal(vDiv)))
+Next
+drawBorderA = AddStrip(i, borderA, sourceMinMax, targetMinMax, heightOption)
+drawBorderC = AddStrip(i, borderC, sourceMinMax, targetMinMax, heightOption)
+For i = 0 To vDiv
+    borderB(i) = Rhino.SurfaceCurvature(sourceSurf, Array(uVal(0),vVal(i)))
+    borderD(i) = Rhino.SurfaceCurvature(sourceSurf, Array(uVal(uDiv),vVal(i)))
+Next
+drawBorderB = AddStrip(i, borderB, sourceMinMax, targetMinMax, heightOption)
+drawBorderD = AddStrip(i, borderD, sourceMinMax, targetMinMax, heightOption)
+
+Rhino.EnableRedraw vbTrue
+End Sub
+
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+
+Function mydrawDVDH(u, v, uVal, vVal, uDiv, vDiv, sourceSurf, sourceMinMax, targetMinMax, heightOption)
+         Rhino.Print "We are in the DVDH function and (u,v) = (" & u & "," & v & ")"
+         ReDim bigArray(uDiv*vDiv)
+         Dim j
+         j = 0   ' Initialize variable.
+         While u <= (uDiv) And v <= (vDiv)
+               bigArray(j) = Rhino.SurfaceCurvature(sourceSurf, Array(uVal(u),vVal(v)))
+               If IsNull(bigArray(j)) Then
+                Rhino.Print "bigArray(j) is null"
+                Exit Function
+               End If            
+               If ((u+1 <= (uDiv)) And (v+1 <= (vDiv))) Then
+                  j = j + 1 ' Increment Counter.
+                  bigArray(j) = Rhino.SurfaceCurvature(sourceSurf, Array(uVal(u+1),vVal(v+1)))
+               End If
+               If ((u+1 <= (uDiv)) And (v+2 <= (vDiv))) Then
+                  j = j + 1 ' Increment Counter.
+                  bigArray(j) = Rhino.SurfaceCurvature(sourceSurf, Array(uVal(u+1),vVal(v+2)))
+               End If
+               If ((u+2 <= (uDiv)) And (v+3 <= (vDiv))) Then
+                  j = j + 1 ' Increment Counter.
+                  bigArray(j) = Rhino.SurfaceCurvature(sourceSurf, Array(uVal(u+2),vVal(v+3)))
+               End If
+               j = j + 1 ' Increment Counter.
+               u = u+3
+               v = v+3
+         Wend
+         If j > 1 Then
+          mydrawDVDH = AddStrip(j, bigArray, sourceMinMax, targetMinMax, heightOption)
+         End If
+End Function
+
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+
+Function mydrawHDVD(u, v, uVal, vVal, uDiv, vDiv, sourceSurf, sourceMinMax, targetMinMax, heightOption)
+         Rhino.Print "We are in the HDVD function and (u,v) = (" & u & "," & v & ")"
+         ReDim bigArray(uDiv*vDiv)
+         Dim j
+         j = 0   ' Initialize variable.
+         While u <= (uDiv) And v <= (vDiv)
+               bigArray(j) = Rhino.SurfaceCurvature(sourceSurf, Array(uVal(u),vVal(v)))
+               If (u+1 <= (uDiv))  Then
+                  j = j + 1 ' Increment Counter.
+                  bigArray(j) = Rhino.SurfaceCurvature(sourceSurf, Array(uVal(u+1),vVal(v)))
+               End If
+               If ((u+2 <= (uDiv)) And (v+1 <= (vDiv))) Then
+                  j = j + 1 ' Increment Counter.
+                  bigArray(j) = Rhino.SurfaceCurvature(sourceSurf, Array(uVal(u+2),vVal(v+1)))
+               End If
+               If ((u+2 <= (uDiv)) And (v+2 <= (vDiv))) Then
+                  j = j + 1 ' Increment Counter.
+                  bigArray(j) = Rhino.SurfaceCurvature(sourceSurf, Array(uVal(u+2),vVal(v+2)))
+               End If
+               j = j + 1 ' Increment Counter.
+               u = u+3
+               v = v+3
+         Wend
+         If j > 1 Then
+          mydrawHDVD = AddStrip(j, bigArray, sourceMinMax, targetMinMax, heightOption)
+         End If
+End Function
+
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+
+Function mydrawVDHD(u, v, uVal, vVal, uDiv, vDiv, sourceSurf, sourceMinMax, targetMinMax, heightOption)
+         Rhino.Print "We are in the VDHD function and (u,v) = (" & u & "," & v & ")"
+         ReDim bigArray(uDiv*vDiv)
+         Dim j
+         j = 0   ' Initialize variable.
+         While u <= (uDiv) And v <= (vDiv)
+               bigArray(j) = Rhino.SurfaceCurvature(sourceSurf, Array(uVal(u),vVal(v)))
+               If (v+1 <= (vDiv))  Then
+                  j = j + 1 ' Increment Counter.
+                  bigArray(j) = Rhino.SurfaceCurvature(sourceSurf, Array(uVal(u),vVal(v+1)))
+               End If
+               If ((u+1 <= (uDiv)) And (v+2 <= (vDiv))) Then
+                  j = j + 1 ' Increment Counter.
+                  bigArray(j) = Rhino.SurfaceCurvature(sourceSurf, Array(uVal(u+1),vVal(v+2)))
+               End If
+               If ((u+2 <= (uDiv)) And (v+2 <= (vDiv))) Then
+                  j = j + 1 ' Increment Counter.
+                  bigArray(j) = Rhino.SurfaceCurvature(sourceSurf, Array(uVal(u+2),vVal(v+2)))
+               End If
+               j = j + 1 ' Increment Counter.
+               u = u+3
+               v = v+3
+         Wend
+         If j > 1 Then
+          mydrawVDHD = AddStrip(j, bigArray, sourceMinMax, targetMinMax, heightOption)
+         End If
+End Function
+
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+
+Function mydrawDHDV(u, v, uVal, vVal, uDiv, vDiv, sourceSurf, sourceMinMax, targetMinMax, heightOption)
+         Rhino.Print "We are in the DHDV function and (u,v) = (" & u & "," & v & ")"
+         ReDim bigArray(uDiv*vDiv)
+         Dim j
+         j = 0   ' Initialize variable.
+         While u <= (uDiv) And v <= (vDiv)
+               bigArray(j) = Rhino.SurfaceCurvature(sourceSurf, Array(uVal(u),vVal(v)))
+               If ((u+1 <= (uDiv)) And (v+1 <= (vDiv))) Then
+                  j = j + 1 ' Increment Counter.
+                  bigArray(j) = Rhino.SurfaceCurvature(sourceSurf, Array(uVal(u+1),vVal(v+1)))
+               End If
+               If ((u+2 <= (uDiv)) And (v+1 <= (vDiv))) Then
+                  j = j + 1 ' Increment Counter.
+                  bigArray(j) = Rhino.SurfaceCurvature(sourceSurf, Array(uVal(u+2),vVal(v+1)))
+               End If
+               If ((u+3 <= (uDiv)) And (v+2 <= (vDiv))) Then
+                  j = j + 1 ' Increment Counter.
+                  bigArray(j) = Rhino.SurfaceCurvature(sourceSurf, Array(uVal(u+3),vVal(v+2)))
+               End If
+               j = j + 1 ' Increment Counter.
+               u = u+3
+               v = v+3
+         Wend
+         If j > 1 Then
+          mydrawDHDV = AddStrip(j, bigArray, sourceMinMax, targetMinMax, heightOption)
+         End If
+End Function
+
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+'This fucntion draws the source curves for the tile and then lofts between them to form the surface strip.
+Function AddStrip(j, bigArray, sourceMinMax, targetMinMax, heightOption)
+         If (j>0) Then
+            ReDim pntBot(j-1), pntTop(j-1)
+            Dim k, myTemp, crvArray(1)
+            For k = 0  To (j-1)
+                myTemp = bigArray(k)
+                If IsNull(myTemp) Then
+                  Rhino.Print "myTemp is null"
+                End If
+                pntBot(k) = myTemp(0)
+                If heightOption = "Constant" Then
+                   pntTop(k) = offsetCalc(myTemp, targetMinMax)
+                End If
+                If heightOption = "Curvature" Then
+                   pntTop(k) = offsetCurvCalc(myTemp, sourceMinMax, targetMinMax)
+                End If
+                If heightOption = "Inverse_Curvature" Then
+                   pntTop(k) = offsetCurvCalcInv(myTemp, sourceMinMax, targetMinMax)
+                End If
+            Next
+            CheckLayer("strip_curves_bottom")
+            crvArray(0) = Rhino.AddPolyline(pntBot)
+            If IsNull(crvArray(0)) Then 
+              Rhino.Print "error in making bottom curve"
+            End If
+            CheckLayer("strip_curves_top")
+            crvArray(1) = Rhino.AddPolyline(pntTop)
+            If IsNull(crvArray(1)) Then 
+              Rhino.Print "error in making top curve"
+            End If
+            CheckLayer("strip_surfaces")
+            AddStrip = Rhino.AddLoftSrf(crvArray)
+         End If
+End Function
+
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+'This fucntion finds the coordinate of a point normal to, and at a <height> from, a point on the surface
+Function offsetCalc(cData, targetMinMax)
+         Dim vscaled
+         vscaled = VectorScale(cData(1),targetMinMax(0))
+         offsetCalc = VectorAdd(vscaled,cData(0))
+End Function
+
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+'This fucntion finds the coordinate of a point normal to, and at a <height> from, a point on the surface. The <height>
+'     is proportional to the curvature at the point.
+Function offsetCurvCalc(cData, sourceMinMax, targetMinMax)
+         Dim vscaled, height
+         height = Ranger(Abs(cData(2)), sourceMinMax, targetMinMax)
+         vscaled = VectorScale(cData(1),height)
+         offsetCurvCalc = VectorAdd(vscaled,cData(0))
+End Function
+
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+'This fucntion finds the coordinate of a point normal to, and at a <height> from, a point on the surface. The <height>
+'     is inversally proportional to the curvature at the point.
+Function offsetCurvCalcInv(cData, sourceMinMax, targetMinMax)
+         Dim vscaled, height, tempMinMax
+         tempMinMax = Array(1/sourceMinMax(1),1/sourceMinMax(0))
+         height = Ranger(1/(Abs(cData(2))), tempMinMax, targetMinMax)
+         vscaled = VectorScale(cData(1),height)
+         offsetCurvCalcInv = VectorAdd(vscaled,cData(0))
+End Function
+
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+'This fuction normalizes a value to a specified range
+Function Ranger(sourceValue, sourceMinMax, targetMinMax)
+         Ranger = (((sourceValue-sourceMinMax(0))/(sourceMinMax(1)-sourceMinMax(0)))*(targetMinMax(1)-targetMinMax(0)))+targetMinMax(0)
+End Function
+
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+'This function checks if the current layer is <layername> and if it isn't, makes it so. If the layer <layername> doesn't
+'     exist then it creates it with the name <layername>.
+Function CheckLayer(layername)
+         If Rhino.IsLayer(layername) Then
+            Rhino.CurrentLayer(layername)
+         Else
+            Rhino.AddLayer(layername)
+            Rhino.CurrentLayer(layername)
+         End If
+End Function
+
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+'function by RMA, "vectors.rvb"
+Function VectorAdd(v1, v2)
+
+  VectorAdd = Null
+  If Not IsArray(v1) Or (UBound(v1) <> 2) Then Exit Function
+  If Not IsArray(v2) Or (UBound(v2) <> 2) Then Exit Function
+  VectorAdd = Array(v1(0) + v2(0), v1(1) + v2(1), v1(2) + v2(2))
+
+End Function
+
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+'function by RMA, "vectors.rvb"
+Function VectorScale(v, d)
+
+  VectorScale = Null
+  If Not IsArray(v) Or (UBound(v) <> 2) Then Exit Function
+  If Not IsNumeric(d) Then Exit Function
+  VectorScale = Array(v(0) * d, v(1) * d, v(2) * d)
+
+End Function
+
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+'This fuction roughly finds the min and max curvature values through a iterative process. Set the <accValue> to a higher value
+'     for more accuracy (and more processing time). The number of sample points is <accValue>^2 (ie, the default value of 50
+'     yields 2500 sample points).
+Function cuvatureMinMax(sourceSurf)
+
+         Dim uData, vData, uInc, vInc, uCount, vCount, uVal, vVal
+         Dim minCurvature, maxCurvature, tempCurvature, accValue
+
+         accValue = 50
+
+         uData = Rhino.SurfaceDomain(sourceSurf, 0)
+         vData = Rhino.SurfaceDomain(sourceSurf, 1)
+
+         uInc = uData(1)/accValue
+         vInc = vData(1)/accValue
+
+         ReDim uVal(accValue)
+         ReDim vVal(accValue)
+
+         For uCount = 0 To accValue
+             uVal(uCount) = uCount * uInc
+         Next
+
+         For vCount = 0 To accValue
+             vVal(vCount) = vCount * vInc
+         Next
+
+         tempCurvature = Rhino.SurfaceCurvature (sourceSurf, Array(uVal(1),vVal(1)))
+         minCurvature = Abs(tempCurvature(2))
+         maxCurvature = minCurvature
+
+         'Roughly find the min and max cuvature values on the surface
+         For uCount = 0 To accValue
+              Rhino.Print "Finding max and min curvature(" & uCount & "/" & accValue & ")..."
+             For  vCount = 0 To accValue
+                  tempCurvature = Rhino.SurfaceCurvature (sourceSurf, Array(uVal(uCount),vVal(vCount)))
+                  If Abs(tempCurvature(2)) < minCurvature Then
+                     minCurvature = Abs(tempCurvature(2))
+                  Else
+                      If Abs(tempCurvature(2)) > maxCurvature Then
+                         maxCurvature = Abs(tempCurvature(2))
+                      End If
+                  End If
+             Next
+         Next
+
+         Rhino.Print "minCurvature: " & minCurvature
+         Rhino.Print "maxCurvature: " & maxCurvature
+         
+         cuvatureMinMax = Array(minCurvature,maxCurvature)
+
+End Function
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+
+'Call the honeycomb sub
+'honeycomb
+Rhino.Print "Honeycomb complete"

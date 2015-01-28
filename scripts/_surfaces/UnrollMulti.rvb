@@ -1,0 +1,74 @@
+﻿Option Explicit
+'Script written by Pascal
+
+'Script version Wednesday, March 04, 2009
+
+
+
+Rhino.AddStartUpScript Rhino.LastLoadedScriptFile
+Rhino.AddAlias "UnrollMulti","_NoEcho _-RunScript (UnrollMulti)"
+
+
+'wants to be able to select multiple surfaces, smash them all 
+'at once sending each smashed surface to a new layer
+
+
+Sub UnrollMulti()
+	
+	Dim aSrf: ASrf = Rhino.GetObjects("Select surfaces to Smash",8+16,,True)
+	
+	Dim aItems:	aItems = array("Explode","No", "Yes", "Labels", "No" ,"Yes")
+	Dim aDef: aDef = array(False, True)
+	Dim aBlns: aBlns = Rhino.GetBoolean("Unroll settings",aItems, aDef)
+	
+	If Not IsArray(aBlns) Then Exit Sub
+	
+	Dim sExp,sLabel
+	
+	Dim sCmd: sCmd = "_UnrollSrf _Enter"
+	
+	If aBlns(0) = True Then
+		
+		sExp = " _Explode=_Yes"
+	Else
+		sExp = " _Explode=_No"
+	End If
+		
+	If aBlns(1) = True Then
+	
+		sLabel = " _Labels=_Yes "
+	Else
+		sLabel = " _Labels=_No "
+	End If
+	
+	sCmd = sCmd & sExp & sLabel & "_Enter _Enter"
+	
+	If Not IsArray(aSrf) Then Exit Sub
+	Dim i, atemp, Name
+	
+	Rhino.EnableRedraw(False)
+	
+	For i = 0 To UBound(aSrf)
+		
+		Name = Rhino.ObjectName(asrf(i))
+		If isNull(name) Then Name = "UnRoll_" & i
+		Rhino.UnselectAllObjects
+		Rhino.SelectObject aSrf(i)
+		Rhino.Command sCmd, False
+		
+		If Rhino.LastCommandResult= 0 Then
+			aTemp = Rhino.LastCreatedObjects
+			
+			If Not islayer (Name) Then
+				Rhino.AddLayer  Name
+				Rhino.ObjectLayer aTemp, Name
+			End If
+		End If
+		
+	Next
+	
+	Rhino.UnselectAllObjects
+	
+	Rhino.EnableRedraw(True)
+	
+End Sub

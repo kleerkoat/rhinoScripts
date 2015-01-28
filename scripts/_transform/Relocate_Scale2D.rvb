@@ -1,0 +1,61 @@
+'Script written and copyrighted by Gelfling '04 aka David Rutten
+'December 7th 2004 revision
+Option Explicit
+
+'TransFormObjectsPositions_Scale2D
+Sub TransFormObjectsPositions_Scale2D()
+	Dim SelObjects
+	Dim Objects, obj
+	Dim arrCP(), i
+	Dim BBox
+	Dim oldC, newC
+
+	SelObjects = Rhino.SelectedObjects(True)
+
+	Objects = Rhino.GetObjects("Pick objects to transform...", 4415, True, True, False)
+	If VarType(Objects) = vbNull Then Exit Sub
+
+	ReDim arrCP(UBound(Objects))
+
+	Rhino.EnableRedraw vbFalse
+	For i = 0 To Ubound(Objects)
+		BBox = Rhino.BoundingBox(Objects(i))
+		oldC = BBoxCentre(BBox)
+		arrCP(i) = Rhino.AddPoint(oldC)
+		Rhino.SetObjectData arrCP(i), "GlobalTransform", "OldPosition", Rhino.Pt2Str(oldC)
+		Rhino.SetObjectData arrCP(i), "GlobalTransform", "LinkID", Objects(i)
+	Next
+
+	Rhino.UnselectAllObjects
+	Rhino.SelectObjects arrCP
+	Rhino.EnableRedraw vbTrue
+
+	Rhino.Command "! -_Scale2D"
+	If Rhino.LastCommandResult <> 0 Then
+		Rhino.DeleteObjects arrCP
+		Rhino.GetString "Something went wrong.... script aborting",,Array("OK")
+		Exit Sub
+	End If
+
+    Rhino.EnableRedraw vbFalse
+	For i = 0 To UBound(Objects)
+		newC = Rhino.PointCoordinates(arrCP(i))
+		oldC = Rhino.Str2Pt(Rhino.GetObjectData(arrCP(i), "GlobalTransform", "OldPosition"))
+		Rhino.MoveObject Objects(i), oldC, newC
+	Next
+
+	Rhino.DeleteObjects arrCP
+	If IsArray(SelObjects) Then Rhino.SelectObjects SelObjects
+	Rhino.EnableRedraw vbTrue
+
+	Rhino.Print "All objects succesfully transposed..."
+End Sub
+
+Function BBoxCentre(BBox)
+	Dim C(2)
+	Dim i
+	For i = 0 To 2
+		C(i) = (BBox(0)(i)+BBox(6)(i))/2
+	Next
+	BBoxCentre = C
+End Function

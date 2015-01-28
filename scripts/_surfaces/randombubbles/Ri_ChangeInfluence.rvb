@@ -1,0 +1,62 @@
+' Script for Rhinoceros 3.0 Sr3
+' Change Influence values for RiBlobby objects to render with RiBlobby Exporter
+' © 2004 Clement Greiner
+
+Option Explicit
+Sub changeRiInf
+Dim arrAllowed, arrObjects, StrObject, IntRiInfluence, StrRiInfluence
+Dim nCount, SkipCount, StrSkip, IntRiOpcode
+' get allowed objects
+arrAllowed = GET_RiObjects
+If Not IsArray(arrAllowed) Then Print "No RiObjects found to change influence value." : Exit Sub
+
+arrObjects = Rhino.GetObjects("Select objects to change Ri_Influence values", 8+4+1, vbTrue, vbTrue,vbTrue, arrAllowed)
+If IsNull(arrObjects) Then Exit Sub
+' search for defaults in document
+intRiInfluence = int(Rhino.GetDocumentData("RandomBubbles", "RiInfluence"))
+If IsNull(intRiInfluence) Then intRiInfluence = 1 : StrRiInfluence = "Positive"
+If intRiInfluence = -1 Then StrRiInfluence = "Negative" Else StrRiInfluence = "Positive"
+' choose what to change to
+StrRiInfluence = Rhino.GetString("RiInfluence Mode to assign", StrRiInfluence, Array("Positive","Negative"))
+If IsNull(StrRiInfluence) Then Exit Sub
+If StrRiInfluence = "Negative" Then IntRiInfluence = -1 Else IntRiInfluence = 1
+' store influence setting in document
+Rhino.SetDocumentData "RandomBubbles", "RiInfluence", intRiInfluence
+
+' change influence values
+ncount = 0 : SkipCount = 0
+For Each StrObject In arrObjects
+	IntRiOpcode = Int(Rhino.GetObjectData(StrObject, "RandomBubbles","RiOpcode"))
+	' Print StrObject & " / Opcode: " & IntRiOpcode
+	If IntRiOpcode = 1001 Or IntRiOpcode = 1002 Or IntRiOpcode = 9000 Then
+		Rhino.SetObjectData strObject, "RandomBubbles", "RiInfluence", IntRiInfluence
+		nCount = nCount + 1
+	Else
+		' count objects without opcode
+		Rhino.UnselectObject StrObject
+		SkipCount = SkipCount + 1
+	End If
+Next
+If SkipCount > 0 Then StrSkip = " Skipped " & SkipCount & " objects." Else StrSkip = ""
+Rhino.Print "Assigned " & LCase(StrRiInfluence) & " RiBlobby influence values to " & nCount & " objects." & StrSkip
+End Sub
+
+Private Function GET_RiObjects
+Dim arrAllObjs, count, StrObject, StrValue, arrRiObjs()
+arrAllObjs = Rhino.NormalObjects
+' exit if document is empty
+If Not IsArray(arrAllObjs) Then GET_RiObjects = vbNull : Exit Function
+' search objects for planes
+count = 0
+For Each StrObject in arrAllObjs
+	StrValue = int(Rhino.GetObjectData(StrObject, "RandomBubbles","RiOpcode"))
+	If StrValue = 9000 Or StrValue = 1001 Or StrValue = 1002 Then
+		Redim Preserve arrRiObjs(count)
+		arrRiObjs(count) = StrObject
+		count = count + 1
+	End If
+Next
+If count > 0 Then GET_RiObjects = arrRiObjs Else GET_RiObjects = vbNull
+End Function
+
+changeRiInf

@@ -1,0 +1,290 @@
+Option Explicit
+'Script written by Pascal
+'RMA
+'Script version Wednesday, January 09, 2008
+
+
+'True up an extruded surface so that its input curve
+'is normal to the extrusion direction.
+
+
+'Rhino.AddAlias "TrueUpExtrusionAuto", "_NoEcho _-Runscript TrueUpExtrusionAuto"
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+ 
+ 'OK, good- it may be more reliable in some cases that you may never have 
+'actually encountered- in fact, it might do to boost one number that I kept 
+'small for testing purposes and forgot to put back up again.
+'
+'On line 54: Dim aMarker: aMarker = getPtOnFace(sSrf, 4, aTrim)
+'
+'probably that 4 should be 8 or so - it determines the number of samples used 
+'to test what surface should be kept when the new extrusion is split up by the 
+'original trim curves. In practice it may not matter but 4 it is more likely to 
+'fail if there are holes in just the wrong places on the original or something 
+'like that. 8 will get 64 samples and 4 only 16. In the original script I was 
+'only checking one point.
+
+
+Sub TrueUpExtrusionAuto
+	Dim aSrfs: aSrfs = Rhino.GetObjects("Select surfaces",8,True, True)
+	Dim sSrf
+	If Not isArray(aSrfs) Then Exit Sub
+	
+	Rhino.EnableRedraw(False)
+	
+	For Each sSrf In aSrfs
+		Rhino.ShrinkTrimmedSurface sSrf
+		TrueUp(sSrf)
+	Next
+	
+	Rhino.EnableRedraw(True)
+End Sub
+
+
+Sub TrueUp(sSrf)
+	
+	
+	Rhino.EnableRedraw(False)
+	Dim CrntPlane: CrntPlane = Rhino.ViewCPlane
+
+
+	Dim aTemp,  i, sObj, str
+	
+	Dim aTrim:aTrim = Rhino.DuplicateEdgeCurves (sSrf)
+	Dim aMarker: aMarker = getPtOnFace(sSrf, 8, aTrim)
+	Dim sGroup: sGroup = Rhino.AddGroup
+	Rhino.AddObjectsToGroup aTrim, sGroup
+	
+	Dim strDir: strDir = FindStraightDirection(sSrf)
+	Dim sEdge
+	
+	Rhino.UnselectAllObjects
+	Rhino.SelectObject sSrf
+	
+	Rhino.Command "_UntrimAll _KeepTrimObjects=_No", False
+	
+	If not Rhino.LastCommandResult() = 0 then exit sub
+	
+	sSrf = Rhino.LastCreatedObjects()(0)
+	If isNull(sSrf) Then Exit Sub
+	
+	
+	If StrDir <> "Pick" Then
+		Rhino.EnableRedraw(False)
+		Dim aDomU:	aDomU = Rhino.SurfaceDomain(sSrf,0)
+		Dim aDomV:	aDomV = Rhino.SurfaceDomain(sSrf,1)
+		
+		If strDir = "U" Then
+			sEdge = Rhino.ExtractIsoCurve(sSrf,array(aDomV(0),aDomU(0)),1)(0)
+			
+		Else
+			sEdge = Rhino.ExtractIsoCurve(sSrf,array(aDomV(0),aDomU(0)),0)(0)
+		
+		End If
+		
+	Else
+	
+		str = "_DupEdge _Pause _Enter"
+		Rhino.Command str 
+	
+		If Rhino.LastCommandResult <>0 Then 	Exit Sub
+		sEdge  = Rhino.LastCreatedObjects()(0)
+		
+	End If
+	
+	
+	Rhino.EnableRedraw(False)
+
+	Dim aStart: aStart = Rhino.CurveStartPoint(sEdge)
+	Dim aEnd: aEnd = Rhino.CurveEndPoint(sEdge)
+	
+	Dim DomU:DomU = Rhino.SurfaceDomain(sSrf,0)
+	Dim DomV: DomV = Rhino.SurfaceDomain(sSrf, 1)
+	Dim DomCrv: DomCrv = Rhino.CurveDomain(sEdge)
+	
+	
+	If CheckCurveDir(DomCrv,DomU,DomV,sEdge) = "U" Then
+		aStart = Rhino.EvaluateSurface(sSrf,array(DomU(0),DomV(0)))
+		aEnd = Rhino.EvaluateSurface(sSrf,array(DomU(0),DomV(1)))
+		
+	Else 
+		aStart = Rhino.EvaluateSurface(sSrf,array(DomU(0),DomV(0)))
+		aEnd = Rhino.EvaluateSurface(sSrf,array(DomU(1),DomV(0)))
+	End If
+	
+	dim vec: vec = Rhino.VectorCreate(aEnd, aStart)
+	
+	dim aMid: aMid = array((aStart(0) + aEnd(0))/2,(aStart(1) + aEnd(1))/2,(aStart(2) + aEnd(2))/2)
+	
+	Dim Plane : Plane = Rhino.PlaneFromNormal(aMid,Vec)
+	
+	Dim aBB: aBB = Rhino.BoundingBox(sSrf,Plane)
+
+	Dim dblDiag: dblDiag = Rhino.Distance(aBB(0),aBB(6))
+	
+	Dim vecDir : VecDir = Rhino.VectorScale(Rhino.VectorUnitize(vec),dblDiag)
+	
+	dim vecRev: vecRev = Rhino.VectorReverse(vecDir)
+	
+	Plane(0) = Rhino.PointAdd(aMid,vecRev)
+	
+	dim xform: xForm = Rhino.XformPlanarProjection (Plane)
+	Rhino.TransformObject sEdge,xForm
+	
+	Dim sNew: sNew = Rhino.ExtrudeCurveStraight (sEdge, Rhino.VectorScale(vecDir, 2))
+
+	Rhino.UnselectAllObjects()
+	Rhino.Selectobject sNew
+	Rhino.Command "_Split _SelGroup " &sGroup &" _Enter", false
+	
+	If Rhino.LastCommandresult <> 0 Then exit sub
+	
+	Dim aSplit: aSplit = Rhino.LastCreatedObjects()
+	
+	Rhino.Command "_ShrinkTrimmedSrf", false
+	KeepSplitPiece aSplit, aMarker
+	
+	Rhino.DeleteObjects aTrim
+	Rhino.DeleteObjects array(sEdge, sSrf)
+	Rhino.DeleteGroup sGroup
+	
+	Rhino.EnableRedraw(True)
+	
+End Sub
+
+
+Function CheckCurveDir(DomCrv,DomU,DomV, sCrv)
+	Dim Result
+	
+	If abs(DomCrv(0)) = abs(DomU(0)) And  abs(DomCrv(1)) = Abs(DomU(1)) Then
+		Result = "U"
+	
+	ElseIf  abs(DomCrv(1)) = abs(DomU(0)) And  abs(DomCrv(0)) = Abs(DomU(1)) Then
+		Result = "U"
+		Rhino.ReverseCurve(sCrv)
+		
+		
+	ElseIf abs(DomCrv(0)) = abs(DomV(0)) And  abs(DomCrv(1)) = Abs(DomV(1)) Then
+		Result = "V"
+		
+	ElseIf abs(DomCrv(1)) = abs(DomV(0)) And  abs(DomCrv(0)) = Abs(DomV(1)) Then
+		Rhino.ReverseCurve(sCrv)
+		Result = "V"
+	End If
+	'msgbox Result
+	CheckCurveDir = Result
+	
+End Function
+
+Sub KeepSplitPiece(aSrf, aPt)
+	Dim aTest, sSrf
+
+	For Each sSrf In aSrf
+		
+		atest = Rhino.PullPoints(sSrf,array(aPt))
+
+		If  Not isArray(aTest) Then
+			
+			Rhino.DeleteObject sSrf
+		
+		End If
+		
+	Next
+	
+	
+End Sub
+
+Function DistancePtToCurves(apt, aCrv)
+	
+	
+	dim X: X = Rhino.PointClosestObject(apt, aCrv)
+	DistancePtToCurves = Rhino.Distance(apt, X(1))
+	
+End Function
+
+Function getPtOnFace(sFace, num, atrim)
+
+	'Get a grid of paramwter values on the surface from the
+	'ParamGrid frunction, below.
+	
+	dim aPar:aPar = ParamGrid(sFace,num)
+	dim aParam, test, X
+
+	'evaluate the surface at each parameter pair to get a 3d point
+	'then compare this 3d point with its closest point on thye trimmed face'
+	'If the points are the same, the point lies on the trimmed face and we keep that
+	'point and stop testing. The function returns the 3d pointy
+	For each aParam in aPar
+		test = Rhino.EvaluateSurface(sFace, aParam)
+		X = Rhino.BrepClosestPoint( sFace, test)
+	
+		If Rhino.PointCompare(test, X(0)) then
+			if DistancePtToCurves(X(0), aTrim) > 10*Rhino.UnitAbsoluteTolerance() then
+				GetPtOnFace = x(0)
+				Exit for
+			End if
+		End if
+	Next
+			
+End Function
+
+Function ParamGrid(sSrf,num)
+	
+	Dim uDom,VDom, n
+	
+	
+	n = (num+1)^2
+	dim arr
+	redim arr(n-1)
+	
+	'get the surface domains
+	UDom = Rhino.SurfaceDomain(sSrf,0)
+	VDom = Rhino.SurfaceDomain(sSrf,1)
+	
+	Dim Umid, VMid, domU, domV, i, j, r
+	
+	'get the domain intervals in each direction
+	domV = UDom(1) - Udom(0)
+	domU = VDom(1) - Vdom(0)
+	
+	r = 0
+	dim intU, intV
+	intU = domU/num
+	intv = domV/num
+	
+	'Iterate through the parameters in each direction,
+	'building a sample grid of parameter pairs. The function
+	'output is an array of paremeter pairs.
+	
+	For i = 0 to num 
+		
+		UMid = UDom(0) + (i*intU)
+			
+		for j = 0 to num 
+			VMid =  VDom(0)+ (j*intV)
+			arr(r) =  array(UMid,VMid)
+			r = r + 1
+		next 
+	next
+	
+	ParamGrid = arr
+	
+End Function
+
+Function FindStraightDirection(sSrf)
+	
+	Dim result
+	Dim aPts: apts = Rhino.SurfacePointCount(sSrf)
+	Dim ptsU : PtsU = aPts(0)
+	Dim ptsV : PtsV =	apts(1)
+	
+	If PtsU = 2 Then 
+		result = "U" 
+	ElseIf  ptsV = 2 Then
+		Result = "V"
+	Else result = "Pick"
+	End If
+	
+	FindStraightDirection = result
+
+End Function

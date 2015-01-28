@@ -1,0 +1,92 @@
+Option Explicit
+'Script written by Pascal
+'Script version Sunday, March 22, 2009 
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "ImportAndName", "_NoEcho _-Runscript (ImportAndName)"
+
+
+Sub BatchImportAndName()
+
+	Dim sFolder: sFolder = Rhino.BrowseForFolder(Rhino.WorkingFolder,"Select  folder","Multi-Import")
+	If isNull(sFolder) Then Exit Sub
+	
+	Dim aExt(8)
+	aExt(0) = ".3dm"
+	aExt(1) = ".igs"
+	aExt(2) = ".stp"
+	aExt(3) = ".dxf"
+	aExt(4) = ".dwg"
+	aExt(5) = ".step"
+	aExt(6) = ".iges"
+	aExt(7) = ".slprt"
+  aExt(8) = ".skp"
+	
+	Dim aFiles: aFiles = GetFormats(sFolder,aExt)
+	
+	Dim aImpFiles: aImpFiles = Rhino.MultiListBox(aFiles,"Select files to import", "BatchImport")
+	If Not isArray(aImpFiles) Then Exit Sub
+	
+	Dim str, sFile, FileName, aLast
+	
+	For Each sFile In aImpFiles
+		
+		Rhino.UnselectAllObjects
+		str = chr(34) & sFile &chr(34)
+		Rhino.Command "_-Import " &str, False
+		
+		If Rhino.LastCommandResult= 0 Then
+			aLast = Rhino.SelectedObjects
+			If isArray(alast) Then
+				FileName = GetBaseFileName(sFile)
+				Rhino.ObjectName aLast,FileName
+			End If
+		End If
+		
+	Next
+	
+End Sub
+
+Function GetFormats(sFolder,aExt)
+	
+	Dim objFSO,objFolder,colFiles
+	Set objFSO = createobject("Scripting.FileSystemObject")
+	Set objFolder = objFSO.GetFolder(sFolder)
+
+	Set colFiles = objFolder.files
+	Dim aPossible(), n
+	n = 0
+	Dim objFile, sExt, temp
+	
+	For Each objFile In objFolder.Files
+		For Each sExt In aExt
+			temp = RIGHT(lCASE(objFile.Path),LEN(sExt))
+			If temp = sExt Then
+				ReDim Preserve aPossible(n)
+				aPossible(n) = ObjFile
+				n = n +1
+			End If
+		Next
+	Next
+	
+	Set objFSO = Nothing
+	Set objFolder = Nothing
+	Set colFiles = Nothing
+	GetFormats = aPossible
+
+End Function
+
+
+Function GetBaseFileName(sFile)
+
+	Dim intFile,lenFile
+	intFile = InstrRev(sFile,"\")
+	lenFile = len(sFile)
+	sFile = Right (sfile, lenFile-intFile)
+	intFile = instr(sFile,".")
+	lenFile = len(sFile)
+	sFile = Left(sfile,intFile-1)
+	
+	
+	GetBaseFilename = sFile
+End Function

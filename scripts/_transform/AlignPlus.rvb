@@ -1,0 +1,461 @@
+Option Explicit
+Private OldAlign
+
+If isEmpty(OldAlign) Then
+	
+	oldAlign = "VertCenter"
+	
+End If
+
+Sub AlignToObject()
+
+	AlignPlus "Obj"
+	
+End Sub
+
+Sub AlignToPoint
+
+	AlignPlus "Pt"
+	
+End Sub
+
+'Rhino.AddStartUpScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "AlignToObject", "! _NoEcho _-Runscript AlignToObject"
+'Rhino.AddAlias "AlignToPoint", "! _NoEcho _-Runscript AlignToPoint"
+
+Sub AlignPlus(sAlignType)
+  
+	Dim arrObj, aGrouped()
+
+	arrObj = Rhino.GetObjects("Select objects to align",,True,True)
+	If Not IsArray(arrObj) Then Exit Sub
+	
+	Dim aGroups: aGroups = ExtractGrouped(arrObj)(1)
+	arrObj = ExtractGrouped(arrObj)(0)
+	
+
+	
+	Dim strAlign, arrTarg, Plane, arrTargPlane
+	Dim Bound, i, arrBase
+  
+	Dim arrAlign:arrAlign = Array("Left","Right", "HorizCenter", "VertCenter", "Concentric", "Top",  "Bottom")
+	Dim arrBasePlane, arrFinal, temp, sTarg
+	
+
+	
+	Do
+		strAlign = Rhino.getString ("Choose alignment",OldAlign, arrAlign)
+		
+		If isNull(strAlign) Or strAlign="" Then
+			Exit Sub
+		End If
+		OldAlign = strAlign
+		
+		If Not IsNull(strAlign) Then 
+
+			Dim arrCoordinate, strCoordinate
+			If CheckValidArray(arrAlign, strAlign) Then
+				arrCoordinate = GetCoordinate(strAlign)
+				strCoordinate = arrCoordinate(0)
+			End If
+		
+		End If
+		
+		If sAlignType = "Obj" Then
+			
+			
+			If sAlignType = "Obj" Then
+				starg = Rhino.GetObject("Select target object",,True)
+				If isNull(sTarg) Then Exit Sub		
+			End If
+		
+			temp = GetAlignPointObj(array(sTarg),arrCoordinate)
+			arrTarg = temp(0)
+		Else
+			arrTarg = Rhino.GetPoint("Select target point")
+			
+		End If
+		
+		If Not IsArray(arrTarg) Then Exit Sub
+	
+		Rhino.EnableRedraw(False)
+		Plane = Rhino.ViewCplane
+		arrTargPlane = Rhino.XFormWorldtoCplane(arrTarg, Plane)
+		
+		If isUpperBound(arrObj) Then
+
+			arrBase = GetAlignPointObj(arrObj, arrCoordinate)
+
+			If isUpperBound(arrBase) Then
+		
+				arrBasePlane = WorldToCPlanePts(arrBase, Plane)
+			
+				For i = 0 To UBound(arrObj)
+					ReDim Preserve arrNewTargPlane(i)
+				
+					If strCoordinate = "X" Then
+						arrNewTargPlane(i) = Array(arrTargPlane(0), arrBasePlane(i)(1), arrBasePlane(i)(2))
+					
+					ElseIf strCoordinate = "Y" Then
+						arrNewTargPlane(i) = Array( arrBasePlane(i)(0),arrTargPlane(1), arrBasePlane(i)(2))
+					
+					ElseIf strCoordinate = "XY" Then
+						arrNewTargPlane(i) = Array( arrTargPlane(0),arrTargPlane(1), arrBasePlane(i)(2))
+					
+					End If
+				Next
+			
+				arrFinal = CPlaneToWorldPts(arrNewTargPlane)
+			
+				'		Else Exit Sub
+			End If
+			
+			For i = 0 To UBound(arrObj)
+				Rhino.MoveObject arrObj(i), arrBase(i), arrFinal(i)
+			Next
+		
+		End If
+		
+		
+		If IsUpperBound(aGroups) Then
+		
+			arrBase = GetAlignPointGrp(aGroups, arrCoordinate)
+			arrBasePlane = WorldToCPlanePts(arrBase, Plane)
+			
+			For i = 0 To UBound(aGroups)
+				ReDim Preserve aGrouped(i)
+				agrouped(i) = Rhino.ObjectsByGroup(aGroups(i))
+				ReDim Preserve arrNewTargPlane(i)
+				
+				If strCoordinate = "X" Then
+					arrNewTargPlane(i) = Array(arrTargPlane(0), arrBasePlane(i)(1), arrBasePlane(i)(2))
+					
+				ElseIf strCoordinate = "Y" Then
+					arrNewTargPlane(i) = Array( arrBasePlane(i)(0),arrTargPlane(1), arrBasePlane(i)(2))
+					
+				ElseIf strCoordinate = "XY" Then
+					arrNewTargPlane(i) = Array( arrTargPlane(0),arrTargPlane(1), arrBasePlane(i)(2))
+					
+				End If
+			Next
+			arrFinal = CPlaneToWorldPts(arrNewTargPlane)
+		
+			For i = 0 To UBound(aGroups)
+				Rhino.MoveObjects aGrouped(i), arrBase(i), arrFinal(i)
+			Next
+			
+		End If
+		
+		Rhino.EnableRedraw(True)
+
+	Loop Until IsNull(strAlign) Or Not IsArray(arrTarg)
+    
+End Sub
+
+Function FindBBCentroid(strObj)
+  
+	Dim arrBB, arrCent
+  
+	arrBB = Rhino.BoundingBox(strObj) 
+	arrCent = AveragePoints (Array(arrBB(0), arrBB(6)))
+	FindBBCentroid = arrCent
+    
+End Function
+
+Function GetAlignPointGrp(aGrp,arrCoordinate)
+
+	Dim arrCen, Bound, i, grp
+	Bound = UBound(aGrp)
+	
+	i = 0
+	If IsArray(aGrp) Then
+		If arrCoordinate(1) = "HORIZCENTER" Or arrCoordinate(1) = "VERTCENTER" _ 
+			Or arrCoordinate(1) = "CONCENTRIC" Then
+			For i = 0 To Bound
+				grp = Rhino.ObjectsByGroup(aGrp(i))
+				arrCen = FindBBPointPlane(grp,8)
+				
+				If IsArray(arrCen) Then
+					ReDim Preserve arrBase(i)
+					arrBase(i) = arrCen
+				End If
+			Next
+		ElseIf arrCoordinate(1) = "LEFT" Or arrCoordinate(1) = "TOP" Then
+			For i = 0 To Bound
+				grp = Rhino.ObjectsByGroup(aGrp(i))
+				arrCen = FindBBPointPlane(grp,7)
+              
+				If IsArray(arrCen) Then
+					ReDim Preserve arrBase(i)
+					arrBase(i) = arrCen
+				End If
+			Next
+                        
+		ElseIf arrCoordinate(1) = "RIGHT" Or arrCoordinate(1) = "BOTTOM" Then
+			For i = 0 To Bound
+				grp = Rhino.ObjectsByGroup(aGrp(i))
+				arrCen = FindBBPointPlane(grp,1)
+              
+				If IsArray(arrCen) Then
+					ReDim Preserve arrBase(i)
+					arrBase(i) = arrCen
+				End If
+			Next
+		End If  
+	Else Exit Function
+	End If
+				
+	
+	GetAlignPointGrp = arrBase
+
+End Function
+
+Function GetAlignPointObj(arrObj,arrCoordinate)
+
+	Dim arrCen, Bound, i
+	Bound = UBound(arrObj)
+	
+	i = 0
+	If IsArray(arrObj) Then
+		If arrCoordinate(1) = "HORIZCENTER" Or arrCoordinate(1) = "VERTCENTER" _ 
+			Or arrCoordinate(1) = "CONCENTRIC" Then
+			For i = 0 To Bound
+				arrCen = FindBBPointPlane(arrObj(i),8)
+				
+				If IsArray(arrCen) Then
+					ReDim Preserve arrBase(i)
+					arrBase(i) = arrCen
+				End If
+			Next
+		ElseIf arrCoordinate(1) = "LEFT" Or arrCoordinate(1) = "TOP" Then
+			For i = 0 To Bound
+				arrCen = FindBBPointPlane(arrObj(i),7)
+              
+				If IsArray(arrCen) Then
+					ReDim Preserve arrBase(i)
+					arrBase(i) = arrCen
+				End If
+			Next
+                        
+		ElseIf arrCoordinate(1) = "RIGHT" Or arrCoordinate(1) = "BOTTOM" Then
+			For i = 0 To Bound
+				arrCen = FindBBPointPlane(arrObj(i),1)
+              
+				If IsArray(arrCen) Then
+					ReDim Preserve arrBase(i)
+					arrBase(i) = arrCen
+				End If
+			Next
+		End If  
+	Else Exit Function
+	End If
+				
+	
+	GetAlignPointObj = arrBase
+
+End Function
+
+Function ExtractGrouped(aObj)
+	
+	'find objects that are not in groups
+	'and make an array
+	'get a list of group names
+	
+	
+	Dim aGrouped,aUngrouped(), i, sObj
+	Dim temp, grp, n, agroups()
+	i = 0
+	n = 0
+	
+	For Each sObj In aObj
+		temp = Rhino.ObjectGroups (sObj)
+			
+		If IsArray(temp)Then
+			For Each grp In temp
+				ReDim Preserve aGroups(n)
+				aGroups(n) = grp
+				n = n +1
+			Next
+			
+		Else ReDim Preserve aUngrouped(i)
+			aUngrouped(i) = sobj
+			i = i +1
+		End If
+			
+	Next
+	If isUpperBound(aGroups) Then
+		temp = Rhino.CullDuplicateStrings(aGroups)
+	End If
+	
+	ExtractGrouped = array(aUngrouped, temp)
+
+End Function
+
+Function FindBBPointPlane(sObj,idxPt)
+	Dim Result, aBB, sView
+	
+	sView = Rhino.CurrentView
+	aBB = Rhino.BoundingBox(sObj, sView) 
+	If idxPt = 8 Then
+		Result =AveragePoints (Array(aBB(0), aBB(6)))
+	Else Result = aBB(idxPt)
+	End If
+	
+	FindBBPointPlane = Result	
+	
+End Function
+
+Function AveragePoints(arrPts)
+
+	Dim X, Y, Z
+	Dim XX, YY, ZZ
+	Dim arrX(), arrY(), arrZ()
+	Dim BigX, BigY, BigZ
+	Dim XAverage, YAverage, ZAverage, arrAverage
+	Dim i
+
+	XX = False
+	YY = False
+	ZZ = False
+
+	For i=0 To UBound(arrPts)
+		ReDim Preserve arrX(i)
+		arrX(i) = arrPts(i)(0)
+		ReDim Preserve arrY(i)
+		arrY(i) = arrPts(i)(1)
+		ReDim Preserve arrZ(i)
+		arrZ(i) = arrPts(i)(2)
+	Next
+
+	If IsArray(arrX)Then
+		For i=0 To UBound (arrX)
+			If XX =False Then
+				X = arrX(0)
+				BigX=X
+				XX =True
+			ElseIf XX =True Then
+				X= BigX+arrX(i)
+				BigX=X
+			End If
+		Next
+	End If
+
+	If IsArray(arrY) Then
+		For i=0 To UBound (arrY)
+
+			If YY = False Then
+				Y = arrY(0)
+				BigY=Y
+				YY =True
+			ElseIf YY =True Then
+				Y= BigY+arrY(i)
+				BigY=Y
+			End If
+		Next
+	End If
+
+	If IsArray(arrZ)Then
+		For i=0 To UBound (arrZ)
+			If ZZ =False Then
+				Z = arrZ(0)
+				BigZ=Z
+				ZZ =True
+			ElseIf ZZ =True Then
+				Z= BigZ+arrZ(i)
+				BigZ=Z
+			End If
+		Next
+	End If
+
+	XAverage =  BigX/(UBound(arrPts)+1)
+	YAverage =  BigY/(UBound(arrPts)+1)
+	ZAverage =  BigZ/(UBound(arrPts)+1)
+
+	arrAverage = Array(XAverage, YAverage, ZAverage)
+	AveragePoints = arrAverage
+
+End Function
+
+Function CheckValidArray(arrCheck, strToCheck)
+
+	Dim blnStatus, strCheck
+
+	blnStatus =False
+	If IsArray(arrCheck) Then
+		For Each strCheck In arrCheck
+			If UCase(strToCheck) = UCase(strCheck) Or strToCheck = ""Then
+				blnStatus = True
+				Exit For
+			End If
+		Next
+	End If
+	CheckValidArray = blnStatus
+
+End Function
+
+
+Function GetCoordinate(strAlign)
+  
+	Dim arrCoord
+  
+	If UCase(StrAlign) = "LEFT" Or UCase(StrAlign) ="RIGHT" Or _
+		UCase(StrAlign) = "VERTCENTER" Then
+		arrCoord = Array("X", UCase(strAlign))
+	ElseIf UCase(StrAlign) = "TOP" Or UCase(StrAlign) = "BOTTOM" Or _
+		UCase(StrAlign) = "HORIZCENTER" Then
+		arrCoord =  Array("Y", UCase(strAlign))
+	ElseIf UCase(StrAlign) = "CONCENTRIC"  Then
+		arrCoord =  Array("XY", UCase(strAlign))
+		
+		
+	End If
+
+	GetCoordinate = arrCoord
+  
+End Function
+
+Function WorldToCplanePts(arrPts, arrPlane)
+
+	Dim  i, arrOutput()
+	'	arrPlane = Rhino.ViewCplane
+	For i = 0 To UBound(arrPts)
+	 
+		ReDim Preserve arrOutput(i)
+		arrOutput(i) = Rhino.XformWorldToCplane (arrPts(i), arrPlane)
+	
+	Next
+
+	WorldToCplanePts = arrOutput
+
+End Function
+
+Function CplaneToWorldPts(arrPts)
+
+	Dim  i, arrOutput()
+	Dim aPlane : 	aPlane = Rhino.ViewCplane
+	For i = 0 To UBound (arrPts)
+		
+		ReDim Preserve arrOutput(i)
+		arrOutput(i) = Rhino.XformCPlaneToWorld (arrPts(i), aPlane)
+		
+	Next
+
+	CplaneToWorldPts = arrOutput
+
+End Function
+
+Function IsUpperBound(ByRef arr)
+
+	IsUpperBound = False
+
+	If IsArray(arr) Then
+
+		On Error Resume Next
+
+		UBound arr
+
+		If Err.Number = 0 Then IsUpperBound = True
+
+	End If
+
+End Function

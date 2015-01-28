@@ -1,0 +1,80 @@
+'--------------------------------------------------------------
+'Command   :  cros(cross)
+'Date      :  2011/10/01
+'Version   :  α111001
+'Organization   :  Rhino+
+'--------------------------------------------------------------
+
+Sub Cross()
+
+Dim dblength,arrPoint,arrCPlane1,arrWorldPlane,Point,PointXYZ,arrStartX,arrEndX,X,X2,arrStartY,arrEndY,Y,Y2,arrStartZ,arrEndZ,Z,Z2,arrPoint0,P0,Movepoint,MovepointXYZ
+
+'--------------------------------------------------------------
+str = Rhino.GetDocumentData("cros", "dbLength")
+If IsNull(str) Then 
+ dblength = Rhino.GetReal("Length" ,10)
+ If IsNull(dblength) Then Exit Sub 
+Else
+ dblength = Rhino.GetReal("Length" ,CDbl(str)) 
+ If IsNull(dblength) Then Exit Sub 
+End If 
+Rhino.SetDocumentData "cros", "dbLength", CStr(dblength)
+'--------------------------------------------------------------
+
+arrPoint = Rhino.GetPoint("Pick a point")
+
+If IsArray(arrPoint) Then
+
+ arrCPlane1 = Rhino.ViewCPlane
+ arrWorldPlane = Rhino.WorldXYPlane
+
+
+ Point=Rhino.AddPoint(arrPoint)
+ PointXYZ = Rhino.PointCoordinates(Point)
+
+'--------------------------------------------------------------
+Rhino.EnableRedraw False
+
+arrStartX= Array(dblength/2,0,0)
+arrEndX= Array(-dblength/2,0,0)
+
+X=Rhino.AddLine (arrStartX, arrEndX)
+X2=Rhino.RemapObject( X, arrWorldPlane, arrCPlane1)
+
+
+
+arrStartY= Array(0,dblength/2,0)
+arrEndY= Array(0,-dblength/2,0)
+
+Y=Rhino.AddLine( arrStartY, arrEndY)
+Y2=Rhino.RemapObject (Y, arrWorldPlane, arrCPlane1)
+
+
+arrStartZ= Array(0,0,dblength/2)
+arrEndZ= Array(0,0,-dblength/2)
+
+Z=Rhino.AddLine (arrStartZ, arrEndZ)
+Z2=Rhino.RemapObject (Z, arrWorldPlane, arrCPlane1)
+
+
+'--------------------------------------------------------------
+arrPoint0 = Array(0,0,0)
+P0=Rhino.AddPoint (arrPoint0)
+Movepoint=Rhino.RemapObject (P0, arrWorldPlane, arrCPlane1)
+MovepointXYZ = Rhino.PointCoordinates(Movepoint)
+'--------------------------------------------------------------
+
+Rhino.MoveObject X2, MovepointXYZ,PointXYZ
+Rhino.MoveObject Y2, MovepointXYZ,PointXYZ
+Rhino.MoveObject Z2, MovepointXYZ,PointXYZ
+
+Rhino.DeleteObject P0
+Rhino.DeleteObject Movepoint
+'Rhino.DeleteObject point
+
+Rhino.EnableRedraw True
+'--------------------------------------------------------------
+End If
+End Sub
+
+ 

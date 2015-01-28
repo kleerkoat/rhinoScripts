@@ -1,0 +1,11 @@
+﻿'The following VERY short script should select the last object created in the file, if that has been deleted, 
+'it will select the one before that, etc., etc. all the way back to the beginning...
+'(Change the second True to False if you don't want lights to be considered as last created objects by the script.)
+'You could also throw this in your startup scripts and/or give it an alias - that way you could call it in a macro if you wanted.
+
+
+Option Explicit
+Call SelectLastCreatedObject()
+Sub SelectLastCreatedObject()
+	Call Rhino.FirstObject(True,True)
+End Sub

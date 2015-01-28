@@ -1,0 +1,23 @@
+﻿Option Explicit
+'Script written by Ryan Gilmore
+'Script version Tuesday, May 22, 2012 6:32:53 AM
+
+'Call MatchProperties()
+Sub MatchProperties()
+	Dim arrTargets, strSource
+
+	arrTargets = Rhino.GetObjects("Select objects")
+
+	If IsArray(arrTargets) Then
+
+		strSource = Rhino.GetObject("Select object to match")
+
+		If Not IsNull(strSource) Then
+
+			Rhino.MatchObjectAttributes arrTargets, strSource
+
+		End If
+
+	End If
+
+End Sub

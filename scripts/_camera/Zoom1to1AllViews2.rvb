@@ -1,0 +1,37 @@
+﻿Option Explicit
+'Script written by Mitch
+'Script version Tuesday, June 22, 2010
+
+Call Zoom1to1AllViews()
+Sub Zoom1to1AllViews()
+	
+	Dim strOrigView,strViewName,arrViewNames,arrAllObjs
+	
+	StrOrigView=Rhino.CurrentView
+	arrViewNames=Rhino.ViewNames
+	Call Rhino.EnableRedraw(False)
+	arrAllObjs=Rhino.NormalObjects
+	
+	If IsArray(arrAllObjs) Then
+		Dim arrViewCen
+		arrViewCen=BBCP(arrAllObjs)		
+	End If
+	For each strViewName in arrViewNames
+		Call Rhino.CurrentView(strViewName)
+		Call Rhino.Command("_Zoom _1to1")
+		If IsArray(arrViewCen) Then
+			Call Rhino.ViewTarget(strViewName,arrViewCen)
+		End If		
+	Next
+	Call Rhino.CurrentView(strOrigView)
+	Call Rhino.EnableRedraw(True)
+End Sub
+
+Private Function BBCP(ByVal arrObjs)
+	BBCP=Null
+	Dim arrBB, arrAdd
+	arrBB=Rhino.BoundingBox(arrObjs)
+	arrAdd=Rhino.PointAdd(arrBB(0),arrBB(6))
+	BBCP=Rhino.PointDivide(arrAdd,2)	
+End Function
+

@@ -1,0 +1,35 @@
+﻿Option Explicit
+
+
+Call Main()
+Sub Main()
+	
+	Dim arrObjects,arrObjLayers(),arrLayers,i,j,k,arrLayersOn()
+	
+	'Pick the objects and get their layers.
+	arrObjects=Rhino.GetObjects("Pick objects for layer on.")
+	
+	For i=0 To Ubound(arrObjects)
+		ReDim Preserve arrObjLayers(i)
+		arrObjLayers(i)=Rhino.ObjectLayer(arrObjects(i))
+	Next
+	
+	'Make sure that the current layer is one of the object layers.
+	Call Rhino.CurrentLayer(arrObjLayers(0))
+
+	'Get all of the layers in the document.
+	arrLayers=Rhino.LayerNames()
+	
+	Call Rhino.EnableRedraw(False)
+	'Turn off all of the layers.
+	For i=0 To Ubound(arrLayers)
+		Call Rhino.LayerVisible(arrLayers(i),False)
+	Next
+	
+	'Turn on the selected object layers.	
+	For i=0 To Ubound(arrObjLayers)
+		Call Rhino.LayerVisible(arrObjLayers(i), True)
+	Next
+	Call Rhino.EnableRedraw(True)
+	
+End Sub

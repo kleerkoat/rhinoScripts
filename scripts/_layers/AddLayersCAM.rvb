@@ -1,0 +1,26 @@
+Option Explicit
+'Script written by Ryan
+'Script version Friday, February 25, 2011 11:21:43 AM
+
+'Call AddLayersCAM()
+Sub AddLayersCAM()
+	Dim strLayer
+
+	strLayer = Rhino.StringBox("New layer name:", "CUTXX", "Add CAM Layers")
+
+	If IsNull(strLayer) Then 
+		Exit Sub
+   
+	Else
+    
+		Rhino.AddLayer(strLayer)
+		Rhino.AddLayer "LOGO", RGB(255,0,255),,,(strLayer)
+		Rhino.AddLayer "ISLAND",RGB(0,255,255),,,(strLayer)
+		Rhino.AddLayer "BORDER",RGB(0,255,0),,,(strLayer)
+		Rhino.AddLayer "ROUTE", RGB(255,0,0),,,(strLayer)
+		Rhino.AddLayer "KNIFE",RGB(0,0,255),,,(strLayer)
+
+	End If
+	
+
+End Sub

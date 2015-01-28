@@ -1,0 +1,31 @@
+Option Explicit
+' Script written by G. C. Webster� (aka Guilherme Cozer Webster) in November/2005 for Rhinoceros 3.0
+' Contact: gcwebster@pop.com.br
+' RhinoScript June 16, 2005
+' Designed to annotate curve radius.
+
+Sub DimCrvRadius()
+
+Dim arrCrv, strCrv
+Dim arrPt, dblRadius
+
+arrCrv = Rhino.GetObjects ("Select curves", 4, True, True, True)
+       If IsNull (arrCrv) Then
+       Exit Sub
+       End If
+       
+       For each strCrv in arrCrv
+           If Rhino.IsArc(strCrv) Then
+              dblRadius = Rhino.ArcRadius (strCrv)
+              arrPt = Rhino.ArcCenterPoint (strCrv)
+              Rhino.AddTextDot CStr (dblRadius), arrPt
+           End If
+           If Rhino.IsCircle(strCrv) Then
+              dblRadius = Rhino.CircleRadius (strCrv)
+              arrPt = Rhino.CircleCenterPoint (strCrv)
+              Rhino.AddTextDot CStr (dblRadius), arrPt
+           End If
+       Next
+
+End Sub
+

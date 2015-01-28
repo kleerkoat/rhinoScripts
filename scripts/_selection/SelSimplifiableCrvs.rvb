@@ -1,0 +1,28 @@
+Option Explicit
+'Script by Mitch Heynick
+'Version Sunday, 12 December, 2010
+
+'Call SelSimplifiableCrvs()
+Sub SelSimplifiableCrvs()
+	
+	Dim arrCrvs,strCrv,strCrvCopy,n : n=0
+	arrCrvs=Rhino.GetObjects("Select curves to check",4,,True)
+	If Not IsArray(arrCrvs) Then Exit Sub
+	
+	Call Rhino.EnableRedraw(False)
+	Call Rhino.UnselectAllObjects
+	For each strCrv in ArrCrvs
+		strCrvCopy=Rhino.CopyObject(strCrv)
+		If Rhino.SimplifyCurve(strCrvCopy)Then
+			n=n+1
+			Call Rhino.SelectObject(strCrv)
+		End If
+		Call Rhino.DeleteObject(strCrvCopy)
+	Next
+	If n>0 Then 
+		Call Rhino.Print("Found "&n&" curves that are simplifiable")
+	Else
+		Call Rhino.Print("No simplifiable curves found")
+	End If
+	Call Rhino.EnableRedraw(True)
+End Sub

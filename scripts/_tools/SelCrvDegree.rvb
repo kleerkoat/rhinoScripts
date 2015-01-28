@@ -1,0 +1,20 @@
+Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version Friday, February 03, 2012 1:42:11 PM
+
+Call Main()
+Sub Main()
+	Dim strObject, dblDegree
+
+	strObject = Rhino.GetObject("Select a curve")
+
+	If Rhino.IsCurve(strObject) Then
+
+		dblDegree = Rhino.CurveDegree(strObject)
+
+		Rhino.Print "Curve degree: " & CStr(dblDegree)
+
+	End If
+
+End Sub

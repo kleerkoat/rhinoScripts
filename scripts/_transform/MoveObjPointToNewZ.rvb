@@ -1,0 +1,23 @@
+Option Explicit
+'Script by Mitch Heynick
+'Version Thursday, 28 January, 2010
+
+Sub MoveObjPointToNewZ()
+	
+	Dim arrSel,arrMoveFromPt,dblZ,dblZMov
+	
+	arrSel=Rhino.GetObjects("Pick objects to move to new Z level",,True,True)
+	If not IsArray(arrSel) Then Exit Sub
+	
+	arrMoveFromPt=Rhino.GetPoint("Pick point at Z Level to move from")
+	If not IsArray(arrMoveFromPt) Then Exit Sub
+	
+	dblZ=Rhino.GetReal("Enter Z level to move to")
+	If IsNull(dblZ) Then Exit Sub
+	
+	dblZMov=dblZ-arrMoveFromPt(2)
+	Call Rhino.MoveObjects(arrSel,array(0,0,dblZMov))
+
+End Sub
+
+'Call MoveObjPointToNewZ()

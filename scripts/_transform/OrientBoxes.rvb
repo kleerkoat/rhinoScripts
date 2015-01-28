@@ -1,0 +1,32 @@
+Option Explicit
+
+'In: lines, box
+'Out: boxes copied and rotated to each line
+'OrientBoxes.rvb
+
+'In: lines, box
+'Out: boxes copied and rotated to each line
+
+'This script is useful for copying small boxes to the intersections of half-lap joint models
+
+
+Sub OrientBoxes
+  
+  Dim arrLines, strBox, arrRefPoints, arrTargetPoints(1), i
+  
+  arrLines = Rhino.GetObjects("Select the intersection lines", 4)
+  
+  strBox = Rhino.GetObject("Select the box to copy to each line", 4)
+  
+  arrRefPoints = Rhino.GetPoints(True,,"Select the 1st reference point","Select the 2nd reference point", 2)
+  
+  For i = 0 To UBound(arrLines)
+    Rhino.StatusBarMessage i & "/" & UBound(arrLines)
+    arrTargetPoints(0) = Rhino.CurveMidPoint(arrLines(i))
+    arrTargetPoints(1) = Rhino.CurveStartPoint(arrLines(i))
+    Rhino.OrientObject strBox, arrRefPoints, arrTargetPoints,1
+  Next
+  
+End Sub
+
+OrientBoxes

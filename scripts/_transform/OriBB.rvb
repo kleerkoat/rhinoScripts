@@ -1,0 +1,33 @@
+﻿Option Explicit
+' Script written by Guilherme Cozer Webster, May 2005
+' Designed to create an oriented Bounding Box accordingly to a 3pt CPlane, in Rhinoceros 3D.
+
+  Sub OriBB
+
+   Dim arrObj, strView
+
+     Rhino.command ("CPlane _3Point"), false
+     If Rhino.LastCommandResult <> 0 Then
+     Exit Sub
+     End If
+
+     arrObj = Rhino.GetObjects ("Select objects for oriented bounding box", , True, True)
+            If IsNull (arrObj) Then
+            Exit Sub
+            Else
+     
+     Rhino.selectobjects arrObj
+     
+     Rhino.command "BoundingBox _pause CPlane", false
+
+     strView = Rhino.CurrentView
+     Rhino.CurrentView (strView)
+     
+     Rhino.command "CPlane _Previous", false
+
+                   End If
+                   
+End Sub
+
+OriBB
+)

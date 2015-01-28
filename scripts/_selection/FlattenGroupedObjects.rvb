@@ -1,0 +1,19 @@
+' VB Script Document
+option explicit
+'The second would take a selected group with possible nested groups and 
+' flatten them into one top level group.
+Sub FlattenGroupedObjects
+  Dim arrObjects, strObject, strGroup, arrGroups
+  arrObjects = Rhino.GetObjects("Select objects to ungroup", ,True, True)
+  If IsArray(arrObjects) Then
+    strGroup = Rhino.AddGroup
+    For Each strObject In arrObjects
+      arrGroups = Rhino.ObjectGroups(strObject)
+      If IsArray(arrGroups) Then
+        Call Rhino.RemoveObjectFromAllGroups(strObject)
+        Call Rhino.AddObjectToGroup(strObject, strGroup)
+      End If
+    Next
+  End If
+  Rhino.Print "Successful, flattened selected groups to one group."
+End Sub

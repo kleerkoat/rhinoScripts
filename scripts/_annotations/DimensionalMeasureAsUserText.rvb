@@ -1,0 +1,110 @@
+Option Explicit
+'Script version Friday, October 12, 2007 10:53:09 PM
+
+'Call DimensionalMeasureAsUserText()
+Sub DimensionalMeasureAsUserText()
+
+	Dim arrObjects
+	Dim strObject, strObjectName, dblVolume
+	Dim strUnitSystem
+	Dim strCSVLine
+	Dim arrMP
+	Dim i
+	Dim arrGroups
+	Dim strGroup
+	Dim strUnit,strValue,strError
+	Dim blnIsExport
+	dim arrCentroid
+	dim arrTemp
+	
+	arrObjects = rhino.GetObjects("Select objects",4+8+16+32,True,True)
+	If Not(isarray(arrObjects)) Then Exit Sub
+	
+	Rhino.EnableRedraw(vbFalse)
+	strUnitSystem = Rhino.UnitSystemName(False, True, True)
+		
+	'***********************************************************************
+	For Each strObject In arrObjects
+		blnIsExport = False
+		If Rhino.IsCurve(strObject) Or Rhino.IsPolyCurve(strObject) Then
+			strUnit = strUnitSystem
+			strValue = Rhino.CurveLength(strObject)
+			strError = "0"
+			
+			arrCentroid = Rhino.CurveMidPoint(strObject)
+			
+			blnIsExport = True
+		End If
+		
+		If Rhino.IsMesh(strObject) Then
+			If Rhino.IsMeshClosed(strObject) Then
+				arrMP = Rhino.MeshVolume(strObject)
+				If isarray(arrMP) Then
+					strUnit = strUnitSystem&"3"
+					strValue = CStr(arrMP(1))
+					strError = CStr(arrMP(2))
+				End If
+				
+				arrCentroid = Rhino.MeshVolumeCentroid(strObject)
+				
+			Else
+				arrMP = Rhino.MeshArea(strObject)
+				If isarray(arrMP) Then
+					strUnit = strUnitSystem&"2"
+					strValue = CStr(arrMP(1))
+					strError = CStr(arrMP(2))
+				End If
+			
+				arrCentroid = Rhino.MeshAreaCentroid(strObject)
+			
+			End If
+			blnIsExport = True
+		End If
+		
+		If rhino.IsSurface(strObject) Or rhino.IsPolysurface(strObject) Then
+			If Rhino.IsObjectSolid (strObject) Then
+				arrMP = Rhino.SurfaceVolume(strObject)
+				If isarray(arrMP) Then
+					strUnit = strUnitSystem&"3"
+					strValue = CStr(arrMP(0))
+					strError = CStr(arrMP(1))
+				End If
+				
+				arrTemp = Rhino.SurfaceVolumeCentroid (strObject)
+				if isarray(arrTemp) then
+					arrCentroid = arrTemp(0)
+				end if
+				
+			Else
+				arrMP = Rhino.SurfaceArea(strObject)
+				If isarray(arrMP) Then
+					strUnit = strUnitSystem&"2"
+					strValue = CStr(arrMP(0))
+					strError = CStr(arrMP(1))
+				End If
+				
+				arrTemp = Rhino.SurfaceAreaCentroid (strObject)
+				if isarray(arrTemp) then
+					arrCentroid = arrTemp(0)
+				end if
+				
+			End If
+			blnIsExport = True
+		End If
+
+		If blnIsExport Then
+			Call Rhino.print("Adding dimensional measure ("&strUnit&") to "&strObject)
+			Call Rhino.SetUserText(strObject,strUnit,strValue)
+			If Not(strError = "0") Then Call Rhino.SetUserText(strObject,"error_"&strUnit,strError)
+			if IsArray(arrCentroid) then
+				Call Rhino.SetUserText(strObject,"Centroid_x",cstr(arrCentroid(0)))
+				Call Rhino.SetUserText(strObject,"Centroid_y",cstr(arrCentroid(1)))
+				Call Rhino.SetUserText(strObject,"Centroid_z",cstr(arrCentroid(2)))
+			end if
+		End If
+
+	Next
+	
+	Rhino.EnableRedraw(vbTrue)
+
+End Sub

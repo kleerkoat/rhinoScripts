@@ -1,0 +1,256 @@
+﻿Option Explicit
+'Script written by Pascal
+'Script copyrighted by RMA
+'Script version Thursday, September 06, 2007
+
+'forces  curve control points to a plane that is a best fit 
+'to the curve if FixEnds = No.
+
+'Forces curve control points to a 3 point plane
+'through the end points and curve mid point if FixEnds=Yes
+
+'ToDo- check on vertical option with FixEndPoints=No
+'set and store a default for fixing curve ends
+
+
+Private sOldFix, sOldPlaneStyle
+
+If isEmpty(sOldFix) Then
+	sOldFix = "Yes"
+End If
+
+If isEmpty(sOldPlaneStyle) Then
+	sOldPlaneStyle = "Auto"
+End If
+Sub PlanarizeCurve
+	
+	'Get the curve
+	Dim sCrv: sCrv = Rhino.getObject("Select curve to planarize", 4,True,True)
+	If isnull(sCrv) Then Exit Sub
+	
+	'decide whether to fix the curve end points or not.
+	Dim sFix: sFix = Rhino.GetString("Fix end points",sOldFix, array("Yes", "No"))
+
+	'make sure the input is a valid Yes or No
+	'set the remembered state(sOldFix)
+	If Not isNull(sFix) Then
+		
+		If Ucase(sFix) = "YES" Then
+			sFix ="Yes" 
+			sOldFix = "Yes"
+		ElseIf Ucase(sFix) = "NO" Then
+			sFix = "No"
+			sOldFix = "No"
+		End If
+		
+	Else Exit Sub
+	End If
+	
+	Dim sPLaneStyle: sPlaneStyle = Rhino.GetString ("Plane style", sOldPlaneStyle, Array("Auto","Vertical"))
+	
+	If Not isNull(sPlaneStyle) Then
+		
+		If Ucase(sPlaneStyle) = "AUTO" Then
+			sPlaneStyle ="Auto" 
+			sOldPlaneStyle = "Auto"
+		ElseIf Ucase(sPlaneStyle) = "VERTICAL" Then
+			sPlaneStyle = "Vertical"
+			sOldPlaneStyle = "Vertical"
+		End If
+		
+	Else Exit Sub
+	End If
+	
+	Rhino.EnableRedraw(False)
+	
+	Dim X:	X = False
+		
+	'turn on the  curve grips if they are not on
+	If Not Rhino.ObjectGripsOn(sCrv) Then
+		Rhino.EnableObjectGrips sCrv
+			
+		'setting enables resetting of the grip state  to off later
+		X = True 
+	End If
+	
+	
+	Dim aPts, temp, tempPlane
+	Dim aSeedPts : aSeedPts = Rhino.DivideCurve(sCrv, 100)
+	'Get the curve control point locations
+	'	Dim aCtrl: aCtrl = Rhino.CurvePoints(sCrv)
+	Dim Count: Count = Rhino.ObjectGripCount(sCrv)
+	
+	Dim aStart: aStart = Rhino.CurveStartPoint(sCrv)	
+	'if FixEnds = Yes then use a three point plane
+	If sFix = "Yes" Then
+		
+		If Not Rhino.IsCurveClosed(sCrv) Then
+			
+			Dim AvPts: AvPts = AveragePoints (aSeedPts)
+	
+			Dim aEnd: aEnd = Rhino.CurveEndPoint(sCrv)
+			
+			If sPlaneStyle = "Vertical" Then
+				
+				temp = AveragePoints (array(aStart, aEnd))
+				tempPlane = Rhino.XformWorldtoCplane(temp, Rhino.ViewCPlane)
+				temp= array(tempPlane(0), tempPlane(1), tempPlane(2)+1)
+				AvPts = Rhino.XFormCplaneToWorld(temp,Rhino.ViewCplane)
+				
+			End If
+			
+			aPts = array(aStart, AvPts, aEnd)
+		
+			
+			
+		Else
+			
+			Dim  aHalf1(), ahalf2(), n
+			
+			Dim	intHalf: intHalf = int(.5*Ubound(aSeedPts))
+			
+			For n = 0 To intHalf
+				ReDim Preserve ahalf1(n)
+				aHalf1(n) = aSeedPts(n)
+			Next
+			
+			For n = 0 To intHalf
+				ReDim Preserve ahalf2(n)
+				aHalf2(n) = aSeedPts(intHalf+n)
+			Next
+			
+			Dim avHalf1: avHalf1 = averagePoints (aHalf1)
+
+			Dim avHalf2: avHalf2 = averagePoints (aHalf2)
+
+			
+			If sPlaneStyle = "Vertical" Then
+				
+				avPts = AveragePoints(array(avHalf1, avHalf2))
+				
+				temp = AvPts
+				tempPlane = Rhino.XformWorldtoCplane(temp, Rhino.ViewCPlane)
+				temp= array(tempPlane(0), tempPlane(1), tempPlane(2)+10)
+				AvHalf1 = AvPts
+				AvHalf2 =Rhino.XFormCplaneToWorld(temp,Rhino.ViewCplane)
+				
+			End If
+			
+			aPts = array(aStart, avHalf1, avHalf2)
+
+		End If
+	Else
+		
+		'if FixEnds = No then use the full sample of points along the curve
+		aPts = aSeedPts
+	End If
+			
+
+	If isArray(aPts) Then
+		'turn of screen redraw to avoid flicker and slowness
+	
+		
+		'Get the plane from the set of points
+		Dim Plane:Plane = Rhino.PlaneFitFromPoints(aPts)
+		
+		Dim  Destination
+
+		Dim i
+		For  i = 0 To Count-1
+			
+			'find the closest points on the plane to each grip.
+			Destination = Rhino.PlaneClosestPoint(plane, Rhino.ObjectGripLocation(sCrv,i),True)
+			
+			'move the grips to that location
+			Rhino.ObjectGripLocation sCrv,i,Destination
+		
+		Next
+		
+	End If
+		
+	'shut off the curve grips if they were off when the curve was selected
+	If X = True Then
+		Rhino.EnableObjectGrips sCrv, False	
+	End If
+	
+	'all done, redraw the screen
+	Rhino.EnableRedraw(True)
+	
+End Sub
+
+	'add a startup script and make a command alias to run the script
+Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+Rhino.addAlias "PlanarizeCurve", "! _-NoEcho _-Runscript PlanarizeCurve"
+
+Function AveragePoints(arrPts)
+
+	Dim X, Y, Z
+	Dim XX, YY, ZZ
+	Dim arrX(), arrY(), arrZ()
+	Dim BigX, BigY, BigZ
+	Dim XAverage, YAverage, ZAverage, arrAverage
+	Dim i
+
+	XX = False
+	YY = False
+	ZZ = False
+
+	For i=0 To UBound(arrPts)
+		
+		ReDim Preserve arrX(i)
+		arrX(i) = arrPts(i)(0)
+		ReDim Preserve arrY(i)
+		arrY(i) = arrPts(i)(1)
+		ReDim Preserve arrZ(i)
+		arrZ(i) = arrPts(i)(2)
+		
+	Next
+
+	If IsArray(arrX)Then
+		For i=0 To UBound (arrX)
+			If XX =False Then
+				X = arrX(0)
+				BigX=X
+				XX =True
+			ElseIf XX =True Then
+				X= BigX+arrX(i)
+				BigX=X
+			End If
+		Next
+	End If
+
+	If IsArray(arrY) Then
+		For i=0 To UBound (arrY)
+
+			If YY = False Then
+				Y = arrY(0)
+				BigY=Y
+				YY =True
+			ElseIf YY =True Then
+				Y= BigY+arrY(i)
+				BigY=Y
+			End If
+		Next
+	End If
+
+	If IsArray(arrZ)Then
+		For i=0 To UBound (arrZ)
+			If ZZ =False Then
+				Z = arrZ(0)
+				BigZ=Z
+				ZZ =True
+			ElseIf ZZ =True Then
+				Z= BigZ+arrZ(i)
+				BigZ=Z
+			End If
+		Next
+	End If
+
+	XAverage =  BigX/(UBound(arrPts)+1)
+	YAverage =  BigY/(UBound(arrPts)+1)
+	ZAverage =  BigZ/(UBound(arrPts)+1)
+
+	arrAverage = Array(XAverage, YAverage, ZAverage)
+	AveragePoints = arrAverage
+
+End Function

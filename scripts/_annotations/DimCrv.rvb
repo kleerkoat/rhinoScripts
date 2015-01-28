@@ -1,0 +1,29 @@
+Option Explicit
+'Script written by Pascal
+'Script version Tuesday, June 15, 2010
+
+Rhino.AddStartUpScript Rhino.LastLoadedScriptFile
+Rhino.AddAlias "DimCrv", "_NoEcho _-RunScript (DimCrv)"
+
+Sub DimCrv()
+	
+	'adds a dimension automatically to the end
+	'points on a curve.
+	
+	Dim sCurve, arrStart, arrEnd, Plane
+	
+	Plane = Rhino.ViewCPlane
+	sCurve = Rhino.GetObject("Select curve",4,True,True)
+	If isNull(sCurve) Then Exit Sub
+	
+	If Not Rhino.IsCurveClosed(sCurve) Then
+
+		arrStart = Rhino.XFormWorldtoCplane(Rhino.CurveStartPoint(sCurve),plane)
+		arrEnd = Rhino.XFormWorldtoCplane(Rhino.CurveEndPoint(sCurve),plane)
+		Rhino.Command "Dim " &Rhino.Pt2Str(arrStart, True) &" " & Rhino.Pt2Str(arrEnd, True) 
+		
+	Else Exit Sub
+	End If
+		
+End Sub
+

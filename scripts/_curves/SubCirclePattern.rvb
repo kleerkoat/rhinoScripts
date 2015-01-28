@@ -1,0 +1,79 @@
+Option Explicit
+'Script written by Luis Fraguada
+'Script copyrighted by LaN | Live Architecture Network
+'http://www.livearchitecture.net
+'code@livearchitecture.net
+'Script version Sunday, November 02, 2008 6:06:56 PM
+
+
+'===========================================================================================================================
+'CREATIVE COMMONS LICENSE
+'
+'This work is licensed under the Creative Commons Attribution-Share Alike 3.0 Unported License. To view a copy of this license, 
+'visit http://creativecommons.org/licenses/by-sa/3.0/ or 
+'send a letter to Creative Commons, 171 Second Street, Suite 300, San Francisco, California, 94105, USA.
+'
+'===========================================================================================================================
+
+'===========================================================================================================================
+'This script is provided as is.  The author cannot be held responsible for any damage or loss of work the execution of this 
+'script may cause the user.  At the time of posting, this script has been tested and works according to the instructions
+'provided.  Any questions, please send to code@livearchitecture.net. 
+'===========================================================================================================================
+
+'===========================================================================================================================
+'subCirclePattern: 
+'This script uses the CGI Bitmap Extension for RhinoScript.  In order for this script to work properly, you must download 
+'and correctly configure the plugin found here: http://en.wiki.mcneel.com/default.aspx/McNeel/RhinoScriptImageExtension.html
+'The script prompts the user to select an image.  Image types supported are JPEG, TIFF, PNG, BMP, EXIF, GIF, ICO, and RLE.
+'There is also a scale control.  Circles are drawn with center at the x,y coordinate.  The radius is driven by the luminance
+'at the pixel.  Circles should never intersect.  
+'===========================================================================================================================
+
+'Call SubCirclePattern()
+Sub SubCirclePattern()
+	
+	Dim RhPicture : Set RhPicture = Rhino.GetPluginObject("RhPicture")
+	Dim intX, intY, x,y
+	Dim lngCoData
+	Dim strCir, strFileName
+	Dim dblScale
+	
+	strFileName = Rhino.OpenFileName("Chose Image","JPEG (*.jpg)|*.jpg|PNG(*.png*)|*.png*|BITMAP (*.bmp)|*.bmp|GIF (*.gif)|*.gif|TIFF (*.tif)|*.tif*|Icons (*.ico)|*.ico|EXIF (*.exif)|*.exif|Memory BMP (*.rle)|*.rle||")
+	
+	dblScale = Rhino.GetReal("Input scale factor",1,1)
+	
+	RhPicture.LoadImage(strFileName)
+	
+	intX = RhPicture.Width()
+	intY = RhPicture.Height()
+
+	Call Rhino.EnableRedraw(False)
+	
+	For x = 1 To intX
+	
+		For y = 1 To intY
+		
+			lngCoData = RhPicture.Luminance(x,y)
+			
+			If Not IsNull(lngCoData) Then
+			
+				strCir = Rhino.AddCircle(Rhino.WorldXYPlane,(dblScale -(lngCoData*dblScale))/2)
+				
+				If Not IsNull(strCir) Then
+			
+					Call Rhino.MoveObject(strCir,array(0,0,0),array(dblScale * x, dblScale * y,0))
+				
+				End If
+		
+			End If
+			
+		Next
+	
+	Next
+	
+	Call Rhino.EnableRedraw(True)
+	
+	Set RhPicture = Nothing
+
+End Sub

@@ -1,0 +1,131 @@
+Option Explicit
+'Script written by Carlos de la Barrera and Luis Fraguada
+'Script copyrighted by <insert company name>
+'Script version Tuesday, January 29, 2008 12:08:00 PM
+
+Call Main()
+Sub Main()
+	'variables
+	Dim strSrf, strSrfFlat 
+	Dim arrDomU, arrDomV, arrPt, arrSrfPoints, arrSrfCrvData
+	Dim dblParamU, dblParamV
+	Dim i, j, intDivU, intDivV
+	
+		
+	'inputs
+	strSrf = Rhino.GetObject("sel the curved surface",8)
+	If isnull(strSrf) Then Exit Sub 'if a srf is not selected, abort
+	
+	strSrfFlat = Rhino.GetObject("sel the flat surface",8)
+	If isnull(strSrfFlat) Then Exit Sub 'if a srf is not selected, abort
+	
+	
+	
+	'number of the divisions
+	intDivU = Rhino.GetInteger("Enter number of divisions in U",10,2,100)
+	intDivV = Rhino.GetInteger("Enter number of divisions in V",10,2,100)
+
+	
+	
+	'here
+	ReDim arrSrfPoints(intDivU, intDivV)
+	ReDim arrSrfCrvData(intDivU, intDivV)
+	
+
+	'catch the surface	the min and max in both directions u, v
+	arrDomU = Rhino.SurfaceDomain(strSrf,0)
+	arrDomV = Rhino.SurfaceDomain(strSrf,1)
+	
+		
+	Rhino.Print "Domain in U direction: " & CStr(arrDomU(0)) & " to " & CStr(arrDomU(1))
+
+	Rhino.Print "Domain in V direction: " & CStr(arrDomV(0)) & " to " & CStr(arrDomV(1))
+		
+	
+	
+	'looping
+	For i = 0 To intDivU
+		For j = 0 To intDivV
+			
+			'here we calculate the point on the surface
+			dblParamU = arrDomU(0) + i * ((arrDomU(1) - arrDomU(0)) / intDivU)
+			dblParamV = arrDomV(0) + j * ((arrDomV(1) - arrDomV(0)) / intDivV)
+			
+			'here we test the point on the curve
+			arrPt = Rhino.SurfaceCurvature(strSrf, array(dblParamU, dblParamV))
+			'Rhino.AddPoint arrPt(0)
+			
+			'here we fill the matrix with corresponding points
+			arrSrfPoints(i,j) = arrPt(0)  'From the surface Curvature Command, we get the 3D Pt at index (0)
+			arrSrfCrvData(i,j) = array(arrPt(1),arrPt(6)) 	  'From the surface Curvature Command, we get the normal index(1) and the Gaussian Curvature at index (6)
+			
+			'note, we could take all of the data we want into one matrix, here we use two 
+			
+		Next
+	Next
+	
+	'here we assign a name for my points inside of the array
+	Call funcPrintField(arrSrfPoints, arrSrfCrvData, intDivU, intDivV, strSrfFlat, strSrf)
+
+End Sub
+
+
+Function funcPrintField(arrSrfPoints, arrSrfCrvData, intDivU, intDivV, strSrfFlat, strSrf)
+	
+	
+	Dim i,j, cnt
+	Dim arrPlane, arrCircles(), arrInt
+	Dim strPath, strExtrude
+	Dim dblData
+	
+	cnt = 0 ' we will be making an array of circles, the nature of the array is unlike that of our matrix, thus, we will make a custom counter that will help to translate the data into a one dimensional array	
+	
+	For i = 0 To intDivU  - 1
+		For j = 0 To intDivV	- 1
+			
+			arrPlane = Rhino.PlaneFromNormal(arrSrfPoints(i,j),arrSrfCrvData(i,j)(0)) 'make a plane based on the direction of the normal of the surface at that point
+			
+			ReDim arrCircles(cnt)
+			
+			'	Rhino.Print	arrSrfCrvData(i,j)(1)
+			
+			If arrSrfCrvData(i,j)(1)<0 Then    'curvature is both positive and negative, since all I care about is the pattern, and a lot of it, I want to use all of the values, negative or positive
+			
+				dblData = arrSrfCrvData(i,j)(1)*-1
+				
+			Else
+				
+				dblData = arrSrfCrvData(i,j)(1)
+			
+			End If
+
+			arrCircles(cnt) = Rhino.AddCircle(arrPlane,(dblData*100000)+10)	'here we must multiply curvature values in order to givce us some useful parameters
+			
+			'Project Curves to flat
+			
+			If Not isNull(arrCircles(cnt)) Then			 'here we mimick the 'Project' command in Rhino...this is essentially an extrude and intersect, so we use these Rhinoscript methods to do this
+			
+				Rhino.EnableRedraw(False) 'turn off redraw 
+				
+				strPath = Rhino.AddLine(arrSrfPoints(i,j), array(arrSrfPoints(i,j)(0),arrSrfPoints(i,j)(1),arrSrfPoints(i,j)(2) - 1000))
+				
+				strExtrude = Rhino.ExtrudeCurve(arrCircles(cnt),strPath)
+				
+				arrInt = Rhino.SurfaceSurfaceIntersection(strExtrude,strSrfFlat,,True)
+				
+				Rhino.DeleteObject strExtrude				   'cleanup
+				Rhino.DeleteObject strPath
+
+				Rhino.EnableRedraw(True) 'turn on redraw 
+			
+			End If
+
+			cnt = cnt + 1	  'increment our counter
+			
+		Next
+	Next
+
+End Function
+	
+	
+

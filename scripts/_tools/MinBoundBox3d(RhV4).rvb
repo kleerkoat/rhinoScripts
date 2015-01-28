@@ -1,0 +1,497 @@
+'Script writing= @2007 Thomas Anagnostou.
+'Last modified May/2/2007 (no new features added at this time. This is only a compatibility update).
+'Version compatibility= Tested with Rhino V4 and RhinoScript 20060906
+
+'Minimum Volume/Surface Bounding Box (iterational)
+option explicit
+
+sub minboundbox ()
+
+'--Declarations--
+Dim objects, bBox,a_bbox_min,v_bbox_min
+Dim count,count2,count3 				'Loop starter
+Dim angle,angle2,angle3 				'Loop ender
+Dim user_inp 						'User input
+Dim epsilon 						'tolerance to be used for comparators (maybe modified by constant)
+Dim spanX,SpanY,SpanZ 				'Bbox dimensions
+Dim a_min(2),v_min(2) 				'Cplane angles recorded at min bbox iteration
+Dim s, pi
+Dim iteration,complete 				'Progress meter
+Dim surf_now,surf_min, Volume_now, Volume_min
+Dim tol 							'absolute tolerance
+Dim TolAngle 						'The smallest required angle increment to satisfy tolerance
+Dim Parsing,unit(2),planar1, detect
+Dim Fstart,Fstart2,fstart3 			'For loop starting value
+Dim ThisView						'Current setting (before script starts
+Dim ThisCplane,startingCplane, newcplane
+Dim thisCplaneName					'Store the curent cplane as a nemedCplane
+Dim a_minCP,v_minCP, min_type(1),srf1
+Dim test
+'--end
+
+'--Default values--
+const version	=20060906
+tol=rhino.unitAbsoluteTolerance
+pi=atn(1)*4
+angle =90 :angle2=90 :angle3=90 'In Degrees
+Fstart =0 :fstart2=0 :fstart3=0
+s=(angle-fstart)/10
+iteration=0
+parsing  =0
+planar1  =0
+srf1    =-1
+min_type(0)="Volume Calculation"
+min_type(1)="Area Calculation"
+ThisView=rhino.currentview 'String
+thiscplane=rhino.viewcplane 'Array of 3D-points
+thisCplaneName="Temp**MinBoundBox3d^^1"
+rhino.addnamedcplane thiscplanename, thisview
+'--end
+
+'Version check
+If (clng(Rhino.Version) < clng(version)) then
+	Rhino.print "Script aborted. (Please update RhinoScript to Version <"&version&"> or higher)"
+	exit sub
+end if
+
+'--PreSelection check and user interaction
+objects=rhino.selectedobjects
+if not isarray(objects) then 
+	objects=rhino.getobjects ("Select objects to frame with a minimum Bounding Box")
+end if
+if not isarray(objects) then 
+	Rhino.print "Script cancelled" 
+	exit sub 
+end if
+
+'Question1 ****
+user_inp=rhino.getstring("Tolerance: <"&tol&">")
+if isnull(user_inp) then :Rhino.print "Script cancelled" :exit sub :end if
+
+if (user_inp="") then 'default value
+	Epsilon=tol
+else
+	epsilon=val2(user_inp,vbtrue)
+	if (epsilon<=0) then epsilon=tol
+end if
+
+detect=detect_planar(objects,tol)
+planar1=detect(0)
+if (planar1=-1) then 
+	rhino.print "Script unsuccessfull (Cannot proceed with this input)" 
+	exit sub 
+end if
+
+'Question2 ****
+if (planar1=0) then
+user_inp=rhino.getstring("Minimum Box Type ", "V",array("Surface","Volume"))
+if isnull(user_inp) then
+	rhino.restorenamedcplane thiscplanename, thisview 
+	rhino.deletenamedcplane thiscplanename
+	Rhino.EnableRedraw vbtrue
+	Rhino.print "Script cancelled"
+	exit sub
+end if
+user_inp=lcase(user_inp)
+select case user_inp
+	case "a","s","surface","area" :srf1=1
+	case "v","volume" :srf1=0
+	case else :srf1=0
+end select
+end if
+
+'Rhino.print epsilon
+'--end
+
+'--Main script
+if isarray(objects) then
+	Rhino.EnableRedraw vbfalse
+	rhino.print "Please wait (Exponential brute-force calculation may take a few minutes)"
+	if (planar1=1) then
+		startingCplane=detect(1) 'Contents of ViewCplane from Detect_Planar function
+		angle=angle-s
+		angle2=fstart2
+		angle3=fstart3
+	else
+		startingCplane=thiscplane
+		angle=angle-s
+		angle2=angle2-s
+		angle3=angle3-s
+	end if
+	do
+		for count3=fstart3 to angle3 step s
+		for count2=fstart2 to angle2 step s
+		For count =Fstart  to angle step s
+		iteration=iteration+1
+		'--Cplane Rotation
+		newcplane=cpRotate(startingCplane,epsilon,count*pi/180,count2*pi/180,count3*pi/180) 'calculate the rotation
+		rhino.viewcplane thisview,newcplane 'commit the rotation
+		'--end
+
+		'--Bounding box for this iteration
+		bbox=rhino.boundingbox (objects,thisview,vbfalse) 'cplane aligned in cplane coord
+                spanX=abs(bbox(0)(0)-bbox(6)(0))
+		spanY=abs(bbox(0)(1)-bbox(6)(1))
+		spanZ=abs(bbox(0)(2)-bbox(6)(2))
+		'rhino.addbox bbox
+		'--
+
+		'Surface area calculation
+		surf_now=spanx*spanY+2*spanx*spanZ+2*spany*spanz
+		'Volume calculation
+		Volume_now=(spanX)*(spanY)*(spanZ)
+
+		'error detect
+		if ((spanx<epsilon or spany<epsilon or spanz<epsilon) and planar1=0) then
+			rhino.restorenamedcplane thiscplanename, thisview
+			rhino.deletenamedcplane thiscplanename
+			Rhino.EnableRedraw vbtrue
+			rhino.print "Script unsuccessful (Improper attempt for minimum Volume calculation on planar object(s) )"
+			exit sub
+		end if
+		'end
+
+		'--Set initial values (first loop cycle)--
+		If (count=fstart and count2=fstart2 and count3=fstart3 and parsing=0) then
+			volume_min=volume_now
+			surf_min=surf_now
+			v_bbox_min=worldBox(bbox,newcplane)
+			v_min(0)=count
+			v_min(1)=count2
+			v_min(2)=count3
+			a_bbox_min=v_bbox_min
+			a_min(0)=count
+			a_min(1)=count2
+			a_min(2)=count3
+			a_minCP=newcplane
+			tolAngle=360*epsilon/(pi*(1+sqr(spanx^2+spany^2)))
+			complete=roundup(log(s/tolangle)/log(5))*(11^3)+(angle3-fstart3+s)*(angle2-fstart2+s)*(angle-fstart+s)/(s^3)
+		else '--Memorize minimum value (if one is found in this iteration--
+			if (surf_min>surf_now) then
+				surf_min=surf_now
+				a_bbox_min=worldBox(bbox,newcplane)
+				a_min(0)=count
+				a_min(1)=count2
+				a_min(2)=count3
+				a_minCP=newcplane
+			end if
+			if (volume_min>volume_now) then
+				volume_min=volume_now
+				v_bbox_min=worldBox(bbox,newcplane)
+				v_min(0)=count
+				v_min(1)=count2
+				v_min(2)=count3
+				v_minCP=newcplane
+
+			end if
+		end if
+		'--end
+		next 'count
+		next 'count2
+			rhino.print min_type(abs(srf1))&" "& _
+						formatnumber(iteration/complete*100,2,vbtrue)& _
+						" percent complete. (Calculations="&iteration&" Parsing="& _
+						parsing+1&" at Tolerance="&epsilon&"units)"
+		next 'count3
+		count=count-s
+		count2=count2-s
+		count3=count3-s
+		'--Tighten the loop parameters
+		if (abs(s)>tolangle) then
+			'set cplane to rotate again
+			if (srf1=0) then 'adapt the Volume iterational branch
+				fstart=v_min(0)-s 'new start for next "for" loop
+				fstart2=v_min(1)-s
+				fstart3=v_min(2)-s
+				angle=fstart+2*s
+				angle2=fstart2+2*s
+				angle3=fstart3+2*s
+			elseif (srf1=1) then 'adapt the surface iterational branch
+				fstart=a_min(0)-s 'new start for next "for" loop
+				fstart2=a_min(1)-s
+				fstart3=a_min(2)-s
+				angle=fstart+2*s
+				angle2=fstart2+2*s
+				angle3=fstart3+2*s
+			elseif (srf1=-1) then 'adapt the truncated surface-iterational branch
+				fstart=a_min(0)-s 'new start for next "for" loop
+				angle=fstart+2*s
+			end if
+			s=s/5 'adjust step increment
+			parsing=parsing+1
+			newcplane=cprotate(newcplane,epsilon, pi/180*(-(count-fstart)),pi/180*(-(count2-fstart2)),pi/180*(-(count3-fstart3)))
+			rhino.viewcplane thisview,newcplane 'commit the rotation
+		else
+			parsing=-1
+		end if
+	loop while(parsing>0)
+
+	'--Draw the minimum found bounding box
+	if (srf1=0) then 'Volume box
+		rhino.addbox v_bbox_min
+	elseif(srf1=1) then 'Surface box
+		rhino.addbox a_bbox_min
+	else 'Perimeter box
+		rhino.addpolyline array(a_bbox_min(0),a_bbox_min(1),a_bbox_min(2),a_bbox_min(3),a_bbox_min(0))
+	end if
+	'--Reset to original cplane
+	rhino.restorenamedcplane thiscplanename, thisview
+	rhino.deletenamedcplane thiscplanename
+	'--end
+
+	Rhino.EnableRedraw vbtrue
+	Rhino.print ("Script completed successfully")
+else
+	rhino.print ("Script unsuccessful (no objects were selected)")
+end if
+'--End of main script
+
+end sub
+
+'# # # # # # # # # # # # # # #
+'Calculate the XY points of a rotated Cplane based on current cplane (returns world coordinates)
+function CpRotate(ThisCp,e,cpXY,XYangle,YZangle)
+dim result(2)
+dim newX,newY
+dim hX(1),hY(1),z(1),ang(1),hp(1)
+dim pi
+
+pi=atn(1)*4
+
+'x-axis rotate----------------
+hx(0)=cos(cpXY)
+hy(0)=sin(cpXY)
+'z(0)=0
+
+'Y-axis rotate - - - - - - -
+hx(1)=cos(cpXY+pi/2)
+hy(1)=sin(cpXY+pi/2)
+'z(1)=0
+
+'X-axis tilt------------------
+z(0) =-hy(0)*sin(YZangle)
+'hx(0)=hx(0)
+hy(0)=hy(0)*cos(YZangle)
+'--
+
+'Y-axis tilt - - - - - - - -
+z(1) =-hy(1)*sin(YZangle)
+'hx(1)=hx(1)
+hy(1)=hy(1)*cos(YZangle)
+'--
+
+'X-axis rotation of tilt------
+if(abs(hx(0))>0) then ang(0)=atn((hy(0)/hx(0)))else ang(0)=pi/2 end if
+if (hx(0)<0) then ang(0)=pi+ang(0)
+hp(0)=sqr(hx(0)^2+hy(0)^2)
+hx(0)=hp(0)*cos(xyangle+ang(0))
+hy(0)=hp(0)*sin(xyangle+ang(0))
+'z(0)=z(0)
+'--
+
+'Y-axis rotation of tilt - - - -
+if(abs(hx(1))>0) then ang(1)=atn((hy(1)/hx(1)))else ang(1)=pi/2 end if
+if (hx(1)<0) then ang(1)=pi+ang(1)
+
+hp(1)=sqr(hx(1)^2+hy(1)^2)
+hx(1)=hp(1)*cos(xyangle+ang(1))
+hy(1)=hp(1)*sin(xyangle+ang(1))
+'--
+
+
+newX=array(hx(0),hy(0),z(0)) 'in cplane coordinates
+newY=array(hx(1),hy(1),z(1)) 'in cplane coordinates
+newx=Rhino.XformCPlaneToWorld(newx,thiscp)
+newy=Rhino.XformCPlaneToWorld(newy,thiscp)
+
+result(0)=thiscp(0) 'origin is the same
+result(1)=Rhino.VectorCreate (thiscp(0), newx)		'X-vector
+result(2)=Rhino.VectorCreate (thiscp(0), newy)		'Y-vector
+'result(3)=Rhino.VectorCreate (thiscp(0), thiscp(3))	'Z-vector (optional)
+
+cprotate=result
+
+end function
+
+'# # # # # # # # # # # # # # #
+'Convert a cplane bounding box to world coordinates
+function worldbox(thisbox, cplane)
+
+dim count, result(7)
+
+for count=0 to 7
+	result(count)=rhino.xformcplanetoworld(thisbox(count),cplane)
+next
+worldbox=result
+end function '- - - - - - - -
+
+'# # # # # # # # # # # # # # #
+'Convert a world coordinate bounding box to cplane coordinates
+function cplanebox(thisbox, cplane)
+
+dim count, result(7)
+
+for count=0 to 7
+	result(count)=rhino.xformworldtocplane(thisbox(count),cplane)
+next
+cplanebox=result
+end function '- - - - - - - -
+
+'# # # # # # # # # # # # # # #
+'Round a number up (5.1 to 6 or -5.1 to -5)
+function roundup(thisnum)
+
+if (abs(int(thisnum))<abs(thisnum)) then roundup=int(thisnum)+1
+
+end function
+
+'# # # # # # # # # # # # # # #
+'Filters user input to ensure numeric output
+function val2(x,deep)
+dim count,xLength,Pflag,result,oneChr, str
+pflag=0
+deep=lcase(deep)
+select case deep
+	case "true","-1","1"	:deep=vbtrue
+	case else				:deep=vbfalse
+end select
+if not isnumeric(x) then
+	if (Len(str)>0) then
+		for count=1 to Len(str)
+			OneChr=mid(str,count,1)
+			if(asc(onechr)>43 and asc(onechr)<58) then
+				if(asc(onechr)=46 or asc(onechr)=44) then
+					if(pflag=0) then 
+						result=result&chr(46) :pflag=1
+					elseif (deep=vbfalse) then 
+						exit for
+					end if
+				elseif (asc(onechr)=45 and count=1) then result=result&onechr
+				elseif (asc(onechr)>47) then result=result&onechr
+				end if
+			elseif (deep=vbfalse) then exit for
+			end if
+		next
+	end if
+	if isnumeric(result) then val2=cdbl(result) else val2=0 end if
+else val2=cdbl(x)
+end if
+end function
+
+'# # # # # # # # # # # # # # #
+'Detect if a group of objects reside entirely on a single plane (co-planar)
+'Send errors if unsupported object types are used
+'Prepare Cplane to handle trivial cases of single straight line or single point
+function detect_planar(theseObj,tol)
+Dim count,non_p,crv_flag,Not_sl,point
+Dim temp_plane	'Temp_plane contains 3 vectors which will be used _
+		'to define a starting cplane for the iteration loop
+Dim Volume,temp_bbox,spanx,spany,spanz,a,unsupported_obj
+Dim thisview,test
+
+'defaults
+thisview=rhino.currentview
+temp_plane=rhino.viewcplane
+non_p=0
+crv_flag=0
+Not_sl=-1
+point=0
+a=0
+unsupported_obj=0
+'---
+
+for count=0 to ubound(theseObj) 'Parse the selection for preliminary object-identification
+	if (rhino.iscurve (theseobj(count))) then
+		if (not rhino.iscurveplanar (theseobj(count))) then 
+			non_p=non_p+1
+		else
+			if (rhino.iscurvelinear(theseobj(count))) then crv_flag=crv_flag+1 else Not_sl=count end if
+		end if
+	elseif (rhino.issurface (theseobj(count))) then
+		if (not rhino.issurfaceplanar (theseobj(count))) then non_p=non_p+1 else Not_sl=count end if
+	elseif (rhino.ispolysurface (theseobj(count))) then
+		if (not rhino.ispolysurfaceplanar (theseobj(count))) then non_p=non_p+1 else Not_sl=count end if
+	elseif (rhino.ispoint(theseobj(count))) then point=point+1
+	elseif (rhino.isMesh (theseobj(count))) then Not_sl=count
+	else unsupported_obj=1
+	end if
+next
+
+if (((crv_flag=1 or point=1) and ubound(theseobj)=0) or unsupported_obj=1) then
+	detect_planar=array(-1,rhino.viewcplane)
+elseif (non_p=0) then
+	if (Not_sl>-1) then 'At least one planar object which is not a straight line is present
+		'Rhino.EnableRedraw vbfalse
+		temp_bbox=rhino.boundingbox (theseobj,rhino.currentview,vbfalse) 'cplane aligned in cplane coordinates
+		spanX=abs(temp_bbox(0)(0)-temp_bbox(6)(0))
+		spanY=abs(temp_bbox(0)(1)-temp_bbox(6)(1))
+		spanZ=abs(temp_bbox(0)(2)-temp_bbox(6)(2))
+		if (spanz>tol) then detect_planar=array(0,rhino.viewcplane) else detect_planar=array(1,rhino.viewcplane) end if
+	elseif (point>0 or crv_flag>0) then 'The selection has only straight lines and/or points
+
+			'Load the first point and use it as origin of temp_plane (a=0 right now)
+			if(rhino.ispoint (theseobj(0))) then
+				temp_plane(a)=rhino.pointcoordinates(theseobj(0))
+			elseif (rhino.iscurve(theseobj(0))) then
+				temp_plane(a)=rhino.curvestartpoint (theseobj(0))
+			end if
+		'Load the other two points
+		'Each new point (of the three) cannot be the same with any previous
+		for count=0 to ubound(theseobj) 'Start again from the beginning
+			if(rhino.ispoint (theseobj(count))) then
+				if(comparePt(temp_plane,a,rhino.pointcoordinates(theseobj(count)))=0 and a<2) then
+					a=a+1 
+					temp_plane(a)=rhino.vectorcreate (temp_plane(0),rhino.pointcoordinates(theseobj(count)))
+				end if
+			elseif (rhino.iscurve(theseobj(count)) and a<2) then 'Check both ends of the straight line
+				if (comparePt(temp_plane,a,rhino.curvestartpoint(theseobj(count)))=0 and a<2) then
+					a=a+1 
+					temp_plane(a)=rhino.vectorcreate (temp_plane(0),rhino.curvestartpoint (theseobj(count)))
+				end if
+				if (comparePt(temp_plane,a,rhino.curveendpoint(theseobj(count)))=0 and a<2) then
+					a=a+1 
+					temp_plane(a)=rhino.vectorcreate (temp_plane(0),rhino.curveendpoint (theseobj(count)))
+				end if
+			end if
+			if (a>=2) then exit for
+		next
+		if (a<2) then 
+			detect_planar=array(-1,rhino.viewcplane) '3 Unique points were not found
+		else
+			Rhino.EnableRedraw vbfalse
+			rhino.viewcplane thisview,temp_plane
+			temp_bbox=rhino.boundingbox (theseobj,rhino.currentview,vbfalse) 'cplane aligned in cplane coordinates
+			spanX=abs(temp_bbox(0)(0)-temp_bbox(6)(0))
+			spanY=abs(temp_bbox(0)(1)-temp_bbox(6)(1))
+			spanZ=abs(temp_bbox(0)(2)-temp_bbox(6)(2))
+			if (spanz>tol) then detect_planar=array(0,rhino.viewcplane) else detect_planar=array(1,rhino.viewcplane) end if
+		end if
+	else 'return with error
+		detect_planar=array(-1,rhino.viewcplane)
+	end if
+else
+	detect_planar=array(0,rhino.viewcplane)
+end if
+end function
+
+'# # # # # # # # # # # # # # #
+'compare an entire array of points to one point
+function comparept(pt_array,arr_index,ToThis)
+dim count,found
+found=0
+
+if (isarray (tothis) and isarray (pt_array)) then
+for count=0 to arr_index
+	if (pt_array(count)(0)=tothis(0) and _
+		pt_array(count)(1)=tothis(1) and _
+		pt_array(count)(2)=tothis(2)) then
+		found=found+1
+		exit for
+	end if
+next
+if (found=0) then comparept=0 else comparept=1
+else
+	comparept=-1
+end if
+end function
+minboundbox

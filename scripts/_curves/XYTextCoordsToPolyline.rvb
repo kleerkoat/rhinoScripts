@@ -1,0 +1,37 @@
+Option Explicit
+'Script by Mitch Heynick
+'Version 22 June, 2011
+
+Call XYTextCoordsToPolyline
+Sub XYTextCoordsToPolyline()
+
+	Dim strFile,strDFolder
+	Dim objFSO, objFile, strText
+  
+	strDFolder=Rhino.DocumentPath
+	If IsNull(strDFolder) then strDFolder=""
+	strFile = Rhino.OpenFileName("Open", "Text Files (*.txt)|*.txt||",strDFolder)
+	If IsNull(strFile) Then Exit Sub
+
+	Set objFSO = CreateObject("Scripting.FileSystemObject")
+	Set objFile = objFSO.OpenTextFile(strFile, 1)
+
+	Dim line,arrPts(),n : n=-1
+	Do Until objFile.AtEndOfStream
+		line=objFile.ReadLine()
+		If line="999,999" Then Exit Do
+		n=n+1
+		Redim Preserve arrPts(n)
+		arrPts(n)=Rhino.Str2Pt(line&",0")		
+	Loop
+
+	objFile.Close
+	Set objFSO = Nothing
+	Set objFile = Nothing
+  
+	
+	Call Rhino.AddPolyline(arrPts)
+	Call Rhino.Print("Added a polyline with "&n+1&" points")
+	
+
+End Sub

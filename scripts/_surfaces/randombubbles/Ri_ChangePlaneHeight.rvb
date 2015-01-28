@@ -1,0 +1,65 @@
+' Script for Rhinoceros 3.0 Sr3
+' Change RiBlobby 9000 plane height
+' © 2004 Clement Greiner
+
+' 12.05.2005 // fixed plane strength float bug from userdata
+
+Option Explicit
+Sub ChangePlaneHeight
+Dim arrAllowed, StrPlane
+Dim StrStrength
+Dim arrDomainU, arrDomainV, arrNormal, arrHeight, StrPoint, blnCommand
+
+arrAllowed = GET_RiPlanes
+If Not IsArray(arrAllowed) Then Print "No RiPlanes found in this document." : Exit Sub
+' select a plane to edit
+StrPlane = Rhino.GetObject("Select a RiPlane object to change maximum influence height", 8, vbTrue, vbTrue, arrAllowed)
+If IsNull(StrPlane) Then Exit Sub
+' display the current height
+StrStrength = Rhino.GetObjectData(StrPlane, "RandomBubbles", "PlaneStrength")
+If IsNull(StrStrength) Then StrStrength = 1 Else StrStrength = CDbl(StrStrength)
+' display a user feedback influence line at the plane origin, get origin
+arrDomainU = Rhino.SurfaceDomain(StrPlane, 0)
+arrDomainV = Rhino.SurfaceDomain(StrPlane, 1)
+' get normal direction
+arrNormal = Rhino.SurfaceNormal(StrPlane, Array(arrDomainU(1)/2,arrDomainV(1)/2))
+' draw influence line
+arrHeight = XFormCPlaneToWorld(Array(StrStrength,0,0), Array(arrNormal(0), arrNormal(1), Array(0.1,0.1,0.1)))
+' Rhino.AddPoint arrHeight
+StrPoint = AddPoint(arrHeight)
+Rhino.UnselectObject(StrPlane)
+Rhino.SelectObject(StrPoint)
+' scale the height(point) interactively
+Print "Pick the maximum influence height for this plane"
+blnCommand = Rhino.Command("_Scale1D " & Pt2Str(arrNormal(0),6) & " " & Pt2Str(arrHeight,6), vbFalse)
+If blnCommand = vbTrue Then
+	arrHeight = Rhino.PointCoordinates(StrPoint)
+	StrStrength = Rhino.Distance(arrNormal(0), arrHeight)
+	Rhino.SetObjectData StrPlane, "RandomBubbles", "PlaneStrength", CStr(StrStrength)
+	Rhino.DeleteObject StrPoint
+	Rhino.Print "New plane maximum influence height: " & StrStrength
+Else
+	Rhino.DeleteObject StrPoint
+End If
+
+End Sub
+
+Private Function GET_RiPlanes
+Dim arrAllObjs, count, StrObject, StrValue, arrPlanes()
+arrAllObjs = Rhino.NormalObjects
+' exit if document is empty
+If Not IsArray(arrAllObjs) Then GET_RiPlanes = vbNull :	Exit Function
+' search objects for planes
+count = 0
+For Each StrObject in arrAllObjs
+	StrValue = int(Rhino.GetObjectData(StrObject, "RandomBubbles","RiOpcode"))
+	If StrValue = 9000 Then
+		Redim Preserve arrPlanes(count)
+		arrPlanes(count) = StrObject
+		count = count + 1
+	End If
+Next
+If count > 0 Then GET_RiPlanes = arrPlanes Else GET_RiPlanes = vbNull
+End Function
+
+ChangePlaneHeight

@@ -1,0 +1,33 @@
+'Script written by Ryan Gilmore (monkeygrip@gmail.com)
+'Script version Friday, 21 September 2012 12:10:19
+
+'Description:
+'
+'Edits:
+'Todo:
+
+Option Explicit
+
+'Call PointCoordinatesToClipboard()
+Sub PointCoordinatesToClipboard()
+	
+	Dim arrPoint, strText
+
+	arrPoint = Rhino.GetPoint("Pick a point")
+
+	If IsArray(arrPoint) Then
+
+		Rhino.AddPoint arrPoint
+		strText = Rhino.Pt2Str(arrPoint)
+		Rhino.ClipboardText(strText)
+		
+	End If
+	
+	If Not IsNull(strText) Then
+
+		MsgBox strText, 0, "Point Coordinates."
+		Rhino.Print("Coordinates copied to clipboard.")
+
+	End If
+
+End Sub

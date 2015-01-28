@@ -1,0 +1,24 @@
+Option Explicit
+'Script written by Ryan
+'Script version Friday, February 25, 2011 11:21:43 AM
+
+'Call AddLayersSet()
+Sub AddLayersSet()
+	Dim strLayer
+
+	'change the CUTXX to a name you would like displayed as default when the prompt appears
+	strLayer = Rhino.StringBox("New layer name", "ParentLayerName", "Add Layers Set")
+
+	If Not IsNull(strLayer) Then
+
+		Rhino.AddLayer(strLayer)
+
+	End If
+	
+	'you can change the name of the layers in the double quotes and change the color at the RGB values
+	Rhino.AddLayer "01", RGB(255, 0, 255),,, (strLayer)
+	Rhino.AddLayer "02", RGB(0, 255, 255),,, (strLayer)
+	Rhino.AddLayer "03", RGB(0, 255, 0),,, (strLayer)
+	Rhino.AddLayer "04", RGB(255, 0, 0),,, (strLayer)
+	Rhino.AddLayer "05", RGB(0, 0, 255),,, (strLayer)
+End Sub

@@ -1,0 +1,15 @@
+﻿Option Explicit
+'Script written by Jonathan Mirtschin
+'Script version 06 February 2008 08:19:44
+
+Call SelectionUnion()
+Sub SelectionUnion()
+	
+	Dim objSet1, Selection
+	
+	
+	objSet1 = Rhino.getObjects("First Selection for Union",0,True,True,False)
+	Selection = Rhino.GetObjects("Second Selection for Union",0,True,False,True,objset1)
+	
+	
+End Sub

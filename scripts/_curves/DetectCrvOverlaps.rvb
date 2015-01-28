@@ -1,0 +1,41 @@
+Option Explicit
+'Script written by Mitch
+'Script version Friday, November 19, 2010
+
+Call DetectCrvOverlaps()
+Sub DetectCrvOverlaps()
+	
+	Dim arrObjs,arrIntSec
+	'arrObjs=Rhino.GetObjects("Select curves to check",4,,True,True)
+	arrObjs=Rhino.NormalObjects 
+	If Not IsArray(arrObjs) Then Exit Sub	
+	
+	Call Rhino.EnableRedraw(False)
+	Call Rhino.SelectObjects(arrObjs)
+	Call Rhino.Command("_Intersect",False)
+	arrIntSec=Rhino.LastCreatedObjects
+	If not IsArray(arrIntSec) Then
+		Call Rhino.EnableRedraw(True) : Exit Sub
+	End If
+	
+	Call Rhino.UnselectAllObjects	
+	Dim strObj,CSP,CEP,strGroup,n : n=0
+	strGroup=Rhino.AddGroup
+	For each strObj in arrIntSec
+		If Rhino.IsPoint(strObj) Then
+			Call Rhino.DeleteObject(strObj)
+		Else			
+			CSP=Rhino.AddPoint(Rhino.CurveStartPoint(strObj))
+			CEP=Rhino.AddPoint(Rhino.CurveEndPoint(strObj))			
+			Call Rhino.AddObjectsToGroup(Array(strObj,CSP,CEP),strGroup)
+			Call Rhino.SelectObjects(Array(strObj,CSP,CEP))
+			n=n+1
+		End If
+	Next
+	If n>0 Then
+		Call Rhino.Print("Found "&n&" overlaps")
+	Else
+		Call Rhino.Print("No overlaps found")
+	End If
+	Call Rhino.EnableRedraw(True)
+End Sub

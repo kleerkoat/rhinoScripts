@@ -1,0 +1,7 @@
+AlignPlus Script aliases-
+
+Drag and drop the rvb file over an open Rhino window to register these aliases:
+
+AlignToPt- aligns selected objects by Cplane aligned bounding box: horizontal centers/vertical centers/both centers/left edge/right edge/top edge/bottom edge to a user defined point in space.
+
+AlignToObject- as above but aligns to the corresponding edges etc of a target object rather than a point in space.

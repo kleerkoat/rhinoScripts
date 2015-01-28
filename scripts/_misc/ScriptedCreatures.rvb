@@ -1,0 +1,61 @@
+Option Explicit
+'Script written by Rodrigo Medina Garcia
+'Script copyrighted by designplaygrounds.com
+'This script is Protected under a Creative Commons 2.5 Licence
+'If you are going to use it for comercial purposes please notify to rodrigo_medina23@hotmail.com
+'Script version miércoles, 23 de julio de 2008 15:49:30
+
+'Call ScriptedCreatures()
+Sub ScriptedCreatures()
+	Dim arrpts,strcrv,strcrv2,crvdomain,evapoints
+	Dim i,u,k,j
+	arrpts=rhino.GetPointCoordinates("select points for structure creation")
+	If isNull (arrpts) Then Exit Sub
+	For i = 0 To uBound(arrpts)
+		For u =0 To UBound(arrpts)
+			If Rhino.distance(arrpts(i),arrpts(u)) <80 Then Call lines(arrpts,i,u,strcrv)
+
+
+		Next
+		Call rhino.addsphere(arrpts(i),1)
+	Next
+
+	strcrv2=rhino.GetObjects("select the created line structures",4)
+
+	For k =0 To ubound (strcrv2)
+
+
+		crvdomain=rhino.CurveDomain(strcrv2(k))
+
+		For j= crvdomain(0)To crvdomain(1) Step crvdomain(1)/4
+			evapoints=rhino.EvaluateCurve(strcrv2(k),j)
+			arrpts=Rhino.AddPoint(evapoints)
+			If j = crvdomain(1)/2 Then
+				Call circles1(strcrv2,k,j)
+			ElseIf j <> crvdomain(1)/2 Then
+				Call circles2(strcrv2,k,j)
+			End If
+
+
+		Next
+		Call rhino.Command("_selnone _selclosedcrv -_loft _enter _enter _delete ")
+	Next
+
+
+End Sub
+Function lines(arrpts,i,u,strcrv)
+	strcrv=rhino.AddLine(arrpts(i),arrpts(u))
+End Function
+Function circles1(strcrv,k,j)
+	Dim frame,radi
+	frame=Rhino.curveperpframe(strcrv(k),j)
+	radi=2.5
+	Call rhino.AddCircle(frame,radi)
+
+End Function
+Function circles2(strcrv,k,j)
+	Dim frame,radi
+	frame=Rhino.curveperpframe(strcrv(k),j)
+	radi=1
+	Call rhino.AddCircle(frame,radi)
+end function

@@ -1,0 +1,131 @@
+﻿Option Explicit
+
+Sub UnitsToStatusBar
+	Dim units , text
+	units = Rhino.UnitSystem
+If units = 0 Then
+	text = " No unit System"
+	Rhino.StatusBarMessage "Units are set to" & text
+Else
+	If units = 1 Then
+		text = " Microns"
+		Rhino.StatusBarMessage "Units are set to" & text
+	Else
+		If units = 2 Then
+			text = " Millimeters"
+			Rhino.StatusBarMessage "Units are set to" & text
+		Else
+			If units = 3 Then
+				text = " Centimeters"
+				Rhino.StatusBarMessage "Units are set to" & text
+			Else
+				If units = 4 Then
+					text = " Meters"
+					Rhino.StatusBarMessage "Units are set to" & text
+				Else
+					If units = 5 Then
+						text = " Kilometers"
+						Rhino.StatusBarMessage "Units are set to" & text
+					Else
+						If units = 6 Then
+							text = " Microinches"
+							Rhino.StatusBarMessage "Units are set to" & text
+						Else
+							If units = 7 Then
+								text = " Mils"
+								Rhino.StatusBarMessage "Units are set to" & text
+							Else
+								If units = 8 Then
+									text = " Inches" 
+									Rhino.StatusBarMessage "Units are set to" & text
+								Else
+									If units = 9 Then
+										text = " Feet"
+										Rhino.StatusBarMessage "Units are set to" & text
+									Else
+										If units = 10 Then
+											text = " Miles"
+											Rhino.StatusBarMessage "Units are set to" & text
+										Else
+											If units = 12 Then
+												text = " Angstroms"
+												Rhino.StatusBarMessage "Units are set to" & text
+											Else
+												If units = 13 Then
+													text = " Nanometers"
+													Rhino.StatusBarMessage "Units are set to" & text
+												Else
+													If units = 14 Then
+														text = " Decimeters"
+														Rhino.StatusBarMessage "Units are set to" & text
+													Else
+														If units = 15 Then
+															text = " Dekameters"
+															Rhino.StatusBarMessage "Units are set to" & text
+														Else
+															If units = 16 Then
+																text = " Hectometers"
+																Rhino.StatusBarMessage "Units are set to" & text
+															Else
+																If units = 17 Then
+																	text = " Megameter"
+																	Rhino.StatusBarMessage "Units are set to" & text
+																Else
+																	If units = 18 Then
+																		text = " Gigameters"
+																		Rhino.StatusBarMessage "Units are set to" & text
+																	Else
+																		If units = 19 Then
+																			text = " Yards"
+																			Rhino.StatusBarMessage "Units are set to" & text
+																		Else
+																			If units = 20 Then
+																				text = " Printer points"
+																				Rhino.StatusBarMessage "Units are set to" & text
+																			Else
+																				If units = 21 Then
+																					text = " Printer picas"
+																					Rhino.StatusBarMessage "Units are set to" & text
+																				Else
+																					If units = 22 Then
+																						text = " Nautical miles"
+																						Rhino.StatusBarMessage "Units are set to" & text
+																					Else
+																						If units = 23 Then
+																							text = " Astronomical units"
+																							Rhino.StatusBarMessage "Units are set to" & text
+																						Else
+																							If units = 24 Then
+																								text = " Lightyears"
+																								Rhino.StatusBarMessage "Units are set to" & text
+																							Else
+																								If units = 25 Then
+																									text = " Parsecs"
+																									Rhino.StatusBarMessage "Units are set to" & text
+																								End If
+																							End If
+																						End If
+																					End If
+																				End If
+																			End If
+																		End If
+																	End If
+																End If
+															End If
+														End If
+													End If
+												End If
+											End If
+										End If
+									End If
+								End If
+							End If
+						End If
+					End If
+				End If
+			End If
+		End If
+	End If
+End If
+End Sub
+UnitsToStatusBar

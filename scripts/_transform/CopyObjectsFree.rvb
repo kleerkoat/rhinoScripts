@@ -1,0 +1,33 @@
+'--------------------------------------------------------------
+'Command   :  fco (Free Copy Objects)
+'Date      :  2011/01/20
+'Version   :  1.0
+'Organization   :  Rhino+
+'--------------------------------------------------------------
+
+Sub CopyObjectsFree
+  
+Dim arrStartPoint,arrEndPoints,arrObjects,arrEndPoint,startPoint
+Dim strEndPoint ,strStartPoint
+	
+arrObjects = Rhino.GetObjects("Select Objects",,True,True)
+If Not IsArray(arrObjects) Then Exit Sub
+  
+strStartPoint = Rhino.GetObject("Pick a origin point",1)
+If IsNull(arrStartPoint) Then Exit Sub
+ 	  
+arrEndPoints = Rhino.GetObjects("Pick destination points",1)
+If Not IsArray(arrEndPoints) Then Exit Sub
+	
+
+For Each strEndPoint In arrEndPoints
+      
+  arrStartPoint = Rhino.PointCoordinates(strStartPoint)
+  arrEndPoint = Rhino.PointCoordinates(strEndPoint)
+  Rhino.CopyObjects arrObjects,arrStartPoint,arrEndPoint      
+      
+Next
+  
+End Sub
+
+'CopyObjectsFree

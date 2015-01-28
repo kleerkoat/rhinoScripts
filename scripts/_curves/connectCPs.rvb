@@ -1,0 +1,34 @@
+'A rhinoscript that extracts control points form a curve and connects cps with a dashed polyline.
+--
+Option Explicit
+'Script written by davide del giudice
+'Script copyrighted by www.madeincalifornia.blogspot.com
+'Script version Friday, 23 April 2010 15:17:58
+
+Call circleOncp_multiplelines()
+Sub circleOncp_multiplelines()
+Dim arrplane,arrpoint,strdot,count,strobject,strlines,arrcircle
+
+Dim arrobjects: arrObjects = Rhino.GetObjects("Select a curve",4)
+
+For Each strobject In arrobjects
+
+Dim arrpoints:arrPoints = Rhino.CurvePoints(strObject)
+
+For Each arrPoint In arrPoints
+count=count+1
+Rhino.AddPoint arrpoint
+
+arrplane = Rhino.PlaneFromFrame(arrpoint, Array(1.0,0.0,0.0), Array(0.0,1.0,0.0))
+arrcircle= Rhino.AddCircle (arrPlane,5)
+strDot=Rhino.AddTextDot (" "& count, arrPoint)
+Call Rhino.ObjectColor(strDot, RGB(count*10,count*20,count*50))
+Call Rhino.ObjectColor(arrcircle, RGB(count*10,count*20,count*50))
+
+Next
+strlines=rhino.addPolyline (arrpoints)
+Rhino.ObjectLinetype strlines, "dashed"
+Call rhino.ObjectColor(strlines,RGB(0,255,255))
+Next
+
+End Sub

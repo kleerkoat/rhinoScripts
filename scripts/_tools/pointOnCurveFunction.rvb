@@ -1,0 +1,61 @@
+'Extracting points from curves can be tricky in rhinoscript because the curve 
+'domain for any given curve can be all over the place. In Bentley’s Generative 
+'Components software, curve domains always range from 0 to 1, which makes life 
+'a lot easier when trying to locate a specific point on the curve. The 
+'following series of functions allow you to get a point or curve parameter from 
+'a T value. A T value is simply a number between Zero and One, Zero being the 
+'beginning of the curve’s parameterization and One being the end. T=0.5 for 
+'example, is the midpoint of the curve’s parameterization.
+
+
+
+'Script written by Peter Van Hage    
+'vanhage@arcnarc.com,vanhage@gmail.com    
+'Script copyrighted by nobody, just give credit where credit is due    
+'created Tuesday, May 05, 2009 1:42:22 PM  
+'  
+'   
+'Arguments Description:    
+'     ArrPoint: the array of points to find the centroid of.  
+'     DblParam: a parameter along the curve  
+'     tValue: a  decimal number value between 0 and 1, 0 being the start of the curve's parameterization, 1 being the end.  
+'  
+'Returns: varies by function either a point or T value, or curve parameter  
+'  
+  
+Function pointOnCurveFromTval(strCurve,tValue)  
+    pointOnCurveFromTval = Null  
+      
+    Dim arrCurveDomain  
+    arrCurveDomain = rhino.CurveDomain(strCurve)      
+  
+    pointOnCurveFromTval =  rhino.EvaluateCurve(strCurve,arrCurveDomain(0) + (tValue * (arrCurveDomain(1)-arrCurveDomain(0))))  
+End Function  
+  
+Function curveParamFromTval(strCurve,tValue)  
+    curveParamFromTval = Null  
+      
+    Dim arrCurveDomain  
+    arrCurveDomain = rhino.CurveDomain(strCurve)      
+      
+    curveParamFromTval = arrCurveDomain(0) + (tValue * (arrCurveDomain(1)-arrCurveDomain(0)))  
+End Function  
+  
+Function TvalFromCurveParam(strCurve,dblParam)  
+    TvalFromCurveParam = Null  
+      
+    Dim arrCurveDomain  
+    arrCurveDomain = rhino.CurveDomain(strCurve)      
+      
+    TvalFromCurveParam = (dblParam-arrCurveDomain(0))/(arrCurveDomain(1)-arrCurveDomain(0))  
+End Function  
+  
+Function TvalFromPointOnCurve(strCurve,arrPoint)  
+    TvalFromPointOnCurve = Null  
+      
+    Dim arrCurveDomain,dblParam  
+    dblParam = rhino.CurveClosestPoint(strCurve,arrPoint)  
+    arrCurveDomain = rhino.CurveDomain(strCurve)      
+      
+    TvalFromPointOnCurve = (dblParam-arrCurveDomain(0))/(arrCurveDomain(1)-arrCurveDomain(0))  
+End Function  

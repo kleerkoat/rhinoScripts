@@ -1,0 +1,35 @@
+'This RhinoScript is very simple but useful to save time spended when we create flat drawing from rhino model with the command make2d, to compose sections or elevations and then export to Autocad.
+'This code reconstructs the curve that has many points in an arc by 3 points, so our drawing will be
+'much cleaner. For my drawing the error approximations is 0,05 cm, it depends from the scale of drawing and number of points on curves created after make2d command.
+
+
+Option Explicit
+'Script written by davide del giudice
+'Script copyrihted by www.co-de-it.com
+'Please visit www.madeincalifornia.blogspot.com
+'Script version Friday, 23 April 2010 15:17:58
+
+
+'Call rebuildArcs()
+Sub rebuildArcs()
+Dim arrpointstrobject,strobject, arrarcs,count
+
+Dim arrobjects: arrObjects = Rhino.GetObjects("Select a curve",4)
+
+For Each strobject In arrobjects
+
+count=count+1
+
+Dim arrPoint1:arrPoint1 = Rhino.CurveStartPoint(strObject)
+Dim arrPoint2:arrPoint2 = Rhino.CurveEndPoint(strObject)
+Dim arrpoint3:arrPoint3 = Rhino.CurveMidPoint(strObject)
+
+arrarcs= Rhino.AddArc3Pt (arrpoint1, arrpoint2, arrpoint3)
+
+Call Rhino.ObjectColor(arrarcs, RGB(0,255,255))
+Call rhino.HideObject (strobject)
+Call rhino.AddTextdot ("new arc"&"_"&count, arrpoint1)
+'Call rhino.AddText ("new arc"&"_"&count, arrpoint1)
+Next
+
+End Sub

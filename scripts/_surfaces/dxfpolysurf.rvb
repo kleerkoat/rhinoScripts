@@ -1,0 +1,45 @@
+
+sub main
+obs=rhino.getobjects("Polysurfaces ?",16,,true)
+if isnull(obs) then exit sub
+rhino.enableredraw false
+for each obj in obs
+  ps2pline obj
+next
+rhino.enableredraw true
+end sub
+
+sub ps2pline(ps)
+sus=rhino.explodepolysurfaces(ps,true)
+lis=sus
+for i=0 to ubound(sus)
+  bor=rhino.duplicatesurfaceborder(sus(i))(0)
+  rhino.simplifycurve bor
+  if not rhino.ispolyline(bor) then
+    rhino.print"Cannot get polyline from surface border ... sorry"
+    exit sub
+  end if
+  ves=rhino.polylinevertices(bor)
+  d01=rhino.distance(ves(0),ves(1))
+  d12=rhino.distance(ves(1),ves(2))
+  rhino.deleteobject bor
+  if d01<d12 then
+    p1=midp(ves(0),ves(1))
+    p2=midp(ves(2),ves(3))
+  else
+    p1=midp(ves(1),ves(2))
+    p2=midp(ves(3),ves(0))
+  end if
+  lis(i)=rhino.addline(p1,p2)
+next
+cur=rhino.joincurves(lis,true)(0)
+rhino.simplifycurve cur
+rhino.deleteobjects sus
+end sub
+
+function midp(a,b)
+midp=array((a(0)+b(0))/2,(a(1)+b(1))/2,(a(2)+b(2))/2)
+end function
+
+main
+

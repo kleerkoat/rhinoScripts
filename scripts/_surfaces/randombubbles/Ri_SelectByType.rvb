@@ -1,0 +1,75 @@
+' Script for Rhinoceros 3.0 Sr3
+' Select RiBlobby Objects by type (1001,1002,9000) => (ellipsoids, segments, planes)
+' © 2004 Clement Greiner
+Option Explicit
+Sub SelectBlobbyObjectsByType
+Dim arrAllowed, StrObj, StrObjSelect, arrSelection(), count
+arrAllowed = GET_RiObjects
+If Not IsArray(arrAllowed) Then Print "No selectable RiObjects found in document." : Exit Sub
+StrObjSelect = Rhino.GetString("Choose object type to select", "All", Array("Points","Ellipsoids","Segments","Planes"))
+If IsNull(StrObjSelect) Then Print "Command aborted" : Exit Sub
+' select by blobtype
+count = 0
+For Each StrObj In arrAllowed
+	' include ellipsoids
+	If StrObjSelect = "All" Then
+		If Rhino.GetObjectData(StrObj, "RandomBubbles", "RiOpcode") <> vbNull Then
+			ReDim Preserve arrSelection(count)
+			arrSelection(count) = StrObj
+			count = count + 1
+		End If
+	ElseIf StrObjSelect = "Points" Then
+		If Int(Rhino.GetObjectData(StrObj,"RandomBubbles","RiOpcode")) = 1001 And Rhino.IsPoint(StrObj) Then
+			ReDim Preserve arrSelection(count)
+			arrSelection(count) = StrObj
+			count = count + 1
+		End If
+	ElseIf StrObjSelect = "Ellipsoids" Then
+		If Int(Rhino.GetObjectData(StrObj,"RandomBubbles","RiOpcode")) = 1001 And Not Rhino.IsPoint(StrObj) Then
+			ReDim Preserve arrSelection(count)
+			arrSelection(count) = StrObj
+			count = count + 1
+		End If
+	ElseIf StrObjSelect = "Segments" Then
+		If Int(Rhino.GetObjectData(StrObj,"RandomBubbles","RiOpcode")) = 1002 Then
+			ReDim Preserve arrSelection(count)
+			arrSelection(count) = StrObj
+			count = count + 1
+		End If
+	ElseIf StrObjSelect = "Planes" Then
+		If Int(Rhino.GetObjectData(StrObj,"RandomBubbles","RiOpcode")) = 9000 Then
+			ReDim Preserve arrSelection(count)
+			arrSelection(count) = StrObj
+			count = count + 1
+		End If
+	End If
+Next
+
+If count = 0 Then Print "No objects found matching your criteria." : Exit Sub
+Rhino.SelectObjects arrSelection
+If StrObjSelect = "All" Then
+	Rhino.Print "Selected " & count & " Ri_Blobby objects."
+Else
+	Rhino.Print "Selected " & count & " Ri_Blobby " & StrObjSelect & "."
+End If
+End Sub
+
+Private Function GET_RiObjects
+Dim arrAllObjs, count, StrObject, StrValue, arrRiObjs()
+arrAllObjs = Rhino.NormalObjects
+' exit if document is empty
+If Not IsArray(arrAllObjs) Then GET_RiObjects = vbNull : Exit Function
+' search objects for planes
+count = 0
+For Each StrObject In arrAllObjs
+	StrValue = Int(Rhino.GetObjectData(StrObject, "RandomBubbles","RiOpcode"))
+	If StrValue = 9000 Or StrValue = 1001 Or StrValue = 1002 Then
+		ReDim Preserve arrRiObjs(count)
+		arrRiObjs(count) = StrObject
+		count = count + 1
+	End If
+Next
+If count > 0 Then GET_RiObjects = arrRiObjs Else GET_RiObjects = vbNull
+End Function
+
+SelectBlobbyObjectsByType

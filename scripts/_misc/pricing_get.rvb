@@ -1,0 +1,43 @@
+﻿Dim strObject, ObjName, SPoint, EPoint, LLen, LType, LHeight, LSide, StrName, arrObjects
+Dim ObjGroup, JoinString, ObjLoop, ObjTotal, SortGroup, FinalGrouped, DStyle, DFac, DStyle1
+Dim PointLoop, arrPoints, arrPoint, LThick, stuff, Groupno, newText, Loopy, strText
+
+strName = "FITTING"
+arrObjects = Rhino.ObjectsByName(strName, vbTrue)
+ 
+ObjTotal = UBound(arrObjects)
+ReDim ObjGroup(ObjTotal)
+
+If IsArray(arrObjects) Then
+
+	ObjLoop = -1
+	For Each strObject In arrObjects
+		ObjLoop = ObjLoop + 1
+		ObjName = Rhino.ObjectName (strObject)
+		LPrice = GetObjectData (strObject, "PRICING", "Price")
+		LType = GetObjectData (strObject, "PRICING", "Type")
+ 		JoinString = Join (Array(LType, vbTab, LPrice))
+		ObjGroup(ObjLoop) = JoinString
+	Next
+	SortGroup = Rhino.Sort(ObjGroup, vbTrue)
+	ReDim FinalGrouped(ObjTotal)
+	GroupNo = 1
+	newText = ""
+	For Loopy = 0 To (UBound(SortGroup)-1)
+		If SortGroup(Loopy) = SortGroup(Loopy + 1) Then
+			GroupNo = GroupNo + 1
+		Else
+			Print GroupNo&" Total of: "
+			Print SortGroup(Loopy)
+			If newText <> "" Then
+				newText = newText&vbCr&CStr(GroupNo)&vbTab&SortGroup(Loopy)
+			Else newText = CStr(GroupNo)&vbTab&SortGroup(Loopy)
+			End If
+			GroupNo = 1
+		End If
+	Next
+	Print GroupNo&" Total of: "
+	Print SortGroup(Loopy)
+	newText = newText&vbCr&CStr(GroupNo)&vbTab&SortGroup(Loopy)
+	strText = Rhino.ClipboardText(newText)
+End If

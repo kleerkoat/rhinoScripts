@@ -1,0 +1,197 @@
+Option Explicit
+'Script written by Brenton Pryer
+'Script version Tuesday, January 10, 2008 1:38:13 PM
+
+'Call StructuredLayer()
+Sub StructuredLayer()
+
+	Dim rhObjectUnknown : rhObjectUnknown                 = 0
+	Dim rhObjectPoint : rhObjectPoint                     = 1
+	Dim rhObjectPointCloud : rhObjectPointCloud           = 2
+	Dim rhObjectCurve : rhObjectCurve                     = 4
+	Dim rhObjectSurface : rhObjectSurface                 = 8
+	Dim rhObjectPolySurface : rhObjectPolySurface         = 16
+	Dim rhObjectMesh : rhObjectMesh                       = 32
+	Dim rhObjectLight : rhObjectLight                     = 256
+	Dim rhObjectAnnotation : rhObjectAnnotation           = 512
+	Dim rhObjectTextDot : rhObjectTextDot                 = 8192
+
+
+	Dim blnDebug : blnDebug = False
+    
+	Dim blnDeleteEmpty : blnDeleteEmpty = False
+	Dim layer    'used for the loop
+	Dim arrLayerObjects
+	Dim layerObject
+	Dim objType
+	Dim layerName
+	Dim layerNameSearch
+    
+	Call rhino.EnableRedraw(blnDebug)
+	
+	Dim arrLayerNames : arrLayerNames = rhino.LayerNames(True)
+	If IsNull(arrLayerNames) Then Exit Sub
+   
+	For Each layer In arrLayerNames
+       
+		If rhino.IsLayerEmpty(layer) Then
+			If blnDeleteEmpty Then Call rhino.DeleteLayer(layer)
+		Else
+           
+			arrLayerObjects = rhino.ObjectsByLayer(layer, False)
+           
+			For Each layerObject In arrLayerObjects
+               
+				objType = rhino.ObjectType(layerObject)
+               
+				Select Case objType                   
+					Case rhObjectUnknown
+                       
+						layerNameSearch = InStr(layer, "_UnknownObjects")
+						
+						If layerNameSearch <> 0 Then
+							layerName = layer 
+							Call rhino.ObjectLayer(layerObject, layerName)
+						Else
+							layerName = layer + "_UnknownObjects"
+							Call rhino.AddLayer(layerName, RGB(RandomNumber(), RandomNumber(), RandomNumber()), True, False, layer)
+							Call rhino.ObjectLayer(layerObject, layerName)  
+						End If
+                   
+					Case rhObjectPoint
+                   
+						layerNameSearch = InStr(layer, "_Points")
+						
+						If layerNameSearch <> 0 Then
+							layerName = layer 
+							Call rhino.ObjectLayer(layerObject, layerName)
+						Else
+							layerName = layer + "_Points"
+							Call rhino.AddLayer(layerName, RGB(RandomNumber(), RandomNumber(), RandomNumber()), True, False, layer)
+							Call rhino.ObjectLayer(layerObject, layerName)  
+						End If
+
+                   
+					Case rhObjectPointCloud
+                   
+						layerNameSearch = InStr(layer, "_PointClouds")
+						
+						If layerNameSearch <> 0 Then
+							layerName = layer 
+							Call rhino.ObjectLayer(layerObject, layerName)
+						Else
+							layerName = layer + "_PointClouds"
+							Call rhino.AddLayer(layerName, RGB(RandomNumber(), RandomNumber(), RandomNumber()), True, False, layer)
+							Call rhino.ObjectLayer(layerObject, layerName)  
+						End If
+                   
+					Case rhObjectCurve
+                   
+						layerNameSearch = InStr(layer, "_Curves")
+						
+						If layerNameSearch <> 0 Then
+							layerName = layer 
+							Call rhino.ObjectLayer(layerObject, layerName)
+						Else
+							layerName = layer + "_Curves"
+							Call rhino.AddLayer(layerName, RGB(RandomNumber(), RandomNumber(), RandomNumber()), True, False, layer)
+							Call rhino.ObjectLayer(layerObject, layerName)  
+						End If
+                   
+					Case rhObjectSurface
+                   
+						layerNameSearch = InStr(layer, "_Surfaces")
+						
+						If layerNameSearch <> 0 Then
+							layerName = layer 
+							Call rhino.ObjectLayer(layerObject, layerName)
+						Else
+							layerName = layer + "_Surfaces"
+							Call rhino.AddLayer(layerName, RGB(RandomNumber(), RandomNumber(), RandomNumber()), True, False, layer)
+							Call rhino.ObjectLayer(layerObject, layerName)  
+						End If
+                   
+					Case rhObjectPolySurface
+                   
+						layerNameSearch = InStr(layer, "_PolySurfaces")
+						
+						If layerNameSearch <> 0 Then
+							layerName = layer 
+							Call rhino.ObjectLayer(layerObject, layerName)
+						Else
+							layerName = layer + "_PolySurfaces"
+							Call rhino.AddLayer(layerName, RGB(RandomNumber(), RandomNumber(), RandomNumber()), True, False, layer)
+							Call rhino.ObjectLayer(layerObject, layerName)  
+						End If
+                   
+					Case rhObjectMesh
+                   
+						layerNameSearch = InStr(layer, "_Mesh")
+						
+						If layerNameSearch <> 0 Then
+							layerName = layer 
+							Call rhino.ObjectLayer(layerObject, layerName)
+						Else
+							layerName = layer + "_Mesh"
+							Call rhino.AddLayer(layerName, RGB(RandomNumber(), RandomNumber(), RandomNumber()), True, False, layer)
+							Call rhino.ObjectLayer(layerObject, layerName)  
+						End If
+                   
+					Case rhObjectLight
+                   
+						layerNameSearch = InStr(layer, "_Lights")
+						
+						If layerNameSearch <> 0 Then
+							layerName = layer 
+							Call rhino.ObjectLayer(layerObject, layerName)
+						Else
+							layerName = layer + "_Lights"
+							Call rhino.AddLayer(layerName, RGB(RandomNumber(), RandomNumber(), RandomNumber()), True, False, layer)
+							Call rhino.ObjectLayer(layerObject, layerName)  
+						End If
+                   
+					Case rhObjectAnnotation
+                   
+						layerNameSearch = InStr(layer, "_Annotation")
+						
+						If layerNameSearch <> 0 Then
+							layerName = layer 
+							Call rhino.ObjectLayer(layerObject, layerName)
+						Else
+							layerName = layer + "_Annotation"
+							Call rhino.AddLayer(layerName, RGB(RandomNumber(), RandomNumber(), RandomNumber()), True, False, layer)
+							Call rhino.ObjectLayer(layerObject, layerName)  
+						End If
+                   
+					Case rhObjectTextDot
+                   
+						layerNameSearch = InStr(layer, "_TextDot")
+						
+						If layerNameSearch <> 0 Then
+							layerName = layer 
+							Call rhino.ObjectLayer(layerObject, layerName)
+						Else
+							layerName = layer + "_TextDot"
+							Call rhino.AddLayer(layerName, RGB(RandomNumber(), RandomNumber(), RandomNumber()), True, False, layer)
+							Call rhino.ObjectLayer(layerObject, layerName)  
+						End If
+                   
+				End Select
+               
+			Next
+           
+		End If
+       
+	Next   
+	
+	Call rhino.EnableRedraw(True)
+   
+End Sub
+
+Function RandomNumber()
+	Dim nMin : nMin = 0
+	Dim nMax : nMax = 255
+	RandomNumber = Null
+	Randomize
+	RandomNumber = Int((nMax - nMin + 1) * Rnd + nMin)
+End Function

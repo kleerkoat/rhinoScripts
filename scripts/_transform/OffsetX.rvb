@@ -1,0 +1,112 @@
+Option Explicit
+
+Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+Rhino.AddAlias "OffsetX","noEcho _-Runscript (OffsetX)"
+
+
+Private oldStyle
+
+If isEmpty(OldStyle) Then
+	OldStyle = "FullCurve"
+End If
+
+'Call OffSetEx()
+
+Sub OffsetX()
+
+	Dim aStyles: aStyles = array("FullCurve","SubCurves","Span")
+	
+	dim SCrv: sCrv = Rhino.GetObject("Select curve",4,true,true)
+	If IsNull(sCrv) then exit sub
+	
+	Dim sStyle: sStyle = Rhino.GetString("Offset curve",OldStyle,aStyles)
+	If isNull(sStyle) Then Exit Sub
+	
+	Dim i, intStyle
+	
+	For i = 0 To uBound(aStyles)
+		If lcase(sStyle) = lcase(aStyles(i))Then
+			oldStyle = aStyles(i)
+			intStyle = i
+			Exit For
+		End If
+	
+	Next
+	
+	OffsetSub sCrv,intStyle
+
+End Sub
+
+
+Sub OffSetSub(sCrv, intStyle)
+	
+	If intStyle = (0) Then
+		Rhino.Command "_Offset"
+		
+	Else
+		
+		If intStyle = 2 Then
+			Dim sCop: sCop = Rhino.CopyObject (sCrv)
+			Rhino.UnselectAllObjects
+			Rhino.SelectObject sCop
+		Else
+			If Rhino.IsPolyCurve(sCrv) or Rhino.IsPolyline(sCrv) then
+				Rhino.UnselectAllObjects
+				Rhino.SelectObject sCrv
+			Else
+				OffsetSub  sCrv,0
+				Exit sub
+			End if
+			
+		End If
+	 
+		If intStyle = 1 Then
+			Rhino.Command "_ExtractSubCrv _Outputlayer=_Current _Join=_Yes _Copy=_Yes"
+		ElseIf intStyle = 2 Then
+			Rhino.Command "_SubCrv"
+		End If		
+	
+	
+			If Rhino.LastCommandResult = 0 then
+				Dim aLast: aLast = Rhino.LastCreatedObjects()
+		
+				If IsNull(alast) then exit sub
+				Else 
+					If intStyle = 2 Then
+						Rhino.DeleteObject sCop
+					End If
+				exit sub
+		
+			End If
+
+			dim sLast 	
+	
+			For each slast in alast
+
+				Rhino.UnselectAllObjects
+				Rhino.SelectObject sLast
+	 
+				Rhino.Command "_Offset"
+	
+				If Rhino.LastCommandResult = 0 then
+					Dim aOff: aOff = Rhino.LastCreatedObjects()
+					Rhino.DeleteObject sLast
+			
+					If not isArray(aOff) then
+						Rhino.DeleteObject slast
+						Exit Sub
+					End if
+		
+				Else 
+			
+					Rhino.DeleteObject slast
+					Exit Sub
+		
+				End If	
+			
+			Next
+	
+		'If Not isnull(sCop) Then Rhino.DeleteObject sCop
+	End If
+	
+End Sub

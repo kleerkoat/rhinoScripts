@@ -1,0 +1,81 @@
+'Option Explicit'MoveSurface script v1,01
+'Script copyrighted by Jørgen Holo - Mars 2011
+
+'Call MoveSurface()
+Sub MoveSurface()
+
+ 
+
+	sObj=Rhino.GetObject("select solid to edit",16,true)
+	If isnull(sObj) then Rhino.print"no objects selected":exit sub
+	If not Rhino.IsPolysurfaceClosed(sObj) then Rhino.print"not a solid":exit sub
+	
+	aSrf=Rhino.ExplodePolysurfaces(sObj,False)
+	sSrf=Rhino.GetObject("select Surface to move",,,,aSrf)
+	If isnull(sSrf) then 
+		Rhino.print "no surface selected"
+		Rhino.DeleteObjects aSrf
+		exit sub
+	End If
+	
+	Rhino.EnableRedraw False
+	
+	'extract the surface edges to check which objects are joined to it
+	aEdges1=Rhino.DuplicateSurfaceBorder (sSrf ,0)
+	aEdges1=Rhino.ExplodeCurves (aEdges1 ,true)
+
+	For each strSrf in aSrf
+		aEdges2=Rhino.DuplicateSurfaceBorder (strSrf ,0)
+		aEdges2=Rhino.ExplodeCurves (aEdges2 ,true)
+		boolCompare=Rhino.CompareGeometry (strSrf,sSrf)
+		If not boolCompare=True then
+			For each sEdge2 in aEdges2
+				For each sEdge1 in aEdges1
+					dCompare=Rhino.CurveDeviation (sEdge2, sEdge1)
+					If not isnull(dCompare) then
+						If dCompare(5) <0.1 Then
+							Rhino.SelectObject strSrf
+							
+						End if
+					End if	
+				Next
+			Next
+		End If
+		Rhino.deleteobjects aEdges2
+	Next
+	
+	Rhino.deleteobjects aEdges1
+	aSrf2=Rhino.selectedobjects
+	Rhino.UnselectAllObjects
+	Rhino.SelectObject sSrf
+	
+	Rhino.EnableRedraw True
+	
+	Rhino.command"_Move"
+
+	Rhino.EnableRedraw False
+	
+	Rhino.selectobjects aSrf2
+	Rhino.command"untrimall"
+	
+	aSrf3=Rhino.selectedobjects
+	Rhino.unselectallobjects
+
+	For i = 0 to ubound(aSrf3)-1
+		For ii = i+1 to ubound(aSrf3)
+			boolCompare=Rhino.CompareGeometry (aSrf3(i),aSrf3(ii))
+			If boolCompare=True then Rhino.selectobject aSrf3(i)
+		Next
+	Next
+	
+	aSrf4=Rhino.selectedobjects
+	If isarray (aSrf4) then Rhino.deleteobjects aSrf4
+	aSrf5=Rhino.selectedobjects
+	Rhino.selectobjects aSrf
+	Rhino.Command"Createsolid"
+	Rhino.DeleteObject sObj
+	
+	Rhino.EnableRedraw True
+	
+	
+End Sub

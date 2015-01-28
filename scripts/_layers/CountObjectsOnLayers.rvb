@@ -1,0 +1,35 @@
+﻿Option Explicit
+'Script written by David Rutten (david@mcneel.com)
+'Script copyrighted by Robert McNeel & Associates
+'Script version Thursday, May 29, 2008 11:21:39
+
+Call CountObjectsOnLayers()
+Sub CountObjectsOnLayers()
+	Dim sFilePath : sFilePath = Rhino.SaveFileName( _
+		"Export layer data", _
+		"Layer Data (*.csv)|*.csv")
+	If (IsNull(sFilePath)) Then Exit Sub
+	
+	Dim sLayers : sLayers = Rhino.LayerNames()
+	Dim sLayer
+	
+	Dim fso, file
+	Set fso = CreateObject("Scripting.FileSystemObject")
+	Set file = fso.CreateTextFile(sfilePath, True)
+	
+	For Each sLayer In sLayers
+		Dim objs : objs = Rhino.ObjectsByLayer(sLayer)
+		If (IsNull(objs)) Then
+			Call file.WriteLine(sLayer & ",0")
+		Else
+			Call file.WriteLine(sLayer & "," & Ubound(objs)+1)
+		End If
+	Next
+	
+	Call file.Close()
+	
+	Set file = Nothing
+	Set fso = Nothing
+	
+	Call Rhino.Print("Layer data exported to: " & sFilePath)
+End Sub

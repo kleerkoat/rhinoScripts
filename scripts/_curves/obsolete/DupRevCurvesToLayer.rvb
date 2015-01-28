@@ -1,0 +1,64 @@
+Option Explicit
+'Script written by <Don Lewis>
+'Script copyrighted by <Lewis Tool & Engineering LLC>
+'Script version Tuesday, May 23, 2009
+'Would a script to duplicate and reverse the curve direction help you at all? You could move the duplicated curves to a 
+'new layer to simplify selection. (i.e. REV_Parent Layer).
+'
+'Don
+'
+'Edit: You can try the attached file and see how it works. Right now it auto selects all the curves in the file, 
+'duplicates, reverses and moves them to a new layer. If you prefer to select only certain curves Uncomment line 22 and 
+'comment out line 21. (Use the apostrophe character to comment out a line.
+
+'090930	edit by Ryan - added line 58 see comment on line 57
+
+'Call DupRevCurvesToLayer()
+Sub DupRevCurvesToLayer()
+	Dim arrObjects, strObject, dupCurve
+	Dim strLayer, strOption
+	Dim NewLayer, lngColor
+
+	'arrObjects = Rhino.ObjectsByType(4, vbTrue)
+	arrObjects = Rhino.GetObjects("Select Curves",4,,True)
+	
+	If IsArray(arrobjects) Then
+		lngColor = RGB(0,0,0)
+  
+		' Have the user pick a command option
+		strOption = Rhino.GetString("Layer Color",,Array("Parent", "Pick", "Random", "AllRandom"))
+ 
+		' Generate a color based on user input
+		Select Case LCase(strOption)
+			Case "pick" 
+				lngColor = Rhino.GetColor()
+			Case "random"
+				Randomize
+				lngColor = RGB(Int(256*Rnd),Int(256*Rnd),Int(256*Rnd))
+		End Select
+		For Each strObject In arrObjects
+			strLayer = Rhino.Objectlayer(strObject)
+			dupCurve = Rhino.CopyObject(strObject)
+			Call Rhino.ReverseCurve(dupCurve)
+			NewLayer  = "Rev Knife " & strLayer
+			If Not strLayer = "Rev Knife " & Rhino.ParentLayer (strLayer) Then
+				If LCase(strOption) = "parent" Then
+					lngColor = Rhino.LayerColor(strLayer)
+				End If
+				If LCase(strOption) = "allrandom" Then
+					Randomize
+					lngColor = RGB(Int(256*Rnd),Int(256*Rnd),Int(256*Rnd))
+				End If
+				If Not Rhino.IsLayer(NewLayer) Then
+					Rhino.AddLayer "Rev Knife " & strLayer,lngColor,,,strLayer
+				End If
+			End If
+			Rhino.ObjectLayer dupCurve , NewLayer
+			'added next line to reset color of dupCurve to layer in case source curves were set to a display color instead of layer
+			Rhino.ObjectColorSource dupCurve, 0
+		Next
+	Else
+		Rhino.Print("No Curves Present")
+	End If
+	Call Rhino.UnselectAllObjects
+End Sub

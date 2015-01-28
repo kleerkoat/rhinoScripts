@@ -1,0 +1,38 @@
+Option Explicit
+' Script written by Mitch Heynick
+' Hope it works
+
+
+'Call SpaceCrvs()
+Sub SpaceCrvs()
+Dim dblSpace, arrObjs, strObj, arrBB, arrNewStart
+arrNewStart=Array(0,0,0)
+
+arrObjs=Rhino.GetObjects("Select curves to move", 4,,True)
+If Not IsArray(arrObjs) Then
+ Call Rhino.Print("No curves found")
+ Call Rhino.EnableRedraw(True)
+ Exit Sub
+End If
+dblSpace=Rhino.GetReal("Space between curves?",1)
+If IsNull(dblSpace) Then
+ Call Rhino.Print("No distance")
+ Call Rhino.EnableRedraw(True)
+ Exit Sub
+End If
+
+Call Rhino.EnableRedraw(False)
+For Each strObj In arrObjs
+ arrBB=Rhino.BoundingBox(strObj)
+ If Not IsArray(arrBB) Then
+  Call Rhino.Print("Bounding box failed")
+  Call Rhino.EnableRedraw(True)
+ End If
+ Call Rhino.MoveObject(strObj, (arrBB(0)), arrNewStart)
+ arrBB=Rhino.BoundingBox(strObj)
+ arrNewStart=arrBB(1)
+ arrNewStart(0)=(arrNewStart(0))+dblSpace
+Next
+Call Rhino.EnableRedraw(True)
+End Sub
+

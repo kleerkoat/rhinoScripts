@@ -1,0 +1,251 @@
+' extrudesrf
+
+function getdocdbl(nam,def)
+	tex=rhino.getdocumentdata("cad",nam)
+	if isnull(tex) then 
+    getdocdbl=cdbl(def)
+  else
+    getdocdbl=cdbl(tex)
+  end if
+end function
+
+sub setdocval(nam,val)
+	rhino.setdocumentdata "cad",nam,cstr(val)
+end sub
+
+' get direction
+function getdir(pt0)
+cam=rhino.viewcamera
+dis=rhino.distance(pt0,cam)
+le=dis/10
+' get current direction
+dx=getdocdbl("extrudesrf-dx",1)
+dy=getdocdbl("extrudesrf-dy",1)
+dz=getdocdbl("extrudesrf-dz",1)
+pre=array(dx,dy,dz)
+'loop: show gizmo
+xax=null
+yax=null
+do
+  res=pikdir(pt0,le,xax,yax,pre)
+  ' if direction => return
+  if isarray(res) then
+    setdocval"extrudesrf-dx",res(0)
+    setdocval"extrudesrf-dy",res(1)
+    setdocval"extrudesrf-dz",res(2)
+    getdir=res
+    exit function
+  end if
+  ' if null pick 2 points
+  if isnull(res) then
+    getdir=null
+    exit function
+  ' if curve object
+  elseif rhino.iscurve(res) then
+    ' pick again
+    ar=rhino.getcurveobject("Curve for direction ?")
+    if isnull(ar) then
+      getdir=null
+      exit function
+    end if
+    cu=ar(0)
+    pt0=ar(3)
+    uu=ar(4)
+    xax=rhino.curvetangent(cu,uu)
+    yax=null
+  ' if surface object
+  elseif rhino.issurface(res) then
+    ' pick again
+    ar=rhino.getsurfaceobject("surface for direction ?")
+    if isnull(ar) then
+      getdir=null
+      exit function
+    end if
+    su=ar(0)
+    pt0=ar(3)
+    uv=ar(4)
+    pla=rhino.surfaceframe(res,uv)
+    xax=pla(1)
+    yax=pla(2)
+  end if
+loop
+end function
+
+' draw arrow sides for viewport from point and vector
+' -> polyline
+function arrsid(pnt,vec,dirlen,nrmlen)
+ar=rhino.viewcameratarget
+cam=ar(0)
+tar=ar(1)
+vwz=rhino.vectorsubtract(cam,tar)
+ang=rhino.vectorangle(vec,vwz)
+if ang>90 then ang=180-ang
+if ang<1 then
+  arrsid=rhino.addpoint(array(0,0,0))
+  exit function
+end if
+nrm=rhino.vectorcrossproduct(vec,vwz)
+vec=rhino.vectorunitize(vec)
+nrm=rhino.vectorunitize(nrm)
+pt0=rhino.vectoradd(pnt,rhino.vectoradd( _
+    rhino.vectorscale(vec,-dirlen), _
+    rhino.vectorscale(nrm,nrmlen)))
+pt1=rhino.vectoradd(pnt,rhino.vectoradd( _
+    rhino.vectorscale(vec,-dirlen), _
+    rhino.vectorscale(nrm,-nrmlen)))
+arrsid=rhino.addpolyline(array(pt0,pnt,pt1))
+end function
+
+' draw direction gizmo
+' and get direction or objectID or null
+' from point, size
+' possible 1 or 2 directions
+' and previous direction
+function pikdir(p0,le,ax,ay,lst)
+' set axes vectors
+if isnull(ax) then
+  dx=array(le,0,0)
+  dy=array(0,le,0)
+  dz=array(0,0,le)
+elseif isnull(ay) then
+  pla=rhino.planefromnormal(ax)
+  dx=rhino.vectorscale(pla(3),le)
+  dy=rhino.vectorscale(pla(1),le)
+  dz=rhino.vectorscale(pla(2),le)
+else
+  pla=rhino.planefromframe(p0,ax,ay)
+  dx=rhino.vectorscale(pla(1),le)
+  dy=rhino.vectorscale(pla(2),le)
+  dz=rhino.vectorscale(pla(3),le)
+end if
+dp=rhino.vectorscale(lst,le*1.5)
+' back vectors
+dxx=rhino.vectorreverse(dx)
+dyy=rhino.vectorreverse(dy)
+dzz=rhino.vectorreverse(dz)
+' calc axes points
+px=rhino.vectoradd(p0,dx)
+pxx=rhino.vectorsubtract(p0,dx)
+py=rhino.vectoradd(p0,dy)
+pyy=rhino.vectorsubtract(p0,dy)
+pz=rhino.vectoradd(p0,dz)
+pzz=rhino.vectorsubtract(p0,dz)
+pr=rhino.vectoradd(p0,dp)
+' draw
+rhino.enableredraw false
+lx=rhino.addline(p0,px)
+alx=arrsid(px,dx,le/8,le/8)
+rhino.objectcolor array(lx,alx),rgb(255,63,63)
+lxx=rhino.addline(p0,pxx)
+alxx=arrsid(pxx,dxx,le/8,le/8)
+rhino.objectcolor array(lxx,alxx),rgb(191,0,0)
+ly=rhino.addline(p0,py)
+aly=arrsid(py,dy,le/8,le/8)
+rhino.objectcolor array(ly,aly),rgb(63,255,63)
+lyy=rhino.addline(p0,pyy)
+alyy=arrsid(pyy,dyy,le/8,le/8)
+rhino.objectcolor array(lyy,alyy),rgb(0,191,0)
+lz=rhino.addline(p0,pz)
+alz=arrsid(pz,dz,le/8,le/8)
+rhino.objectcolor array(lz,alz),rgb(63,63,255)
+lzz=rhino.addline(p0,pzz)
+alzz=arrsid(pzz,dzz,le/8,le/8)
+rhino.objectcolor array(lzz,alzz),rgb(0,0,191)
+lpr=rhino.addline(p0,pr)
+alpr=arrsid(pr,dp,le/8,le/8)
+rhino.objectcolor array(lpr,alpr),rgb(255,255,255)
+' pick
+rhino.unselectallobjects
+rhino.enableredraw true
+pk=rhino.getobject("Which direction (Enter to pick a new direction) ?")
+if isnull(pk) then
+  ok=rhino.command("line")
+  if not ok then
+      rhino.deleteobjects array(lx,alx,lxx,alxx,ly,aly,lyy,alyy,lz,alz,lzz,alzz,lpr,alpr)
+      pikdir=null
+    exit function
+  end if
+  lin=rhino.firstobject
+  pt0=rhino.curvestartpoint(lin)
+  pt1=rhino.curveendpoint(lin)
+  rhino.deleteobject lin
+  di=rhino.vectorsubtract(pt1,pt0)
+elseif pk=lx or pk=alx then
+  di=dx
+elseif pk=lxx or pk=alxx then
+  di=dxx
+elseif pk=ly or pk=aly then
+  di=dy
+elseif pk=lyy or pk=alyy then
+  di=dyy
+elseif pk=lz or pk=alz then
+  di=dz
+elseif pk=lzz or pk=alzz then
+  di=dzz
+elseif pk=lpr or pk=alpr then
+  di=dp
+else
+  ' return objectID
+  rhino.deleteobjects array(lx,alx,lxx,alxx,ly,aly,lyy,alyy,lz,alz,lzz,alzz,lpr,alpr)
+  pikdir=pk
+  exit function
+end if
+' return direction
+rhino.deleteobjects array(lx,alx,lxx,alxx,ly,aly,lyy,alyy,lz,alz,lzz,alzz,lpr,alpr)
+pikdir=rhino.vectorunitize(di)
+end function
+
+sub extrudeSrfScript()
+obs=rhino.selectedobjects
+rhino.unselectallobjects
+pt0=rhino.getpoint("Gizmo at ...")
+if isnull(pt0) then exit sub
+di=getdir(pt0)
+if isnull(di) then exit sub
+if isarray(obs) then
+  rhino.selectobjects obs
+end if
+cmd="_ExtrudeCrv _Pause _D 0,0,0 "&cstr(di(0))&","&cstr(di(1))&","&cstr(di(2))
+rhino.print"<"&cmd&">"
+rhino.command cmd
+end sub
+
+'main
+
+
+sub nprint(n,v)
+tex=cstr(n)&" : "
+if isnull(v) then
+  tex=tex&"Null"
+else
+  tex=tex&cstr(v)
+end if
+rhino.print tex
+end sub
+
+sub vprint(n,v)
+tex=cstr(n)&" : "
+if isnull(v) then
+  tex=tex&"Null"
+else
+  tex=tex&formatnumber(v,3)
+end if
+rhino.print tex
+end sub
+
+sub v3print(n,v)
+tex=cstr(n)&" :"
+if isnull(v) then
+  tex=tex&" Null"
+elseif not isarray(v) then
+  tex=tex&" Not an Array"
+else
+  tex=tex&" X"&formatnumber(v(0),3)
+  tex=tex&" Y"&formatnumber(v(1),3)
+  tex=tex&" Z"&formatnumber(v(2),3)
+end if
+rhino.print tex
+end sub
+
+
+

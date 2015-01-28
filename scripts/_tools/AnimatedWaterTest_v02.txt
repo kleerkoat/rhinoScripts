@@ -1,0 +1,15 @@
+Here is an update of the script, it now has:
+- Even "water" distribution, with noise
+- Makes layers for both the trails and the heightcurves
+- Makes polylines instead of single line pieces
+- Adds points to the ends of the trails
+- Stops some of the curves.
+
+Unsolved:
+- Density, now you have to scale the terrain.
+- Stop trails at the surface edge.
+- Avoid invalid trailing
+( Intersection can result in faulty heightcurves that can result in faulty jumps to heightcurves)
+- Stop trailing at the bottom of a "pool"
+- and more :)
+- mesh handling

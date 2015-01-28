@@ -1,0 +1,17 @@
+Option Explicit
+Sub ModifyHoleSize()
+    Dim arrPoint, tempPt
+    Call Rhino.OsnapMode (4)
+    arrPoint = Rhino.GetPoint ("Select the center of the hole")
+    If IsArray(arrPoint) Then
+        tempPt = Rhino.AddPoint (ArrPoint)
+        Call Rhino.Prompt ("Select the edge of the hole")
+    Else
+        Exit Sub
+    End If
+    Call Rhino.Command ("DeleteHole all=no pause Enter",vbFalse)
+    Call Rhino.OsnapMode (1024)
+    Call Rhino.Command ("RoundHole ",vbFalse)
+    Call Rhino.DeleteObject (tempPt)
+End Sub
+'ModifyHoleSize

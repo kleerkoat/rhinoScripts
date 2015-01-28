@@ -1,0 +1,60 @@
+'--------------------------------------------------------------
+'Command   :  mic(mirror cplane)
+'Date      :  2011/05/04
+'Version   :  1.0
+'Organization   :  Rhino+
+'--------------------------------------------------------------
+
+Sub MirrorOnCplane()
+
+Dim strObject,strView,arr0,arrXPt,arrYPt,arrZPt
+
+strObject = Rhino.GetObjects("Select cplane mirror objects",0,True,True)
+
+If Not IsNull(strObject) Then
+
+ 
+Dim arrNames(2), str,arrDefaults
+
+arrNames(0) = "Z_XY"
+arrNames(1) = "Y_ZX"
+arrNames(2) = "X_ZY"
+
+str = Rhino.GetDocumentData("MIPlane","arrDefaults")
+If IsNull(str) Then
+   
+ arrDefaults = Rhino.GetString("Set mirror plane","Z_XY", arrNames) 
+If IsNull(arrDefaults) Then Exit Sub 
+Else
+ arrDefaults = Rhino.GetString("Set mirror plane",CStr(str) , arrNames) 
+ 
+ If IsNull(arrDefaults) Then Exit Sub 
+End If 
+ Rhino.SetDocumentData "MIPlane", "arrDefaults",CStr(arrDefaults)
+ 
+
+'-----------------------------------------------------------------------  
+Select Case arrDefaults
+  
+Case "Z_XY" realType = 0
+Rhino.SelectObjects strObject
+Rhino.Command "_NoEcho _Mirror _3Point 0,0,0 1,0,0 0,1,0"
+
+Case "Y_ZX" realType = 1
+Rhino.SelectObjects strObject
+Rhino.Command "_NoEcho _Mirror _3Point 0,0,0 1,0,0 0,0,1"
+
+Case "X_ZY" realType = 2
+Rhino.SelectObjects strObject
+Rhino.Command "_NoEcho _Mirror _3Point 0,0,0 0,1,0 0,0,1"
+
+End Select
+
+
+Rhino.command "_NoEcho _SelNone"
+
+End If
+
+
+End Sub
+

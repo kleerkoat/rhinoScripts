@@ -1,0 +1,36 @@
+Option Explicit
+'Orient surface(s) to point
+
+'Call OrientSrfToPt()
+Sub OrientSrfToPt()
+	
+	Dim arrObjects,strPoint,strObject,arrVector,arrPlane1,arrPlane2,arrOrientPtCoords,arrMatrix
+	Dim arrOrigin,arrNormal1,arrNormal2
+	
+	arrObjects=Rhino.GetObjects("Pick the surfaces to orient.")
+	If IsNull(arrObjects) Then Exit Sub
+	
+	strPoint=Rhino.GetObject("Pick the point to orient to.")
+	If IsNull(strObject) Then Exit Sub
+	
+	arrNormal1=Array(0,0,1)
+	arrOrientPtCoords=Rhino.PointCoordinates(strPoint)
+	
+	Call Rhino.EnableRedraw(False)
+	For Each strObject In arrObjects
+		arrOrigin=Rhino.SurfaceAreaCentroid(strObject)
+		
+		arrPlane1=Rhino.PlaneFromNormal(arrOrigin(0), arrNormal1)
+
+		
+		arrVector=Rhino.VectorCreate(arrOrigin(0),arrOrientPtCoords)
+		arrNormal2=Rhino.VectorUnitize(arrVector)
+		arrPlane2=Rhino.PlaneFromNormal(arrOrigin(0), arrNormal2)
+
+		
+		arrMatrix=Rhino.XformRotation(arrPlane1, arrPlane2)
+
+		Call Rhino.TransformObject(strObject, arrMatrix)
+	Next
+	Call Rhino.EnableRedraw(True)
+End Sub

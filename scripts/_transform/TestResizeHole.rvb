@@ -1,0 +1,64 @@
+Option Explicit
+'Script by Mitch Heynick
+'Version August 30, 2011
+'Thanks to Dan Bayn as well...
+
+Private oldNewDiameter
+If IsEmpty(oldNewDiameter) Then oldNewDiameter=0
+	
+'Call TestResizeHole()
+Sub TestResizeHole()
+	Dim arrEC,strEC,strPS,arrPt,dbltol
+	dblTol=Rhino.UnitAbsoluteTolerance
+	arrEC=Rhino.GetEdgeCurves("Pick edge of round hole to resize",1,-1,True)
+	If Not IsArray(arrEC) Then Exit Sub
+	strEC=arrEC(0)(0)
+	strPS=arrEC(0)(1)
+	arrPt=Rhino.CurveMidPoint(arrEC(0)(0))
+	
+
+	Call Rhino.EnableRedraw(False)
+	Dim arrSrfs,strSrf,arrMatch(),arrCylParams,n : n=-1
+	Call Rhino.DeleteObject(strEC)
+	arrSrfs=Rhino.ExplodePolysurfaces(strPS,False)
+	For each strSrf in arrSrfs		
+		If Rhino.IsPointOnSurface(strSrf,arrPt,dblTol) Then
+			n=n+1 : Redim Preserve arrMatch(n)
+			arrMatch(n)=strSrf
+		End If
+	Next	
+	If n<0 Then Call Rhino.EnableRedraw(True) : Exit Sub
+	
+	For each strSrf in arrMatch
+		If Rhino.IsCylinder(strSrf) Then
+			arrCylParams=Rhino.SurfaceCylinder(strSrf) : Exit For			
+		End If
+	Next
+	Call Rhino.DeleteObjects(arrSrfs)
+	Call Rhino.EnableRedraw(True)
+	If Not IsArray(arrCylParams) Then Exit Sub
+	
+	Dim	prec,dblERad,msg,dblNewDia,strPt,strNewCyl,arrRevAxis,arrCurrCP
+	prec=Rhino.UnitDistanceDisplayPrecision
+	dblERad=Round(arrCylParams(2),prec)
+		
+	msg="Existing diameter is "&Cstr(2*dblERad)&"   Enter new diameter:"
+	'dblNewDia=Rhino.GetReal(msg)
+	dblNewDia=Rhino.RealBox(msg,oldNewDiameter,"Resize Hole")
+	If IsNull(dblNewDia) or dblNewDia<=0 Then Exit sub
+	oldNewDiameter=dblNewDia
+	
+	'this allows for angled outer surfaces
+	arrRevAxis=Rhino.VectorReverse(arrCylParams(0)(3))
+	arrRevAxis=Rhino.VectorScale(arrRevAxis,arrCylParams(1))
+	arrCylParams(0)(0)=Rhino.PointAdd(arrCylParams(0)(0),arrRevAxis)
+
+	Call Rhino.EnableRedraw(False)
+	arrCurrCP=Rhino.ViewCPlane
+	arrPt=Rhino.XformWorldToCPlane(arrPt,arrCurrCP)	
+	strPt=Rhino.Pt2Str(arrPt)
+	Call Rhino.Command ("_DeleteHole _All=_No "&strPt&" _Pause _Enter",True)
+	strNewCyl=Rhino.AddCylinder (arrCylParams(0),2*arrCylParams(1),dblNewDia/2,True)
+	Call Rhino.BooleanDifference(Array(strPS),Array(strNewCyl),True)
+	Call Rhino.EnableRedraw(True)
+End Sub

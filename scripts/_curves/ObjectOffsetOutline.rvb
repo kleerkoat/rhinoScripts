@@ -1,0 +1,55 @@
+﻿Option Explicit
+'Script written by Mitch
+'Version Saturday, 20 March, 2010
+
+Sub ObjectOffsetOutline()
+	
+	Dim strObj,dblOdist,arrSilObj
+
+	strObj=Rhino.GetObject("Select object to create offset outline",,True,True)
+	If IsNull(strObj) Then Exit Sub
+	dblODist=Rhino.GetReal("Offset distance?")
+	If IsNull(dblODist) Then Exit Sub
+	
+	Call Rhino.EnableRedraw(False)
+	Call Rhino.Command("_Silhouette")
+	Call Rhino.UnselectAllObjects
+	arrSilObj=Rhino.LastCreatedObjects(True)
+	If Not IsArray(arrSilObj) Then
+		Call Rhino.Print("No silhouette created")
+		Call Rhino.EnableRedraw(True)
+		Exit Sub
+	End If
+	
+	Dim arrBB, arrPickPt,strPt,strComm,arrOutL
+	
+	arrBB=Rhino.BoundingBox(arrSilObj)
+	If Not IsArray(arrBB) Then 
+		Call Rhino.Print("Unable to process silhouette")
+		Call Rhino.DeleteObjects(arrSilObj)
+		Call Rhino.EnableRedraw(True)
+		Exit Sub
+	End If
+	arrPickPt=arrBB(2)
+	arrPickPt(0)=arrPickPt(0)+1
+	arrPickPt(1)=arrPickPt(1)+1
+	
+	strPt=Rhino.Pt2Str(arrPickPt)
+	strComm="_CurveBoolean DeleteInput=All CombineRegions=Yes "
+	
+	Call Rhino.Command(strComm&strPt&" _Enter",False)	
+	arrOutL=Rhino.LastCreatedObjects(True)
+	If Not IsArray(arrOutL) Or UBound(arrOutL)>0 Then
+		Call Rhino.DeleteObjects(arrSilObj)
+		Call Rhino.Print("Error creating object outline")
+		Call Rhino.EnableRedraw(True)
+		Exit Sub
+	End If
+	
+	Call Rhino.OffsetCurve(arrOutL(0),arrPickPt,dblOdist)
+	Call Rhino.DeleteObject(arrOutL(0))
+	Call Rhino.EnableRedraw(True)
+	
+End Sub
+
+Call ObjectOffsetOutline()

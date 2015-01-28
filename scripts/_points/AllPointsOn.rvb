@@ -1,0 +1,31 @@
+'Script written by Ryan Gilmore (monkeygrip@gmail.com)
+'Script version Tuesday, 23 October 2012 09:49:24
+
+'Description: Turns on points for all selected objects
+'
+'Edits:
+'Todo:671200060
+
+Option Explicit
+
+'Call AllPointsOn()
+Sub AllPointsOn()
+	Dim arrObjects, Object
+	
+	arrObjects = Rhino.GetObjects("Select objects for edit point display.", 1073742364, True, True, False)
+	If isNull(arrObjects) Then
+		Exit Sub
+	End If
+	Rhino.EnableRedraw False
+	For Each Object In arrObjects
+		Rhino.SelectObject Object
+		If Rhino.IsBrep(Object) Then
+			Rhino.Command "_NoEcho _SolidPtOn"
+		ElseIf Rhino.IsCurve(Object) Then
+			Rhino.Command "_noecho _PointsOn"
+		ElseIf Rhino.IsDimension(Object) Then
+			Rhino.Command "_noecho _PointsOn"
+		End If
+	Next
+	Rhino.EnableRedraw True
+End Sub

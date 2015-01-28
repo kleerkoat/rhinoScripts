@@ -1,0 +1,53 @@
+Option Explicit
+
+'Script written by Davide del Giudice
+'Script copyrighted by MadeInCalifornia http://madeincalifornia.blogspot.com/
+'Script version Tuesday, 07 April 2010
+
+Call Main()
+Sub Main()
+
+Rhino.MessageBox "check all lines are exploded and flip direction to change dimension orientation", 0,_
+"First of all"
+
+Dim arrLine:arrLine=Rhino.GetObjects("select lines",4)
+If isNull (arrLine) Then Exit Sub
+
+Rhino.AddLayer "DIMENSIONS",RGB(0,255,255)
+Rhino.CurrentLayer "DIMENSIONS"
+
+Dim Line
+For Each Line In arrLine
+Call dimension(Line)
+Next
+
+Rhino.MessageBeep 1
+
+End Sub
+
+Sub dimension(line)
+
+Dim arrcurves,arrAngle,a,b,c,point,point2,strp,strq,arrOffsetCurve,arrsPoint, arrEpoint,arrMP,linebeta
+
+LineBeta=line
+
+arrMP = Rhino.CurveMidPoint( linebeta)
+arrcurves=Rhino.OffsetCurve (linebeta, arrMP, 1.0)
+
+Dim curve
+For Each curve In arrcurves
+
+arrsPoint = Rhino.CurveStartPoint( curve)
+a= Rhino.Pt2Str(arrsPoint)
+arrePoint = Rhino.CurveEndPoint( curve)
+b= Rhino.Pt2Str(arrePoint)
+arrAngle = Rhino.Angle(arrsPoint, arrePoint)
+
+Dim arrMidPt: arrMidPt = Array( arrepoint(0), arrepoint(1)-1, 0)
+
+c = Rhino.Pt2Str (arrMidPt )
+rhino.Command "_DimAligned " & a &" "& b &" "& b
+rhino.HideObjects arrcurves
+
+Next
+End Sub

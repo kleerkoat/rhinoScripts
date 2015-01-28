@@ -1,0 +1,63 @@
+Option Explicit
+
+'Call ExtrudeByText()
+Sub ExtrudeByText()
+
+	'select curves to extrude part
+	Dim strObjsPart : strObjsPart = Rhino.GetObjects("Select the part curves to extrude", 4, False, True)
+	If IsNull(strObjsPart) Then Exit Sub
+	
+	'select text to use for extrusion depth part
+	Dim strDepthPart : strDepthPart = Rhino.GetObject("Select extrusion depth",, False)
+	If IsNull(strDepthPart) Then Exit Sub
+	
+	'convert selected text to value for extrusion part
+	Dim intDepthPart
+	If Rhino.IsText(strDepthPart) Then
+		Dim strTxtPart : strTxtPart = Rhino.TextObjectText(strDepthPart)
+		intDepthPart = Cstr(strTxtPart)
+	Else
+		Call Rhino.Print("Not a valid value for extrusion.")
+		Exit Sub
+	End If
+	
+	'select curves to extrude detail
+	Dim strObjsDetail : strObjsDetail = Rhino.GetObjects("Select the detail curves to extrude", 0, True, False)
+	If IsNull(strObjsDetail) Then Exit Sub
+	
+	'	'select curves to extrude detail
+'	Dim strObjsDetail : strObjsDetail = Rhino.GetString("Enter the detail curves to extrude", 0, True, False)
+'	If IsNull(strObjsDetail) Then Exit Sub
+	
+	'select text to use for extrusion depth detail
+	Dim strDepthDetail : strDepthDetail = Rhino.GetObject("Select detail extrusion depth",, False)
+	If IsNull(strDepthDetail) Then Exit Sub
+'	
+'	'select text to use for extrusion depth detail
+'	Dim strDepthDetail : strDepthDetail = Rhino.GetString("Enter detail extrusion depth",, False)
+'	If IsNull(strDepthDetail) Then Exit Sub
+	
+	'convert selected text to value for extrusion detail
+	Dim intDepthDetail
+	If Rhino.IsText(strDepthDetail) Then
+		Dim strTxtDetail : strTxtDetail = Rhino.TextObjectText(strDepthDetail)
+		intDepthDetail = Cstr(strTxtDetail)
+	Else
+		Call Rhino.Print("Not a valid value for extrusion.")
+		Exit Sub
+	End If
+		
+	'convert intDepth to a negative value
+	'Dim intNegDepth : intNegDepth = intDepth 
+	
+	'perform extrusion Detail
+	Rhino.SelectObjects strObjsPart
+	Dim arrPart : arrPart = Rhino.Command("_-ExtrudeCrv _BothSides=No " & Cstr(intDepthPart))
+	Rhino.UnselectAllObjects()
+
+	'perform extrusion Detail
+	Rhino.SelectObjects strObjsDetail
+	Dim arrDetail : arrDetail = Rhino.Command("_-ExtrudeCrv " & Cstr(intDepthDetail))
+	Rhino.UnselectAllObjects()
+
+End Sub

@@ -1,0 +1,39 @@
+
+Option Explicit
+
+Call DupRevCurvesToLayerKnife()
+Sub DupRevCurvesToLayerKnife()
+	Dim arrObjects, strObject, dupCurve, strObjectName
+	Dim strLayer, strOption
+	Dim NewLayer, lngColor
+
+	arrObjects = Rhino.GetObjects("Select Curves",4,,True)
+	
+	If IsArray(arrobjects) Then
+		lngColor = RGB(191,63,63)
+
+		For Each strObject In arrObjects
+			strLayer = Rhino.Objectlayer(strObject)
+			dupCurve = Rhino.CopyObject(strObject)
+			
+			Call Rhino.ReverseCurve(dupCurve)
+			If Not strLayer = "KNIFE" Then
+				If Not Rhino.IsLayer("KNIFE") Then
+					Rhino.AddLayer "KNIFE",lngColor,,,strLayer
+				End If
+			End If
+			
+			strObjectName = "KNIFE"
+			If Not IsNull(dupCurve) Then
+				strObjectName = Rhino.ObjectName(dupCurve, strObjectName)
+			End If
+			
+			Rhino.ObjectLayer dupCurve , "KNIFE"
+			Rhino.ObjectColorSource dupCurve, 0
+			
+		Next
+	Else
+		Rhino.Print("No Curves Present")
+	End If
+	Call Rhino.UnselectAllObjects
+End Sub

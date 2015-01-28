@@ -1,0 +1,155 @@
+Option Explicit
+'Script written by willemderks.com
+'Script version Monday, November 08, 2010 12:52:24
+
+'set tolerance as a variable that 
+Private oldUserTol
+If IsEmpty(oldUserTol) Then oldUserTol=Rhino.UnitAbsoluteTolerance
+
+
+'Call SelNearDuplicatePoints()
+Sub SelNearDuplicatePoints()
+
+	'select point objects
+	Dim arrStrPts
+	arrStrPts = Rhino.GetObjects("Select points for near duplicate selection",1)
+	'if ni points were selected exit the script
+	If isNull(arrStrPts) Then Exit Sub
+	'set tolerance
+	Dim dlbTolerance
+	dlbTolerance = Rhino.RealBox("minimum distance between points",oldUserTol,"Duplicate tolerance")
+	If isNull(dlbTolerance) Then Exit Sub
+	oldUserTol = dlbTolerance
+	
+	'get time to calculate runtime afterwards
+	Dim time
+	time=timer
+	
+	
+	Dim UB,i,j
+	'the upperbound of the array tht contains the point objects
+	'This is the number of points minus 1 bacause the array starts with 0
+	UB = Ubound(arrStrPts)
+	
+	Dim arrPts
+	'create an array the same size as the point objects array
+	Redim arrPts(UB)
+	'get the coordiantes (array(x,y,z)) from each point object and store in arrPts
+	For i=0 to UB
+		arrPts(i) = Rhino.PointCoordinates(arrStrPts(i))
+	Next
+	
+	'turn off screen redrawing 
+	Call Rhino.EnableRedraw(False)
+	Call Rhino.UnselectAllObjects()
+	
+
+	
+	'Go through all points in the array arrPts,exept the last one hence (ub-1))
+	'the i variable represents the index of the point to check
+	For i=0 to UB-1
+	
+	'this will update the rhino prompt with the percentage of points checked
+	'not always but inly every 100th point
+		If ((i Mod 100) = 0) Then
+			Call Rhino.Prompt (Round (i/(UB-2)*100,0)  &"% done")
+			Rhino.Redraw()
+		End If
+		
+		
+		
+		
+		'point (i) in the array is checked if its not Null
+		'If its set to Null than the point is previously marked as a neighbor		
+		If Not isNull(arrPts(i)) Then
+		
+'If we come here, arrPts(i) was not null so it's an array(xyz) reprenting the coordinates	
+'The new variable j will represent the index of the point coordinates in arrPts
+'We only check the 'trailing' point in arrPts so j starts with j=i+1
+'i+1 is the index of the next point in arrPts.
+'We check all trailing points so we go up to UB
+'that is why we let i loop until UB-1: to make sure we can here check (i+1)
+	
+			For j=i+1 to UB
+			'Again we check if arrPts(j) is not previously marked as neighbor by setting it to Null
+				If Not isNull(arrPts(j)) Then
+				'So arrPts(i) and arrPts(j) are both an array(xyz)
+				'below the function "ComparePointsByTol" will compare both points and returns
+'true if the distance between the points is equal or less that dblTolerance				
+					If 	ComparePointsByTol(arrPts(i),arrPts(j),dlbTolerance) Then
+					'If we get into this If statement, "ComparePointsByTol" has returned as True
+					'so point coordiante arrPts(j) is a near neighbor of arrPts(i)
+					'thus we select the point object ar position (j) in the array of point objects (arrStrPts(j))
+						Call Rhino.SelectObject(arrStrPts(j))
+					'the point coordinates should not have to be checked again bacause they are already
+					'identified as close to another point (arrPts(i)). By setting the value of arrPts(j)
+'to Null, it will be skipped when further on oin the loop i is equal to the current j					
+						arrPts(j) = Null
+					End If
+				End If
+			Next
+		End If
+	Next
+	
+	'turn on screen redrawing again
+'the screen refresjes and we see what point objects are selected
+	Call Rhino.EnableRedraw(True)
+	
+	'print the difference in time between the start of the loop and now 
+	Call Rhino.Print("Calc time : "&(Round(timer-time,2))&" sec.")
+	
+	
+	Dim arrDups
+	'here we create an array from all selected objects (the neighbor points)
+	arrDups = Rhino.SelectedObjects
+	If Not IsNuLL(arrDups) Then
+	'if arrDups is not null, there were objects selected so we can report the number of
+	'objects in the arry as the numbor of near duplicates found
+		Call Rhino.Print(Cstr(Ubound(arrDups)+1)&" near duplicate points found")
+	Else
+	'no objects were selected so no near duplicates found
+		Call Rhino.Print("No near duplicate points found")
+	End If
+	
+End Sub
+
+
+Function ComparePointsByTol(ptA,ptB,dblTol)
+	
+	'set the return value of the function to be false
+	'if lateron we find the points are within tolarance we set it to True
+	ComparePointsByTol = False
+		
+	
+	
+	'to compare the 2 point coordinates 
+	'we first check if the absolute (Abs)
+	'value of the difference between the x values of the points are within tolerance
+	'ptA(x)-ptB(x)  ->  ptA(0)-ptB(0)
+	 
+	 
+	 'and last the z values -> ptA(1)-ptB(1)
+	
+	
+	
+	
+
+	If Abs(ptA(0)-ptB(0))<dblTol Then
+	'if so we compare the y values -> ptA(1)-ptB(1)
+		If Abs(ptA(1)-ptB(1))<dblTol Then
+		'and last the z values -> ptA(1)-ptB(1)
+			If Abs(ptA(2)-ptB(2))<dblTol Then
+			'when we end up here, we know that the 2 points are within tolerance
+			'on all axes. "they would fit within a box of dblTol * dblTol * dblTol
+			'To test of they would fit within a sphere with diameter dblTol, we have to
+			'test if theys 3Dimensional distance is within tolerance as well
+				If Rhino.Distance(ptA,ptB)<dblTol Then
+				'we are hete the distance between the points is < the dblTolerance 
+				'so the return value of the function should be True
+					ComparePointsByTol = True
+				End If
+			End If
+		End If
+	End If
+		
+End Function

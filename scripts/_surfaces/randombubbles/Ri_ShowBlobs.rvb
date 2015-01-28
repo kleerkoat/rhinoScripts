@@ -1,0 +1,36 @@
+' Script for Rhinoceros 3.0 Sr3
+' script to show all primitives created with the RandomBubbles toolset
+' © 2004 Clement Greiner
+Option Explicit
+Sub HideBlobs
+Dim arrAllowed, StrObj, StrVMode, arrSelection()
+arrAllowed = GET_RiObjects
+If Not IsArray(arrAllowed) Then 
+	Print "No hidden RiObjects found in document."
+	Exit Sub
+Else
+	Rhino.Print CStr((UBound(arrAllowed)) + 1) & " blobby objects made visible."
+    Rhino.ShowObjects arrAllowed
+End If
+
+End Sub
+
+Private Function GET_RiObjects
+Dim arrAllObjs, count, StrObject, StrValue, arrRiObjs()
+arrAllObjs = Rhino.HiddenObjects
+' exit if document is empty
+If Not IsArray(arrAllObjs) Then GET_RiObjects = vbNull : Exit Function
+' search objects for planes
+count = 0
+For Each StrObject In arrAllObjs
+	StrValue = Int(Rhino.GetObjectData(StrObject, "RandomBubbles","RiOpcode"))
+	If StrValue = 9000 Or StrValue = 1001 Or StrValue = 1002 Then
+		ReDim Preserve arrRiObjs(count)
+		arrRiObjs(count) = StrObject
+		count = count + 1
+	End If
+Next
+If count > 0 Then GET_RiObjects = arrRiObjs Else GET_RiObjects = vbNull
+End Function
+
+HideBlobs

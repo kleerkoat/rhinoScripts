@@ -1,0 +1,236 @@
+Option Explicit
+'Script written by Vicky Chan
+'Script copyrighted by u-graphics
+'Script version Saturday, March 22, 2008 1:54:44 AM
+'aggreagete six module into a surface based on surface local altitude
+
+'Call AggregateLandscape()
+
+Sub AggregateLandscape()
+	
+
+	' divider dertermine the value of the UV division
+	Dim divider : divider = 40
+	Dim level : level = 10
+	Dim affected_small_area : affected_small_area = divider/ 10
+	Dim affected_large_area : affected_large_area = divider/ 8
+	Dim dbltrim : dbltrim = 1
+
+	
+	Dim arrParam(1), arrPoint
+	Dim matrixDot : ReDim matrixDot(divider, divider)
+
+	
+	' turn module that you would like to aggregate into six different block
+	' enter the name of six different modules
+	'idshape1 is the module with lowest altitude
+	'idshape_highest is the module with lighest altitude
+	
+	Dim u
+	Dim arrShapes : ReDim arrShapes(level)
+	For u = 1 To level
+		arrShapes(u-1) = Rhino.GetString("Name of module "& u &" to insert",u)
+		If IsNull(arrShapes(u-1)) Then Exit Sub
+	Next
+	
+	
+	' pick a surface
+	Dim idSrf : idSrf = Rhino.getobject("get a surface",8)
+	If IsNull(idSrf) Then Exit Sub
+	
+	Dim arrDomainU : arrDomainU = Rhino.surfacedomain(idSrf, 0)
+	Dim arrDomainV : arrDomainV = Rhino.surfacedomain(idSrf, 1)
+	Dim matrixDomainW : ReDim matrixDomainW(divider, divider)
+	
+	' get the UV point into 3dpoints
+	Dim i,j
+	For i = 0 To divider 
+		For j = 0 To divider
+		
+			arrParam(0) = i*arrDomainU(1)/divider
+			arrParam(1) = j*arrDomainV(1)/divider
+		
+			arrPoint = Rhino.EvaluateSurface(idSrf, arrParam)
+			matrixDomainW (i,j) = Rhino.SurfaceNormal(idSrf, arrParam)
+			matrixDot(i,j) = arrPoint
+			
+		Next
+	Next
+	' determine the altitude of the 3dpoints on the surface
+	' find the max and min and divide them into six group for aggregation
+	
+
+	Dim standard_block : standard_block = rhino.Distance(matrixDot(0,0),matrixDot(affected_large_area,affected_large_area))
+	rhino.print (standard_block)
+	
+	Dim a, b ,s , r, p
+	
+	For a = dbltrim To divider-dbltrim 
+		For b = dbltrim To divider-dbltrim
+			
+
+			Dim lowest_local_value : lowest_local_value = 0
+			Dim lowest_local_point
+			'get the lowest_local value within the affected small area			
+			For s = -(affected_small_area) To affected_small_area
+				For r = -(affected_small_area) To affected_small_area
+					
+					Dim tempX, tempY
+					
+					If a+s >= divider Then 
+						tempX = divider
+					ElseIf a+s <= 0 Then 
+						tempX = 0
+					Else
+						tempX = a+s
+					End If
+						
+					
+					If b+r >= divider Then 
+						tempY = divider
+					ElseIf b+r <= 0 Then 
+						tempY = 0
+					Else
+						tempY = b+r
+					End If
+		
+					If lowest_local_value <=  matrixDot(tempX,tempY)(2) Then
+						lowest_local_value = lowest_local_value
+					Else 
+						lowest_local_value = matrixDot(tempX,tempY)(2) 
+						lowest_local_point = matrixDot(tempX,tempY)
+
+					End If
+			
+				Next
+			Next
+			
+			
+			'find the rotation angle
+			'The lowest_local point is rotated toward the lowest_local point
+			Dim x : x = lowest_local_point(0) - matrixDot(a,b)(0)
+			Dim y : y = lowest_local_point(1) - matrixDot(a,b)(1)	
+			' use tangent to turn two points into angle
+			Dim dblangle : dblangle =  Rhino.ToDegrees ( Rhino.ATan2 (y, x))
+			
+			
+
+			'get the lowest_global value within the affected large area
+			Dim lowest_global_value : lowest_global_value = 0
+			Dim lowest_global_point : lowest_global_point = array (0,0,0)
+			Dim s1 : s1 = -affected_large_area
+			Dim r1 : r1 = -affected_large_area
+
+			
+			For s1 = -affected_large_area To affected_large_area
+				For r1 = -affected_large_area To affected_large_area
+					
+					If a+s1 >= divider Then 
+						tempX = divider
+					ElseIf a+s1 <= 0 Then 
+						tempX = 0
+					Else
+						tempX = a+s1
+					End If
+						
+					
+					If b+r1 >= divider Then 
+						tempY = divider
+					ElseIf b+r1 <= 0 Then 
+						tempY = 0
+					Else
+						tempY = b+r1
+					End If
+		
+					If lowest_global_value <=  matrixDot(tempX,tempY)(2) Then
+						lowest_global_value = lowest_global_value
+					Else 
+						lowest_global_value = matrixDot(tempX,tempY)(2) 
+						lowest_global_point = matrixDot(tempX,tempY)
+
+					End If
+			
+				Next
+			Next
+			
+			
+			
+			Dim global_distance : global_distance = (Rhino.Distance(matrixDot(a,b),lowest_global_point))
+			'rhino.print (global_distance)
+			Dim zone : zone = 0
+			Dim t : t = 0
+			
+
+			
+			For t = 0 To level-1			
+				
+				If global_distance >= standard_block Then
+				zone = level-1
+				
+				ElseIf global_distance = 0 Then
+					zone = 0
+				
+				ElseIf global_distance >= standard_block*(t/level) And global_distance < standard_block*(t+1)/ level Then
+					zone = t
+					'rhino.print(zone)
+				Else
+					zone = zone
+				End If
+				
+			Next
+			
+			
+			Dim h, k, min
+			Dim absolute_min
+			min = 0
+	
+	
+			For h = 0 To divider-1 
+				For k = 0 To divider-1
+			
+					If min <= matrixDot (h,k)(2)Then
+						min = min
+					Else 
+						min = matrixDot (h,k)(2)
+						absolute_min =  matrixDot (h,k)
+					End If
+				Next
+			Next
+			
+			rhino.Print(absolute_min(2))
+			
+			If matrixDot(a,b)(2) <= absolute_min(2) + 30 Then
+				zone = 0
+			End If
+			
+			If matrixDot(a,b)(2) > absolute_min(2) + 30 And matrixDot(a,b)(2) <= absolute_min(2) + 40 Then
+				zone = 1
+			End If
+			
+			If matrixDot(a,b)(2) > absolute_min(2) + 40 And matrixDot(a,b)(2) <= absolute_min(2) + 50 Then
+				zone = 2
+			End If
+			
+				
+			' aggregate the modules based on the global and local altitude
+			Dim module : module = rhino.InsertBlock (arrShapes(zone), matrixDot(a,b),,dblangle)
+			'If zone = 1 Or zone = 2 Or zone = 3 or zone = 4 or zone =5 Then
+				Dim vertical_point : vertical_point = array (matrixDot(a,b)(0), matrixDot(a,b)(1), matrixDot(a,b)(2)+1)
+				Dim vertical_vector : vertical_vector = rhino.VectorCreate(matrixDot(a,b),vertical_point)
+				Dim rotAxis : rotAxis=Rhino.VectorCrossProduct(vertical_vector, matrixDomainW(a,b))
+				Dim dAngle : dAngle = acos(Rhino.VectorDotProduct(vertical_vector, matrixDomainW(a,b)) )
+				Call Rhino.RotateObject(module,matrixDot(a,b), Rhino.toDegrees(dAngle),rotAxis)
+			'End If
+		
+			Dim random_factorX : random_factorX = rnd * (level-zone)
+			Dim random_factorY : random_factorY = rnd * (level-zone)
+			Dim new_position : new_position = array (matrixDot(a,b)(0) + random_factorX, matrixDot(a,b)(1) + random_factorY, matrixDot(a,b)(2)) 
+			Call Rhino.MoveObject (module, matrixDot(a,b), new_position)
+					
+					
+		Next
+		
+	Next
+	
+
+End Sub

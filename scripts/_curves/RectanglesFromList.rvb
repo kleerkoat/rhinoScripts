@@ -1,0 +1,92 @@
+Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version Tuesday, August 04, 2009 4:16:52 PM
+
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''    
+' Draws Rectangles from INI file
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''      
+Sub RectanglesFromList()
+  
+	Dim cmdname, configfile, section, tsection
+	Dim filename, entries, entry, value, data, bname
+	Dim tentries, tentry, tvalue
+	Dim ip, xl, yl, thk
+	Dim p0, p1, p2, p3, p4
+	Dim e0, e1, a0, strSource
+	
+	strSource = Null
+
+	cmdname = "RectanglesFromList"
+	configfile = "C:\Users\ryan\AppData\Roaming\McNeel\Rhinoceros\5.0\scripts\_curves\RectanglesFromList.ini"
+	section = "RECTANGLES"
+    
+	filename = Rhino.FindFile(configfile)
+	If IsNull(filename) Then
+		Call MsgBox("Unable to locate " & configfile & ".", 17, cmdname)
+		Exit Sub
+	End If
+    
+	entries = Rhino.GetSettings(filename, section)
+	If IsNull(entries) Then Exit Sub
+    
+	entry = Rhino.ListBox(entries, "Select a rectangle size", cmdname)
+	If IsNull(entry) Then Exit Sub
+	value = entry
+	
+	If entry = "Prompt" Then
+		entry = Rhino.PropertyListBox(Array("X","Y"),Array("1","1"),cmdname)
+		If isNull (entry) Then Exit Sub
+		value = entry(0)& "," & entry(1)
+		strSource = "Prompt"
+	End If
+   
+	bname = Replace(value, ".", "_")
+    
+	If Rhino.IsBlock(bname) = False Then
+    
+		If Not strSource = "Prompt" Then
+			value = Rhino.GetSettings(filename, section, entry) 
+			If IsNull(value) Then Exit Sub
+		End If
+
+		data = Rhino.Strtok(value, ", ;")
+		If IsNull(data) Or (UBound(data) <> 1) Then Exit Sub
+
+		' Hide the dirty work      
+		Call Rhino.EnableRedraw(False)
+          
+		ip = Array(0,0,0)
+		xl = CDbl(data(0))
+		yl = CDbl(data(1))
+
+		' Top
+		p0 = Rhino.Polar(ip, 90, yl)
+		p1 = Rhino.Polar(ip, 0, xl)
+		p2 = Rhino.Polar(p0, 0, xl)
+		e0 = Rhino.AddPolyline(Array(ip, p0, p2, p1, ip))
+		Call Rhino.Command("_-FilletCorners _SelID " & e0 & " _Enter " & CStr(1.5), 0 )
+    
+		' Join
+		a0 = Rhino.JoinCurves(Array(e0), True)
+
+		' Create the block
+		Call Rhino.SelectObjects(a0)
+		Call Rhino.Command("_-Block 0 " & Chr(34) & bname & Chr(34) & " _Enter _Enter _Enter", 0)
+    
+		' Delete the block inserted by the Block command
+		Call Rhino.DeleteObjects(Rhino.LastCreatedObjects)
+
+		' Enable redrawing
+		Call Rhino.EnableRedraw(True)
+    
+	End If
+  
+	' Insert the block
+	Call Rhino.Command("_-Insert " & Chr(34) & bname & Chr(34) & " _Block", 0 )
+
+End Sub
+
+'RectanglesFromList
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "Rectangles","_NoEcho _-RunScript (Rectangles)"

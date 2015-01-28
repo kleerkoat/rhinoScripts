@@ -1,0 +1,495 @@
+' ****************************** RhinoScript.org ******************************
+'
+'   Layer_Library, version 1
+'
+'   by Johannes Kuhnen, published Oct 03, 2009
+'
+'
+'   a collection of functions to work with layers in rhinoscript and to extend the functions of rhino:
+'   layer_isolate
+'   layer_match
+'   layer_off
+'   ....
+'
+'
+'
+'
+'   This RhinoScript Library has been downloaded from RhinoScript.org.
+'
+'   Rhino versions: Rhino 4 (at least service release 6)
+'
+'   LICENSE INFORMATION:
+'   This script is published under the GNU General Public License, version 3
+'   or any later version, and thus comes WITHOUT ANY WARRANTY. You can get
+'   the complete license text here: www.rhinoscript.org/gpl
+'
+' ****************************** RhinoScript.org ******************************
+
+
+
+Option Explicit
+
+'------------------------------------------------------------------------------------------------------------------------------------
+' a.
+' 1]layer_all		: returns the names of all layers
+' 2]layer_box		: displays a list of layers in a multiple-selection list box dialog
+' 3]layer_byColor 	: returns all layer with a given color
+' 4]layer_byObjects : returns the layer names of an array of objects
+' 5]layer_sort		: returns a list of layers sorted by the current display order index as displayed in rhino's layer dialog box
+' 6]layer_equals	: tests if one layer equals a list of layers
+'
+' b.
+' 1]layer_add		: adds a new layer to the document
+' 2]layer_multiAdd	: adds a list of new layers to the document
+'
+' c.
+' 1]layer_prefix	: adds a prefix to a list of layers
+' 2]layer_sufix		: adds a sufix to a list of layers
+'
+' d.
+' 1]layer_match		: changes the layers of a list of objects to a specified layer
+' 2]layer_isolate	: isolates one or more layers
+' 3]layer_on		: turns all layers on
+' 4]layer_off		: turns all layers off (beside the current)
+'
+' e. 
+' 1]layer_colorgradient	: changes the color of a list of layers by a gradient between 2 RGB values
+' 2]layer_colorrnd		: changes the color of a list of layers by a random value
+'------------------------------------------------------------------------------------------------------------------------------------
+
+' a.1] layer_all
+' returns the names of all layers
+
+' [Parameters]
+' None
+ 
+' [Returns]
+' Array		: a zero-based, one-dimensional array containing all layer names
+' Null 	: on error
+
+Function layer_all()
+	
+	layer_all = Null
+	layer_all = Rhino.LayerNames() 'layer_sort(Rhino.LayerNames())
+	
+End Function
+
+' a.2] layer_box
+' displays a list of layers in a multiple-selection list box dialog
+
+' [Parameters]
+' None
+ 
+' [Returns]
+' Array		: a zero-based, one-dimensional array containing the selected layers
+' Null 	: on error
+
+Function layer_box()
+	
+	layer_box = Null
+	
+	Dim arrLayer 	: arrLayer = layer_all()
+	
+	layer_box = Rhino.MultiListBox(arrLayer, "Select layer", "layer_box")
+	
+End Function
+
+' a.3] layer_byColor
+' returns all layer with a given color
+
+' [Parameters]
+' Long		: RGB() value
+ 
+' [Returns]
+' Array		: a zero-based, one-dimensional array containing the layer names
+' Null 	: on error
+
+Function layer_bycolor(lngColor)
+
+	layer_bycolor = Null
+	
+	Dim i
+	Dim arrResult	: ReDim arrResult(0)
+	Dim arrlayer	: arrlayer = layer_all() 
+	
+	For i = 0 To Ubound(arrlayer)
+		If Rhino.LayerColor(arrlayer(i)) = lngColor Then
+			arrResult(Ubound(arrResult)) = arrlayer(i)
+			ReDim Preserve arrResult(Ubound(arrResult)+1)
+		End If
+	Next
+	
+	If Not IsNull(arrResult(0)) Then
+		ReDim Preserve arrResult(Ubound(arrResult)-1)
+		layer_bycolor = arrResult
+	End If
+	
+End Function
+
+' a.4] layer_byObjects
+' returns the layer names of an array of objects
+
+' [Parameters]
+' Array		: the identifier of the objects
+ 
+' [Returns]
+' Array		: a zero-based, one-dimensional array containing the layer names
+' Null 	: on error
+
+Function layer_byObjects(arrObjects)
+	
+	layer_byObjects = Null
+
+	Dim i
+	Dim arrResult	: ReDim arrResult(0)
+	Dim strLayer
+	
+	For i = 0 To Ubound(arrObjects)
+		strLayer = Rhino.ObjectLayer(arrObjects(i))
+		If Not layer_equals(strLayer, arrResult) Then
+			arrResult(Ubound(arrResult)) = strLayer
+			ReDim Preserve arrResult(Ubound(arrResult)+1)
+		End If
+	Next
+	
+	If Not IsNull(arrResult(0)) Then
+		ReDim Preserve arrResult(Ubound(arrResult)-1)
+		layer_byObjects = arrResult
+	End If
+	
+End Function
+
+' a.5] layer_sort
+' returns a list of layers sorted by the current display order index as displayed in rhino's layer dialog box
+
+' [Parameters]
+' Array		: the names of the layers
+ 
+' [Returns]
+' Array		: a zero-based, one-dimensional array containing all sorted layer names
+' Null 	: on error
+
+Function layer_sort(arrLayer)
+	
+	layer_sort = Null
+	
+	Dim i, intIndex
+	Dim arrResult	: ReDim arrResult(Rhino.LayerCount ())
+	
+	For i = 0 To Ubound(arrLayer)
+		intIndex = Rhino.LayerOrder(arrLayer(i))
+		Call Rhino.printex ("index: " & intIndex)
+		If intIndex <= Ubound(arrResult) Then
+			arrResult(intIndex) = arrLayer(i)
+		End If
+	Next
+	
+	layer_sort = arrResult
+	
+End Function
+
+' 6]layer_equals
+' tests if one layer equals a list of layers
+
+' [Parameters]
+' String	: name of layer to test
+' Array		: layer names
+
+' [Returns]
+' Booleans	: True/False 
+' Null 		: on error
+
+Function layer_equals(strLayer, arrLayer)
+	
+	layer_equals = Null
+	
+	Dim i
+	
+	If IsArray(ArrLayer) Then
+		For i = 0 To Ubound(arrLayer)
+			If strLayer = arrLayer(i) Then
+				layer_equals = True
+				Exit Function
+			End If
+		Next
+		layer_equals = False
+	End If
+	
+End Function
+
+' b.1] layer_add
+' adds a new layer to the document
+
+' [Parameters]
+' String	: the name of the layer
+
+' [Returns]
+' String	: the name of the new layer 
+' Null 		: on error
+
+Function layer_add(strName)
+	
+	layer_add = Null
+	
+	layer_add = Rhino.AddLayer (strName)
+	
+End Function
+
+' b.2] layer_multiAdd
+' adds a list of new layers to the document
+
+' [Parameters]
+' Array		: the names of the layers
+
+' [Returns]
+' Array		: the names of the new layers 
+' Null 		: on error
+
+Function layer_multiAdd(arrNames)
+	
+	layer_multiadd = Null
+	
+	Dim i
+	Dim arrResult	: ReDim arrResult(Ubound(arrNames))
+	
+	For i = 0 To Ubound(arrNames)
+		arrResult(i) = Rhino.AddLayer (arrNames(i))
+	Next
+	
+	layer_multiadd = arrResult 
+	
+End Function
+
+' c.1] layer_prefix
+' adds a prefix to a list of layers
+
+' [Parameters]
+' Array		: the names of the layers
+' String	: the prefix
+
+' [Returns]
+' Array		: the new names of the layers 
+' Null 		: on error
+
+Function layer_prefix(arrLayer, strPrefix)
+	
+	layer_prefix = Null
+	
+	Dim i
+	Dim arrResult	: ReDim arrResult(Ubound(arrLayer))
+					
+	For i = 0 To Ubound(arrLayer)		
+		arrResult(i) = Rhino.RenameLayer (arrLayer(i), strPrefix & arrLayer(i))		
+	Next
+	
+	layer_prefix = arrResult
+			
+End Function
+
+' c.2] layer_sufix
+' adds a sufix to a list of layers
+
+' [Parameters]
+' Array		: the names of the layers
+' String	: the sufix
+
+' [Returns]
+' Array		: the new names of the layers 
+' Null 		: on error
+
+Function layer_sufix(arrLayer, strSufix)
+	
+	layer_sufix = Null
+	
+	Dim i
+	Dim arrResult	: ReDim arrResult(Ubound(arrLayer))
+					
+	For i = 0 To Ubound(arrLayer)		
+		arrResult(i) = Rhino.RenameLayer (arrLayer(i), arrLayer(i) & strSufix)		
+	Next
+	
+	layer_sufix = arrResult
+				
+End Function
+
+' d.1] layer_match
+' changes the layers of a list of objects to a specified layer
+
+' [Parameters]
+' String 	: the identifier of the parent object 
+' Array		: the identifiers of the child objects
+
+' [Returns]
+' Array		: the name of the new layer 
+' Null 		: on error
+
+Function layer_match(strParent, arrChilds)
+	
+	layer_match = Null
+	
+	If isArray(arrChilds) Then
+		
+		Dim strLayer : strLayer = Rhino.ObjectLayer(strParent)
+		Call Rhino.ObjectLayer (arrChilds, strLayer)
+		layer_match = strLayer
+		
+	End If
+	
+End Function
+
+' d.2]layer_isolate]
+' isolates one or more layers
+
+' [Parameters]
+' Array 	: the layer names to isolate
+
+' [Returns]
+' Array		: the name of the layers
+' Null 		: on error
+
+Function layer_isolate(arrLayer)
+	
+	layer_isolate = Null
+	
+	If IsArray(arrLayer) Then
+	
+		Dim i, ii
+		Dim arrAllLayer	: arrAllLayer = layer_all()
+	
+		Rhino.CurrentLayer arrLayer(0)
+		
+		For i = 0 To Ubound(arrAllLayer)
+			For ii = 0 To Ubound(arrLayer)
+				If Not arrAllLayer(i) = arrLayer(ii) Then
+					Rhino.LayerVisible arrAllLayer(i) , False
+				End If
+			Next
+		Next
+
+		layer_isolate = arrLayer
+		
+	End If
+	
+End Function
+
+' d.3] layer_on
+' turns all layers on
+
+' [Parameters]
+' None
+
+' [Returns]
+' Booleans	: True
+' Null 		: on error
+
+Function layer_on()
+	
+	layer_on = Null
+	
+	Dim i
+	Dim arrLayer	: arrLayer = Rhino.LayerNames()
+	
+	For i = 0 To Ubound(arrLayer)
+		If Rhino.LayerVisible (arrLayer(i), True) = False Then
+			Call Rhino.LayerVisible (arrLayer(i) , True)
+		End If
+	Next
+	
+	layer_on = True
+
+End Function
+
+' d.4] layer_off
+' turns all layers (beside the current) off
+
+' [Parameters]
+' None
+
+' [Returns]
+' Booleans	: True
+' Null 		: on error
+
+Function layer_off()
+	
+	layer_off = Null
+	
+	Dim i
+	Dim arrLayer	: arrLayer 	= layer_all()
+	
+	For i = 0 To Ubound(arrLayer)
+		If arrLayer(i) <> Rhino.CurrentLayer() Then
+			Rhino.LayerVisible arrLayer(i) , False
+		End If
+	Next
+	
+	layer_off = True
+	
+End Function
+
+' e.1] layer_colorgradient
+' changes the color of a list of layers by a gradient between 2 RGB values
+
+' [Parameters]
+' Array		: the names of the layers
+' Long		: 1st RGB() value
+' Long		: 2nd RGB() value
+
+' [Returns]
+' Array		: a zero-based, one-dimensional array containing all 'colored' layer names
+' Null 		: on error
+
+Function layer_colorgradient(arrLayer, ColorA, ColorB)
+	
+	layer_colorgradient = Null
+	
+	Dim RV			: ReDim RV(2)        
+	Dim R, G, B
+	Dim i
+	
+	Dim Color1		: Color1 = array(ColorA Mod 256,(ColorA\256) Mod 256,(ColorA\256\256) Mod 256)
+	Dim Color2		: Color2 = array(ColorB Mod 256,(ColorB\256) Mod 256,(ColorB\256\256) Mod 256)
+	
+	RV(0) = Color2(0) - Color1(0)
+	RV(1) = Color2(1) - Color1(1)
+	RV(2) = Color2(2) - Color1(2)
+ 
+	For i = 0 To Ubound(arrLayer)
+		R = Color1(0) + i / Ubound(arrLayer) * RV(0)
+		G = Color1(1) + i / Ubound(arrLayer) * RV(1)
+		B = Color1(2) + i / Ubound(arrLayer) * RV(2)
+		Call Rhino.LayerColor (arrLayer(i), RGB(R,G,B))
+	Next
+	
+	layer_colorgradient = arrLayer
+	
+End Function
+
+' e.2] layer_colorrnd
+' changes the color of a list of layers by a random value
+
+' [Parameters]
+' Array		: the names of the layers
+
+' [Returns]
+' Array		: a zero-based, one-dimensional array containing all 'colored' layer names
+' Null 		: on error
+
+Function layer_colorrnd(arrLayer)
+	
+	layer_colorrnd = Null
+	        
+	Dim R, G, B
+	Dim i
+	
+	Randomize
+	
+	For i = 0 To Ubound(arrLayer)
+		R = Int(255 * Rnd)
+		G = Int(255 * Rnd)
+		B = Int(255 * Rnd)
+		Call Rhino.LayerColor (arrLayer(i), RGB(R,G,B))
+	Next
+	
+	layer_colorrnd = arrLayer
+	
+End Function

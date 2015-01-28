@@ -1,0 +1,34 @@
+Option Explicit
+'Script written by Davide del Giudice
+'Script copyrighted by Co-de-iT www.co-de-it.com
+'Script version Sunday, 21 February 2010 20:40:21
+
+Call returnArea()
+Sub returnArea()
+
+Dim arrObj,strObj,arrMP,arrtemp,strtext
+Dim arrPt
+
+
+arrObj= Rhino.GetObjects("input surfaces",8)
+
+For Each strObj In arrObj
+arrtemp=Rhino.SurfaceAreaCentroid (strObj)
+arrPt=arrTemp(0)
+rhino.AddPoint arrpt
+arrMP=Rhino.SurfaceArea (strObj)
+rhino.DuplicateEdgeCurves(strobj)
+'use INT for integer rounding
+
+Rhino.AddTextDot "Area"& "_"& int(arrMP(0))&"mq", arrpt
+'Rhino.AddText "Area"& "_"& int(arrMP(0))&"mq", arrPt,2
+rhino.HideObjects arrobj
+
+
+
+
+Next
+strtext=Rhino.Sum (array(arrMP(0)))
+MsgBox "last: " & int(strtext)&"mq"
+
+End Sub

@@ -1,0 +1,34 @@
+Option Explicit
+'Script written by Mitch Heynick
+'Script version Wednesday, March 16, 2011
+'V4 or V5
+
+'Call LayersAndSublayersTurnOff()
+Sub LayersAndSublayersTurnOff()
+
+	Dim arrLayers,strLayer
+	If Rhino.ExeVersion()=5 Then
+		arrLayers=Rhino.GetLayers("Select layers to turn off")
+		If Not IsArray(arrLayers) Then Exit Sub
+		For Each strLayer In arrLayers
+			Call Rhino.LayerVisible(strLayer,False)
+			TurnOffChildLayers(strLayer)
+		Next
+	Else
+		strLayer=Rhino.GetLayer("Select layer to turn off")
+		If IsNull(strLayer) Then Exit Sub
+		Call TurnOffChildLayers(strLayer)
+		Call Rhino.LayerVisible(strLayer,False)	
+	End If	
+End Sub
+
+Function TurnOffChildLayers(Layer)
+	Dim arrChildren,strChild,blnVis
+	arrChildren=Rhino.LayerChildren(Layer)
+	If IsArray(arrChildren) Then
+		For Each strChild In arrChildren
+			Call TurnOffChildLayers(strChild)
+			blnVis=Rhino.LayerVisible(strChild,False)			
+		Next
+	End If
+End Function

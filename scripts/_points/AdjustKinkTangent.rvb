@@ -1,0 +1,91 @@
+Option Explicit
+'Script written by Mitch
+'Version Tuesday, May 01, 2012
+
+Private oldPAdjustSett
+If IsEmpty(oldPAdjustSett) Then oldPAdjustSett = "KinkPointOnly"
+
+'Call AdjustKinkTangent()
+Sub AdjustKinkTangent()
+
+	Dim strCrv,arrDCPts,arrTempPtObjs,strPickPt,arrPickPt,arrDelete
+	strCrv = Rhino.GetObject("Select curve to adjust", 4, True)
+	If IsNull(strCrv) Then Exit Sub
+	
+	arrDCPts = Rhino.CurveDiscontinuity(strCrv, 2)
+	If IsNull(arrDCPts) Then 
+		Call Rhino.Print("No kinks found in curve") : Exit Sub
+	End If
+	
+	arrTempPtObjs = Rhino.AddPoints(arrDCPts)
+	'dummy operation
+	Call Rhino.LockObject(strCrv)
+	
+	strPickPt = Rhino.GetObject("Pick kink point to adjust", 1,, True, arrTempPtObjs)	
+	Call Rhino.UnlockObject(strCrv)		
+	If IsNull(strPickPt) Then Call Rhino.DeleteObjects(arrTempPtObjs) : Exit Sub
+	
+	arrPickPt = Rhino.PointCoordinates(strPickPt)
+	arrDelete = RemoveItemsFromArray(arrTempPtObjs, strPickPt)
+	Call Rhino.DeleteObjects(arrDelete)
+	
+	Dim str1,str2,str3,strResp
+	str1 = "KinkPointOnly"
+	str2 = "NeighborPointsOnly"
+	str3 = "AverageKinkPointAndNeighbors"	
+	strResp = Rhino.GetString("PointsToAdjust", oldPAdjustSett, Array(str1, str2, str3))	
+	If strResp <> str1 And strResp <> str2 And strResp <> str3 Then Exit Sub
+	
+	oldPAdjustSett = strResp
+
+	Dim gripPt,arrPGP,arrNGP,line,arrLCP,moveVec,newPt,i
+	Call Rhino.EnableRedraw(False)
+	Call Rhino.EnableObjectGrips(strCrv, True)
+	
+	For i=1 To Rhino.ObjectGripCount(strCrv) - 2 'don't count ends
+		gripPt = Rhino.ObjectGripLocation(strCrv, i)
+		If Rhino.PointCompare(arrPickPt, gripPt) Then Exit For 'tolerance? 
+	Next
+
+	arrPGP = Rhino.ObjectGripLocation(strCrv, i - 1)
+	arrNGP = Rhino.ObjectGripLocation(strCrv, i + 1)
+	line = Array(arrPGP, arrNGP)
+	arrLCP = Rhino.LineClosestPoint(line, gripPt)
+	
+	Select Case strResp
+		Case str1
+			Call Rhino.ObjectGripLocation(strCrv, i, arrLCP)
+		Case str2
+			moveVec = Rhino.VectorCreate(gripPt, arrLCP)
+			Call Rhino.ObjectGripLocation(strCrv, i - 1, Rhino.PointAdd(arrPGP, moveVec))
+			Call Rhino.ObjectGripLocation(strCrv, i + 1, Rhino.PointAdd(arrNGP, moveVec))		
+		Case str3
+			moveVec = Rhino.VectorCreate(arrLCP, gripPt)
+			moveVec = Rhino.VectorScale(moveVec, 0.5)
+			Call Rhino.ObjectGripLocation(strCrv, i, Rhino.PointAdd(gripPt, moveVec))
+			moveVec = Rhino.VectorReverse(moveVec)
+			Call Rhino.ObjectGripLocation(strCrv, i - 1, Rhino.PointAdd(arrPGP, moveVec))
+			Call Rhino.ObjectGripLocation(strCrv, i + 1, Rhino.PointAdd(arrNGP, moveVec))
+	End Select
+		
+	Call Rhino.DeleteObject(strPickPt)
+	Call Rhino.EnableObjectGrips(strCrv, False)
+	Call Rhino.EnableRedraw(True)	
+End Sub
+
+Function RemoveItemsFromArray(arrOrig, item)
+	'removes all instances of item from arrOrig
+	'only works with items that can be compared with "=":
+	'strings, integers, booleans
+	RemoveItemsFromArray = Null
+	Dim arrResult(),i, j : 	j = -1
+	ReDim arrResult(UBound(arrOrig))
+	For i = 0 To UBound(arrOrig)
+		If (item <> arrOrig(i)) Then
+			j = j + 1
+			arrResult(j) = arrOrig(i)			
+		End If
+	Next
+	ReDim Preserve arrResult(j)
+	RemoveItemsFromArray = arrResult	
+End Function

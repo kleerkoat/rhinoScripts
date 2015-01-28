@@ -1,0 +1,48 @@
+﻿Option Explicit
+'Script written by Pascal
+'Script version Tuesday, March 17, 2009 
+
+Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+Rhino.AddAlias "ExtractWiresDir", "_NoEcho _-Runscript (ExtractWiresDir)"
+
+'ToDo: make it work with singularities
+
+
+Sub ExtractWiresDir()
+
+	Dim sSrf: sSrf = Rhino.GetObject("Select a surface.",8,True,True)
+	If IsNull(sSrf)  Then Exit Sub
+
+	Dim sLayer: Slayer = Rhino.ObjectLayer(sSrf)
+	
+	Rhino.Command "_ExtractWireFrame"
+	If Rhino.LastCommandResult = 0 Then 
+		Dim aLast: aLast = Rhino.LastCreatedObjects
+		Rhino.ObjectLayer aLast,sLayer
+	End If
+	
+	Dim sCrv: SCrv = Rhino.GetObject("Select an isocurve in the direction to keep",4,False,,alast)
+	
+	If isNull(sCrv) Then Exit Sub
+	Dim Crv
+	
+	Rhino.EnableRedraw(False)
+	
+	For Each Crv In aLast
+		
+		If Crv<>sCrv Then
+			If isArray(Rhino.CurveCurveIntersection(Crv, sCrv)) Then
+				Rhino.DeleteObject Crv
+			End If
+			
+		End If
+			
+	Next
+	
+	Dim sGrp: sGrp = Rhino.AddGroup
+	Rhino.AddObjectsToGroup  aLast,sGrp
+	Rhino.SelectObjects aLast
+	Rhino.EnableRedraw(True)
+
+	
+End Sub

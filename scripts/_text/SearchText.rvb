@@ -1,0 +1,185 @@
+option explicit
+
+''''''''''''''''''''''''''''''''''''''''''''''''''''''
+''   script for Rhino V4 & WSH 5.6                  ''
+''   search for or substitute text/regexp-pattern   ''
+''   in all selectable _Text objects                ''
+''   25.7.2007 :: tyglik :: no right reserved! :)   ''
+''''''''''''''''''''''''''''''''''''''''''''''''''''''
+
+private g_pattern, g_subst
+
+
+call search_text()
+
+
+sub search_text()
+
+  '' get mode & options for searching
+  dim ddata: ddata = rhino.getdocumentdata( "CommandOptions", "SearchText" )
+
+  dim default
+  if isnull( ddata ) then
+    default = array( false, true, true, true, false )
+  else
+    execute ( ddata )
+  end if
+
+  dim items: items = array(						_
+  			    "Mode", "Search", "Subsitute",		_
+  			    "CaseSensitive", "Yes", "No",		_
+  			    "OccurrencesInText", "First", "All",	_
+  			    "Multiline", "No", "Yes",			_
+  			    "ZoomInAllViews", "No", "Yes"		_
+  			  )
+
+  dim modes: modes = rhino.getboolean( "Select options for searching. Press Enter when done", items, default )
+  if isnull( modes ) then exit sub
+
+  dim substitute: substitute = modes(0)
+  dim zoomall: zoomall = modes(4)
+
+  default = "default = array( " & join( modes, "," ) & " )"
+  call rhino.setdocumentdata( "CommandOptions", "SearchText", default )
+
+  '' get all annotation objects
+  dim objects: objects = rhino.objectsbytype( 512, false )
+  if isnull( objects ) then exit sub
+
+  '' get pattern for searching
+  g_pattern = rhino.getstring( "Search for pattern", g_pattern & "" )
+  if isnull( g_pattern ) then exit sub
+
+  '' initialize regular expression object
+  dim regex: set regex = new regexp
+      regex.pattern    = g_pattern
+      regex.ignorecase = modes(1)
+      regex.global     = modes(2)
+      regex.multiline  = modes(3)
+
+  '' filter _Text objects that match
+  dim object, text, match, i
+  for each object in objects
+    if ( rhino.istext( object ) ) and ( rhino.isobjectselectable( object )  ) then
+      text = rhino.textobjecttext( object )
+      match = regex.test( text )
+      if match then
+        redim preserve collection(i): collection(i) = object
+        redim preserve   original(i):   original(i) = text
+        i = i + 1
+      end if
+    end if
+  next
+
+  '' text object not found
+  if isempty( text ) then call rhino.print( "No text objects!" ) : exit sub
+
+  '' pattern not found
+  if isempty( i ) then call rhino.print( "Pattern not found!" ) : exit sub
+
+  '' initial zoom of all objects in collection
+  rhino.unselectallobjects
+  dim counts: counts = rhino.selectobjects( collection )
+  call rhino.zoomselected( rhino.currentview, zoomall )
+  dim doall: doall = true
+
+  dim last: last = ubound( collection )
+  if not cbool( last ) then
+    call rhino.print( "Only one object found. Double-click the text to edit." )
+    exit sub
+  end if
+
+  '' perform substitution
+  dim options
+  if substitute then
+    g_subst = rhino.getstring( "Substitution of pattern for", g_subst & "" )
+    if isnull( g_subst ) then exit sub
+
+    for i=0 to last
+      redim preserve newtext(i):  newtext(i) = regex.replace( original(i), g_subst )
+      call rhino.textobjecttext( collection(i), newtext(i) )
+    next
+
+    options = array( "All", "Current", "Next", "Previous", "Undo", "Redo" )
+    dim undoredo: undoredo = " Undo/Redo applies to selected objects!"
+  else
+    options = array( "All", "Current", "Next", "Previous", "Edit" )
+  end if
+
+  '' go through objects in original collection - including replaced/edit objects
+  i = empty
+  dim push, j
+  do while ( true )
+    if doall then
+      push = rhino.getstring( "All text objects (" & counts & ")." & undoredo & _
+                              " Press Enter when done.", , options )
+    else
+      push = rhino.getstring( "Text object " & ( i + 1 ) & " of " & counts & "." & _
+                              undoredo & " Press Enter when done.", , options )
+    end if
+    call rhino.enableredraw( false )
+    rhino.unselectallobjects
+
+    select case ( push )
+      case ( "All" )
+        call rhino.selectobjects( collection )
+        doall = true
+
+      case ( "Current" )
+        doall = false
+
+      case ( "Next" )
+        doall = false
+        i = i + 1
+        if ( i > last ) then
+          call rhino.print( "Search hit LAST, continuing at FIRST" )
+          i = 0
+        end if
+
+      case ( "Previous" )
+        doall = false
+        i = i - 1
+        if ( i < 0 ) then
+          call rhino.print( "Search hit FIRST, continuing at LAST" )
+          i = last
+        end if
+
+      case ( "Undo" )
+        if doall then
+          for j=0 to last
+            call rhino.textobjecttext( collection(j), original(j) )
+          next
+          call rhino.selectobjects( collection )
+        else
+          call rhino.textobjecttext( collection(i), original(i) )
+        end if
+
+      case ( "Redo" )
+        if doall then
+          for j=0 to last
+            call rhino.textobjecttext( collection(j), newtext(j) )
+          next
+          call rhino.selectobjects( collection )
+        else
+          call rhino.textobjecttext( collection(i), newtext(i) )
+        end if
+
+      case ( "Edit" )
+        call rhino.selectobject( collection(i) )
+        call rhino.command( "_EditText" )
+
+      case else
+        exit do
+
+    end select
+
+    call rhino.selectobject( collection(i) )
+    call rhino.zoomselected( rhino.currentview, zoomall )
+    call rhino.enableredraw( true )
+  loop
+
+  call rhino.selectobjects( collection )
+  call rhino.enableredraw( true )
+
+end sub
+

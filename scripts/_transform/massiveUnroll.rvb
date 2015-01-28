@@ -1,0 +1,68 @@
+﻿Option Explicit
+'
+'Script written by Dimitrie Stefanescu
+'Released under the Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Licence
+'…
+'
+'massive unroller
+'
+
+
+Call Main()
+
+Sub Main()
+	
+	Dim arrobj
+	arrobj = Rhino.GetObjects("Sel obj to unroll ", ,,True)
+	
+	Dim te : te = Rhino.GetString("Sel groups id (must be unique) ")
+	
+	Dim obj, k, udom, vdom 
+	k = -1
+	Dim arrUnroll : arrUnroll = Array()
+	
+	Call rhino.EnableRedraw(False)
+	For Each obj In arrobj
+		k = k + 1
+		Call Rhino.UnselectAllObjects
+		Call Rhino.SelectObject(obj)
+		Call Rhino.Command (CStr("_UnrollSrf Explode=No Labels=No _Enter"), vbFalse)
+		
+		redim preserve arrUnroll(k) 
+		arrUnroll(k) = Rhino.FirstObject
+		
+	Next
+	
+	Dim unr
+	Dim gr
+	Dim bb, bbdim : bbdim = 0
+	
+	k = 0
+	For Each unr In arrUnroll
+		
+		bb = Rhino.BoundingBox(unr)
+		bbdim = bbdim + Rhino.Distance(bb(1), bb(0))
+		
+		Call rhino.MoveObject(unr, array(0,0,0), array(0+bbdim,0,0))
+		
+		Dim t : t = Rhino.AddText(te + "_" + CStr(k),array(0 + bbdim,,0),0.5)
+		
+		Dim ared : ared = rhino.DuplicateEdgeCurves(unr)
+		Dim jn : jn = Rhino.JoinCurves(ared, True)
+		
+		Dim strg : strg = "massunroll_" + te + "_" + CStr(k+1)
+		Call rhino.print(strg)
+		gr = Rhino.AddGroup(strg)
+		Dim ub : ub = UBound(jn) + 1
+		ReDim Preserve jn(ub)
+		jn(ub) = t
+		Call Rhino.AddObjectsToGroup(jn, strg)
+		
+		Call Rhino.DeleteObject(unr)
+		
+		k = k + 1
+	Next
+	
+	
+	Call rhino.EnableRedraw(True)
+End Sub

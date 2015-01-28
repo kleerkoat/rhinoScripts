@@ -1,0 +1,90 @@
+Option Explicit
+'Script written by peter harris
+'Script copyrighted by peterwhatcreates, llc
+'Script version Saturday, February 24, 2007 1:46:02 PM
+
+'Call JoinCrvsByClosestEnds()
+Sub JoinCrvsByClosestEnds()
+
+	Dim arrPoint1, arrPoint2, arrPoint3, arrPoint4, strObject
+	Dim D1, D2, D3, NumOfObjects, arrObjects, Line1, Line2
+				
+	arrObjects = Rhino.GetObjects ("Select two curves",4,,True, True)
+	If IsArray(arrObjects) Then
+		
+		'make sure they are not closed
+		For Each strObject In arrObjects
+			If Rhino.IsCurveClosed(strObject) Then
+				Call Rhino.Print ("One or more curves selected was closed.  Script cancelled.")
+				Exit Sub
+			End If
+
+		Next	
+		
+		NumOfObjects = UBOUND(arrObjects)
+		If NumOfObjects = 1 Then 'there are two curves
+			Rhino.EnableRedraw(vbFalse)
+			
+			arrPoint1 = Rhino.CurveEndPoint (arrObjects(0))
+			arrPoint2 = Rhino.CurveStartPoint (arrObjects(0))
+			arrPoint3 = Rhino.CurveEndPoint (arrObjects(1))
+			arrPoint4 = Rhino.CurveStartPoint (arrObjects(1))
+			
+			
+			D1 = Rhino.Distance(arrPoint1, arrPoint3)
+			D2 = Rhino.Distance (arrPoint1, arrPoint4)
+			
+			
+			If D1<D2 Then	'D1 is smallest	
+				Line1 = Rhino.AddLine (arrPoint1, arrPoint3)
+				Line2 = Rhino.AddLine (arrPoint2, arrPoint4)
+			Else
+				Line1 = Rhino.AddLine (arrPoint1, arrPoint4)
+				Line2 = Rhino.AddLine (arrPoint2, arrPoint3)
+			End If
+			
+			
+			Rhino.SelectObject (Line1)
+			Rhino.SelectObject (Line2)
+			
+			
+			Dim arrToJoin(3), arrFinalCurve, strFinalCurve
+			
+			arrToJoin(0) = Line1
+			arrToJoin(1) = Line2
+			arrToJoin(2) = arrObjects(0)
+			arrToJoin(3) = arrObjects(1)
+			arrFinalCurve = Rhino.JoinCurves (arrToJoin, vbtrue)
+			strFinalCurve = arrFinalCurve(0)
+			Rhino.SelectObject strFinalCurve
+
+			
+			If Rhino.IsCurve(strFinalCurve) Then
+
+				If Rhino.IsCurvePlanar(strFinalCurve) Then
+
+					Rhino.Print "4 curves joined into one closed planar polycurve."
+
+				Else
+
+					Rhino.Print "4 curves joined into one closed NON-PLANAR polycurve."
+
+				End If
+			End If
+
+
+
+
+			Rhino.EnableRedraw(vbTrue)
+		Else
+			If NumOfObjects = 0 Then  'there's only one curve, so close it
+				Rhino.command "_CloseCrv"
+			Else
+				Rhino.Print "too many curves selected"
+			End If
+				
+		End If
+	End If
+		
+
+End Sub

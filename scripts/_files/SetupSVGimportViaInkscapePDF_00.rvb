@@ -1,0 +1,113 @@
+Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version Thursday, May 12, 2011 20:03:45
+
+Call SetupInkscapeSVGtoPDF()
+Sub  SetupInkscapeSVGtoPDF()
+	
+	Dim strRVBPath
+	strRVBPath = Rhino.OpenFileName("Select SVGimportViaInkscapePDF script file for setup", "SVGimportViaInkscapePDF_xx .rvb* |SVGimportViaInkscapePDF*")
+	If (IsNull(strRVBPath)) Then
+		Rhino.MessageBox ("Scriptfile not found, exiting setup, nothing changed")
+		Exit Sub
+	End If
+	
+	
+		
+	
+	'get Inkscape executable
+	Dim strInkscapeEXE
+
+		strInkscapeEXE = Rhino.OpenFileName ("Get Inkscape executable" , "Inkscape executable (.exe)| inkscape*.exe")
+		'	strInkscapeEXE = "c:/Dummy/inkscape.exe"
+		If (IsNull(strInkscapeEXE)) Then
+			Rhino.MessageBox ("No valid Inkscape executable found, exiting setup, nothing changed")
+			Exit Sub
+		End If
+
+	
+
+	
+	Dim markerEXE
+	
+	markerEXE     = "'SETUP MARKER: Inkscape Executable"
+
+	
+	Dim strRVB,Line,strLine
+	
+	
+	
+	
+	Dim Fso,RVB
+	Set Fso = CreateObject("Scripting.FileSystemObject")
+	Set RVB = fso.OpenTextFile(strRVBPath, 1)
+	
+	Do While Not RVB.AtEndOfStream
+		
+		Line = RVB.ReadLine()
+		
+		strLine = Line
+		
+				
+		If  (right(strLine,len(markerEXE)) = markerEXE) Then
+			strLine = "   "&Chr(34)&strInkscapeEXE&Chr(34)& markerEXE
+		End If
+						
+		
+		strRVB = strRVB&strLine&vbCrLf
+	Loop
+					
+					
+					
+					
+					
+	'Close file
+	Call RVB.Close
+	
+	'Open file in writing mode
+	Set RVB = fso.OpenTextFile(strRVBPath, 2)
+	Call RVB.Write(strRVB)
+	Call RVB.Close()	
+	
+	'clean up
+	Set Fso=Nothing
+	Set RVB=Nothing
+
+	
+	Call AddAlias(strRVBPath)
+	
+	Call Goodbye()
+	
+	
+	
+End Sub
+
+
+
+
+Sub AddAlias(strRVBPath)
+		
+	Call Rhino.DeleteAlias("SVGimport")
+	
+	Call Rhino.AddAlias ("SVGimport", "!_NoEcho _-LoadScript "&Chr(34)&strRVBPath&Chr(34))
+
+
+	
+End Sub
+
+
+Function Goodbye()
+	
+	Dim strTXT
+	strTXT = strTXT& "SVG import script Setup is complete"&Chr(13)
+	strTXT = strTXT& Chr(13)
+	strTXT = strTXT& "the Alias created is SVGimport"& Chr(13)
+
+ 
+	Call Rhino.MessageBox (strTXT,0,"Setup complete")
+	
+	
+	
+End Function
+

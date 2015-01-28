@@ -1,0 +1,39 @@
+Option Explicit
+
+'Script written by Pascal
+
+'Script version Tuesday, July 22,
+
+Sub RandomObjectColors()
+  
+	Dim aObj: aObj = Rhino.GetObjects("Select objects to color",,True,True)
+	If Not isArray(aObj) Then Exit Sub
+	
+	Dim i,p
+	i =0
+	p=0
+	
+	Dim lngColorI, lngColorP, intRed,intGreen,intBlue,ColorOut
+	
+	Rhino.EnableRedraw(False)
+	
+	For i = 0 To UBound(aObj) 
+		For p = 0 To UBound(aObj)
+			lngColorI = Rhino.ObjectColor(aObj(i))
+			lngColorP = Rhino.ObjectColor(aObj(p))
+			If lngColorI = lngColorP And i<>p Then
+				intRed = 255*Rnd
+				intGreen = 255*Rnd
+				intBlue = 255*Rnd 
+				ColorOut =  RGB(intRed,IntGreen,intBlue)  
+				Rhino.ObjectColor aObj(p), colorOut
+			End If
+		Next
+	Next
+	
+	Rhino.EnableRedraw
+	
+End Sub
+
+'Rhino.AddStartUpScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "RandomColor", "_NoEcho _-RunScript (RandomColor)"

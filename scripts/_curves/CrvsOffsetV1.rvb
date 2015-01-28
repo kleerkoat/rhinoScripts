@@ -1,0 +1,87 @@
+' ****************************** RhinoScript.org ******************************
+'
+'   OffsetCrvs, version 1.1
+'
+'   by Jan Hempel, published Jun 09, 2008
+'
+'
+'   offsets closed planar curves automaticly inside or outside by distance. works only on xy plane.
+'
+'
+'
+'
+'   This RhinoScript Tool has been downloaded from RhinoScript.org.
+'
+'   Rhino versions: Rhino 4
+'
+'   LICENSE INFORMATION:
+'   This script is published under the GNU General Public License, version 3
+'   or any later version, and thus comes WITHOUT ANY WARRANTY. You can get
+'   the complete license text here: www.rhinoscript.org/gpl
+'
+' ****************************** RhinoScript.org ******************************
+
+
+
+Option Explicit
+'Script written by Jan Hempel
+'Script copyrighted by Jan Hempel (janhempel@gmx.de)
+'Script version 1.1 Dienstag, 27. Mai 2008 13:59:27
+
+'Call CrvsOffsetV1()
+
+Sub rgCrvsOffsetV1()
+	
+	If Rhino.IsLayer ("Offset") = False Then
+		Rhino.AddLayer ("Offset")
+	End If
+
+	If Rhino.IsLayerCurrent ("Offset") = False Then
+		Rhino.CurrentLayer ("Offset")
+	End If
+	
+	Dim arrObjects, strObject, dblDistance, arrOrigin, arrcp, arrItems, arrResults, arrbbpts, arrplsrf, arrisocrv, arrObject, arrParameter, dist
+
+	arrObjects = Rhino.GetObjects
+	dblDistance = (Rhino.GetReal ("Distance", 5))
+	arrItems = Array( "Direction", "inside", "outside", "Original", "delete", "keep")
+	arrResults = Rhino.GetBoolean("Boolean options", arrItems, array(True, True))
+	
+	Rhino.EnableRedraw (False)
+
+
+	If IsArray(arrObjects) Then
+
+		For Each strObject In arrObjects
+
+			If arrResults(0) = False Then
+				
+				arrcp = Rhino.CurveAreaCentroid (strObject)
+				arrObject = array (strObject)
+				arrplsrf = Rhino.AddPlanarSrf (arrObject)
+				arrParameter = Rhino.SurfaceClosestPoint (arrplsrf(0), arrcp(0))
+				arrisocrv = Rhino.ExtractIsoCurve (arrplsrf(0) , arrParameter, 0)
+				arrOrigin = Rhino.CurveMidPoint (arrisocrv(0))
+				Rhino.DeleteObjects arrplsrf 
+				Rhino.DeleteObjects arrisocrv
+				
+			ElseIf arrResults(0) = True Then
+				
+				arrbbpts = Rhino.BoundingBox (arrObjects)
+				arrOrigin = array((arrbbpts(6)(0) + 1), (arrbbpts(6)(1) + 1), (arrbbpts(6)(2) + 1))
+				
+			End If
+			
+			Rhino.EnableRedraw (True)
+		
+			Rhino.OffsetCurve strObject, arrOrigin, dblDistance
+			 
+		Next
+
+		If arrResults(1) = False Then
+			Rhino.DeleteObjects arrObjects
+		End If
+				
+	End If
+	
+End Sub

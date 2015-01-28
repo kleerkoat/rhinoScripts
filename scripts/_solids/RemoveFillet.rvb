@@ -1,0 +1,32 @@
+﻿Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version Tuesday, March 01, 2011 12:23:34 PM
+
+'Call RemoveFillet()
+Sub RemoveFillet()
+	
+	Dim sObj, aSrf, aFillets
+
+	sObj=Rhino.GetObject("select solid to edit",16,true)
+	If isnull(sObj) then Rhino.print"no objects selected":exit sub
+	If not Rhino.IsPolysurfaceClosed(sObj) then Rhino.print"not a solid":exit sub
+	
+	aSrf=Rhino.ExplodePolysurfaces(sObj,False)
+	aFillets=Rhino.GetObjects("select Fillets to remove",,,,true,aSrf)
+	If not isarray(aFillets) then 
+		Rhino.print "no surfaces selected"
+		Rhino.DeleteObjects aSrf
+		exit sub
+	End If
+	
+	Rhino.command"_Delete"
+	Rhino.EnableRedraw False
+	Rhino.selectobjects aSrf
+	Rhino.command"untrimall"
+	Rhino.Command"Createsolid"
+	Rhino.DeleteObject sObj
+	Rhino.EnableRedraw True
+	
+	
+End Sub

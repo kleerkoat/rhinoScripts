@@ -1,0 +1,91 @@
+' ****************************** RhinoScript.org ******************************
+'
+'   Simple Recursive Branching, version 1
+'
+'   by Erick, published May 24, 2011
+'
+'
+'   A simple Recursive Branching system that asks for a set of lines as starting branches. Asks user input for desired angle, recursive scale rate and number of generations to run.
+'
+'
+'
+'
+'   This RhinoScript Tool has been downloaded from RhinoScript.org.
+'
+'   Rhino versions: Rhino 4
+'
+'   LICENSE INFORMATION:
+'   This script is published under the GNU General Public License, version 3
+'   or any later version, and thus comes WITHOUT ANY WARRANTY. You can get
+'   the complete license text here: www.rhinoscript.org/gpl
+'
+' ****************************** RhinoScript.org ******************************
+
+
+
+Option Explicit
+'	//ESP//	// www.erickprins.com //	//opensource//	//Thursday, 19 May 2011//
+
+'A simple Recursive Branching system that asks for a set of lines as starting branches.
+'Asks user input for desired angle, recursive scale rate and number of generations to run.
+
+'Call SimpleRecursiveBranching()
+Sub SimpleRecursiveBranching()
+
+	'user input
+	Dim stBranch : stBranch = Rhino.GetObjects("select starting branches",4)
+	If isNull(stBranch) Then Exit Sub
+	Dim angle : angle = Rhino.GetReal ("Angle of Rotation", 45,0,360)
+	If isNull(angle) Then Exit Sub
+	Dim scale : scale = Rhino.GetReal("Scale Factor", 0.75,0.0,2.0)
+	If isNull(scale) Then Exit Sub
+	Dim gens : gens = Rhino.GetInteger("select number of generations for script to run", 3,0)
+	If isNull(gens) Then Exit Sub
+		
+	Call branchCalc(stBranch,angle,scale,gens)
+	
+End Sub
+
+
+Function branchCalc(branch,angle,scale,gens)
+	'for each branch loop through and create new branches
+	If gens > 0 Then
+		Dim i
+		ReDim newBranchArr(2*(ubound(branch))+1)
+		For i = 0 To ubound(branch)
+			Dim currentBranch
+			currentBranch = branch(i)
+		
+			Dim currentStPt, currentEndPt, currentVec
+			Dim currentVecScaled, currentVecScaledRotated1, currentVecScaledRotated2
+			Dim newVec1, newVec2, newBranch1, newBranch2
+	
+			currentStPt = Rhino.CurveStartPoint(currentBranch)
+			currentEndPt = Rhino.CurveEndPoint(currentBranch)
+	
+			currentVec = Rhino.VectorCreate(currentEndPt,currentStPt)
+			currentVecScaled = Rhino.VectorScale(currentVec,scale)
+			currentVecScaledRotated1 = rhino.VectorRotate (currentVecScaled, angle, array(0,0,1))
+			currentVecScaledRotated2 = rhino.VectorRotate (currentVecScaled, -angle, array(0,0,1))
+			newVec1 = rhino.VectorAdd(currentEndPt,currentVecScaledRotated1)
+			newVec2 = rhino.VectorAdd(currentEndPt,currentVecScaledRotated2)
+		
+			'create new branch line
+			newBranch1 = rhino.AddLine(currentEndPt, newVec1)
+			newBranch2 = Rhino.AddLine(currentEndPt, newVec2)
+		
+			'add each branch into the correct location in the newBranchArr
+			newBranchArr(2*i) = newBranch1
+			newBranchArr(2*i+1) = newBranch2
+
+		Next
+
+		'recursively call branch
+		gens = gens - 1
+		Call branchCalc(newBranchArr,angle,scale,gens)
+
+		
+		
+	End If
+	
+End Function

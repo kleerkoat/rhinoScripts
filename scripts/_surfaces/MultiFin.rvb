@@ -1,0 +1,43 @@
+Option Explicit
+'Script written by Pascal
+
+'Script date Wednesday, October 21, 2009 
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "MultiFin", "_NoEcho _-Runscript (MultiFin)"
+
+Private Oldheight
+If isEmpty (OldHeight) then
+	OldHeight = 1.0
+End If
+
+'Call MultiFin()
+
+Sub MultiFin()
+
+	Dim aCrvs: aCrvs = Rhino.GetObjects("Select curves to extrude",4,,true)
+	If not isArray(aCrvs) then  exit sub
+	
+	Dim sSrf: SSrf = Rhino.GetObject("Select base surface", 8)
+	If isNull(sSrf) then exit sub
+	
+	Dim Dist: Dist = Rhino.GetReal("Fin height",oldHeight)
+	If not isNumeric(Dist) then exit sub
+	
+	OldHeight = Dist
+
+	Dim Cmd: Cmd = "_Fin SelID " & sSrf & " " &Dist &  " _Enter _Enter"
+	
+	Rhino.EnableRedraw(False)
+	
+	dim sCrv
+	For each sCrv in aCrvs
+		
+		Rhino.UnselectAllObjects
+		Rhino.SelectObject sCrv
+		Rhino.Command Cmd, False
+		
+	Next
+	
+	Rhino.EnableRedraw(True)
+	
+End Sub

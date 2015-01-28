@@ -1,0 +1,53 @@
+'--------------------------------------------------------------
+'Command   :  mdc (DisplayColorMatch)
+'Date      :  2011/03/16
+'Version   :  2.0
+'Organization   :  Rhino+
+'--------------------------------------------------------------
+
+Sub DisplayColorMatch
+
+Dim arrObjects, strObject, arrLayers, strLayer,showobjects
+
+
+strLayer = Rhino.CurrentLayer
+arrObjects = Rhino.ObjectsByLayer(strLayer, True)
+
+
+Rhino.command "_NoEcho _SelAll"
+showobjects = Rhino.SelectedObjects
+Rhino.command "_NoEcho _SelNone"
+
+If IsArray(arrObjects) Then
+Rhino.ShowObjects arrObjects
+Else
+Rhino.print"Current layer is no objects."
+Rhino.command "_NoEcho _SelNone"
+End If
+
+If IsArray(arrObjects) Then
+For Each strObject In arrObjects
+If (Rhino.objectColor(strObject)=Rhino.LayerColor (strLayer)) Then
+Rhino.ObjectColor strObject , Rhino.LayerColor (strLayer)
+
+Rhino.HideObject (strObject)
+
+Else 
+
+Rhino.HideObject (strObject)
+
+
+End If
+
+Next
+
+Rhino.ShowObjects showobjects
+Rhino.command "_NoEcho _SelNone"
+Rhino.MessageBox "Work completed.Objects without the color were changed. Others have not changed.",,"Rhino+  DisplayColorMatch"
+End If
+
+
+
+End Sub
+
+'DisplayColorMatch

@@ -1,0 +1,94 @@
+Option Explicit
+'Script written by cw wang
+'based on sprocket drawing instructions from http://www.gizmology.net/sprockets.htm
+'Script copyrighted by cwwang.com
+'Script version Sunday, March 29, 2009 7:12:48 PM
+
+'Call CircleToCOG()
+Sub CircleToCOG()
+	Dim circle:circle=Rhino.getobject("select circle",4)
+	Dim teeth:teeth=Rhino.GetInteger("number of teeth",10)
+	Dim pitch:pitch=RHino.GetReal("pitch",.25)
+	Dim rollerD:rollerD=RHino.GetReal("roller diameter",.13)
+
+	Dim center:center=Rhino.CircleCenterPoint(circle)
+	Dim	radius:radius=Rhino.CircleRadius(circle)
+
+	Dim ln(2)
+	Dim lnOff(3)
+	ln(0)=Rhino.AddLine(center,array(center(0),center(1)+radius,center(2)))
+	lnOff(0)=Rhino.OffsetCurve(ln(0),center,pitch/2,array(0,0,-1))(0)
+	lnOff(1)=Rhino.OffsetCurve(ln(0),center,pitch/2,array(0,0,1))(0)
+
+
+
+	ln(1)=Rhino.RotateObject(ln(0),center,(360/teeth),,True)
+	Dim offsetDir:offsetDir=rhino.CurveEndPoint(ln(0))
+	lnOff(2)=Rhino.OffsetCurve(ln(1),offsetDir,pitch/2)(0)
+	ln(2)=Rhino.RotateObject(ln(0),center,-1*(360/teeth),,True)
+	lnOff(3)=Rhino.OffsetCurve(ln(2),offsetDir,pitch/2)(0)
+
+	'draw rollers
+	Dim intersection1:intersection1=rhino.curvecurveIntersection(lnOff(0),lnOff(3))
+	Dim plane1:plane1=rhino.planeFromNormal(intersection1(0,1),array(0,0,1))
+	Dim roller1:roller1= rhino.AddCircle(plane1,rollerD/2)
+	Dim intersection2:intersection2=rhino.curvecurveIntersection(lnOff(1),lnOff(2))
+	Dim plane2:plane2=rhino.planeFromNormal(intersection2(0,1),array(0,0,1))
+	Dim roller2:roller2= rhino.AddCircle(plane2,rollerD/2)
+	Dim interLn:interLn=rhino.AddLine(intersection1(0,1),intersection2(0,1))	
+
+	'draw circles
+	Dim rollerLineIntersection1:rollerLineIntersection1=Rhino.CurveCurveIntersection(interLn,roller1)
+	Dim r1:r1=Rhino.Distance(intersection2(0,1),rollerLineIntersection1(0,1))
+	Dim circle1:circle1=Rhino.addCircle(plane1,r1)
+
+	Dim rollerLineIntersection2:rollerLineIntersection2=Rhino.CurveCurveIntersection(interLn,roller2)
+	Dim r2:r2=Rhino.Distance(intersection2(0,1),rollerLineIntersection2(0,1))
+	Dim circle2:circle2=Rhino.addCircle(plane2,r1)
+
+	Dim tootharc(3)
+	'trim sharp part
+	Dim tip:tip=Rhino.CurveCurveIntersection(circle1,circle2)
+	Dim arrinterval(1)
+	arrInterval(0)=Rhino.CurveClosestPoint(circle1,	tip(0,1))
+	arrInterval(1)=RHino.CurveClosestPoint(circle1, rollerLineIntersection1(0,1))
+	toothArc(0)=Rhino.TrimCurve(circle1,arrInterval,True)
+
+	arrInterval(1)=Rhino.CurveClosestPoint(circle2,	tip(0,1))
+	arrInterval(0)=RHino.CurveClosestPoint(circle2, rollerLineIntersection2(0,1))
+	toothArc(1)=Rhino.TrimCurve(circle2,arrInterval,True)
+
+	'trim valley
+	Dim intersection:intersection=Rhino.CurveCurveIntersection(roller1,lnOff(3))
+	arrinterval(0)=Rhino.CurveClosestpoint(roller1,rollerLineIntersection1(0,1))
+	arrInterval(1)=RHino.CurveClosestPoint(roller1,	 intersection(1,1))
+	toothArc(2)=Rhino.TrimCurve(roller1,arrInterval,True)
+
+	intersection=Rhino.CurveCurveIntersection(roller2,lnOff(1))
+	arrinterval(1)=Rhino.CurveClosestpoint(roller2,rollerLineIntersection2(0,1))
+	arrInterval(0)=RHino.CurveClosestPoint(roller2,	 intersection(1,1))
+	toothArc(3)=Rhino.TrimCurve(roller2,arrInterval,True)
+
+	'delete stuff
+	Call Rhino.DeleteObjects(ln)
+	Call Rhino.DeleteObjects(lnOff)
+	Call RHino.DeleteObject(interLn)
+
+	Dim sprocketCrv()
+	ReDim sprocketCrv(1)
+
+	sprocketCrv(0)=Rhino.JoinCurves(toothArc,True)(0)
+
+	Dim i
+	For i=1 To teeth-1
+		ReDim Preserve sprocketCrv(i)
+		sprocketCrv(i)= Rhino.RotateObject(sprocketCrv(0),center,i*360/teeth,,True)
+	Next
+
+	Call Rhino.JoinCurves(sprocketCrv,True)
+
+	Call Rhino.AddText(teeth,center,pitch)
+
+	Call Rhino.addPoint(center)
+
+End Sub

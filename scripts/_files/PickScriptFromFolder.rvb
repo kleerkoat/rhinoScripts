@@ -1,0 +1,21 @@
+Option Explicit
+'Script written by Don Lewis
+'Script copyrighted by Lewis Tool & Engineering LLC
+
+
+'Call PickScriptFromFolder()
+Sub PickScriptFromFolder()
+
+	Dim strResult, curDirectory
+	
+	curDirectory = Rhino.DocumentPath
+	
+	strResult = Rhino.OpenFileName("Pick Script To Run","RVB Files (*.rvb)|*.rvb|All Files (*.*)|*.*||","C:\Program Files (x86)\Rhinoceros 5.0 WIP\Profile Defaults\English\Scripts\")
+	If IsNull(strResult) Then Exit Sub
+	Call Rhino.Command ("! _-loadscript " & CHR(34) & strResult & CHR(34),False)
+	
+	If Not IsNull(curDirectory) Then
+		Call Rhino.WorkingFolder(curDirectory)
+	End If
+		
+End Sub

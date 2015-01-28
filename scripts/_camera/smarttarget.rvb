@@ -1,0 +1,278 @@
+Option Explicit
+Sub SmartTarget()
+	Dim bIsProjectOn, bIsOsnapsOn
+	Dim strCurrentView, arrTargetPoint, arrCameraPoint, arrUpVector
+	Dim arrCplane
+
+	'Get the current view
+	strCurrentView = Rhino.CurrentView( ,False)
+	If IsNull(strCurrentView) Then
+		Rhino.Print "Couldn't get current view"
+		Exit Sub
+	End If
+
+	'Check to see if Project is on and make note of it's state. If it is on, turn it off
+	If Rhino.ProjectOsnaps Then
+		bIsProjectOn = vbTrue
+		'Turn off project
+		Rhino.ProjectOsnaps vbFalse
+	Else
+		bIsProjectOn = vbFalse
+	End If
+
+	'Check to see if Objects Snaps are active or not, if not, turn them on
+	If Rhino.Osnap Then
+		bIsOsnapsOn = vbTrue
+	Else
+		bIsOsnapsOn = vbFalse
+		'Turn on Osnaps
+		Rhino.Osnap vbTrue
+	End If
+
+
+	'Get the camera and target points
+	arrTargetPoint = Rhino.GetPoint("New target location")
+	If IsNull(arrTargetPoint) Then
+		Rhino.Print "No point picked"
+		'If Project was on, return it to that state
+		If bIsProjectOn Then
+			Rhino.ProjectOsnaps vbTrue
+		End If
+		'If Osnaps were off, return to that state
+		If Not bIsOsnapsOn Then
+			Rhino.Osnap vbFalse
+		End If
+		Exit Sub
+	End If
+	
+	arrCameraPoint = Rhino.ViewCamera(strCurrentView)
+	If IsNull(arrCameraPoint) Then
+		Rhino.Print "Problem getting camera point"
+		'If Project was on, return it to that state
+		If bIsProjectOn Then
+			Rhino.ProjectOsnaps vbTrue
+		End If
+		'If Osnaps were off, return to that state
+		If Not bIsOsnapsOn Then
+			Rhino.Osnap vbFalse
+		End If
+		Exit Sub
+	End If
+	
+	'Set a default camera up vector for perspective views
+	arrUpVector = array(0,0,1)
+	
+	If Rhino.IsViewPerspective(strCurrentView) = False Then
+		arrCplane = Rhino.ViewCPlane(strCurrentView)
+		'Check to be sure we got something
+		If IsNull(arrCplane) then
+			Rhino.Print "Problem getting current CPlane"
+			'If Project was on, return it to that state
+			If bIsProjectOn Then
+				Rhino.ProjectOsnaps vbTrue
+			End If
+			'If Osnaps were off, return to that state
+			If Not bIsOsnapsOn Then
+				Rhino.Osnap vbFalse
+			End If
+			Exit Sub
+		End If
+		Dim arrCplaneTarget, arrCplaneCamera
+		arrCplaneTarget = Rhino.XformWorldToCPlane(arrTargetPoint, arrCplane)
+		arrCplaneCamera = Rhino.XformWorldToCPlane(arrCameraPoint, arrCplane)
+		arrCplaneCamera(0) = arrCplaneTarget(0)
+		arrCplaneCamera(1) = arrCplaneTarget(1)
+		arrCameraPoint = Rhino.XformCPlaneToWorld(arrCplaneCamera, arrCplane)
+		
+		'Get the camera up vector
+		'arrUpVector = Rhino.ViewCameraUp(strCurrentView)
+		'If IsNull(arrUpVector) Then
+		'	Rhino.Print "Problem getting camera up vector"
+		''If Project was on, return it to that state
+		'	If bIsProjectOn Then
+		'		Rhino.ProjectOsnaps vbTrue
+		'	End If
+		'	'If Osnaps were off, return to that state
+		'	If Not bIsOsnapsOn Then
+		'		Rhino.Osnap vbFalse
+		'	End If
+		'	Exit Sub
+		'End If
+		'arrUpVector = Rhino.XformWorldToCPlane(arrUpVector, arrCplane)
+		
+	End If
+	
+
+	'Set the target point
+	Rhino.EnableRedraw False
+	Rhino.ViewCameraTarget strCurrentView, arrCameraPoint, arrTargetPoint
+	Rhino.ViewCameraUp strCurrentView, arrUpVector
+	Rhino.EnableRedraw True
+
+
+	'If Project was on, return it to that state
+	If bIsProjectOn Then
+		Rhino.ProjectOsnaps vbTrue
+	End If
+
+	'If Osnaps were off, return to that state
+	If Not bIsOsnapsOn Then
+		Rhino.Osnap vbFalse
+	End If
+End Sub
+
+
+Sub setTargetPlane()
+	Dim bIsProjectOn, bIsOsnapsOn
+	Dim strCurrentView, arrPoint, arrPointNew, arrViewCPlane, arrCameraPoint
+	Dim arrUpVector, arrTargetPoint
+
+
+	'Check to see if Project is on and make note of it's state. If it is on, turn it off
+	If Rhino.ProjectOsnaps Then
+		bIsProjectOn = vbTrue
+		'Turn off project
+		Rhino.ProjectOsnaps vbFalse
+	Else
+		bIsProjectOn = vbFalse
+	End If
+
+	'Check to see if Objects Snaps are active or not, if not, turn them on
+	If Rhino.Osnap Then
+		bIsOsnapsOn = vbTrue
+	Else
+		bIsOsnapsOn = vbFalse
+		'Turn on Osnaps
+		Rhino.Osnap vbTrue
+	End If
+	
+	'Get the current target
+	strCurrentView = Rhino.CurrentView( ,False)
+	If Rhino.IsViewPerspective(strCurrentView) = False Then
+		Rhino.Print "Command must be called from a perspective viewport"
+		'If Project was on, return it to that state
+		If bIsProjectOn Then
+			Rhino.ProjectOsnaps vbTrue
+		End If
+		'If Osnaps were off, return to that state
+		If Not bIsOsnapsOn Then
+			Rhino.Osnap vbFalse
+		End If
+		Exit Sub
+	End If
+	
+	'Get the current view CPlane
+	arrViewCPlane = Rhino.ViewCameraPlane(strCurrentView)
+	If IsNull(arrViewCPlane) Then
+		Rhino.Print "Problem retrieving camera CPlane"
+		'If Project was on, return it to that state
+		If bIsProjectOn Then
+			Rhino.ProjectOsnaps vbTrue
+		End If
+		'If Osnaps were off, return to that state
+		If Not bIsOsnapsOn Then
+			Rhino.Osnap vbFalse
+		End If
+		Exit Sub
+	End If
+	'Get the camera up vector
+	arrUpVector = Rhino.ViewCameraUp(strCurrentView)
+	If IsNull(arrUpVector) Then
+		Rhino.Print "Problem getting camera up vector"
+		'If Project was on, return it to that state
+		If bIsProjectOn Then
+			Rhino.ProjectOsnaps vbTrue
+		End If
+		'If Osnaps were off, return to that state
+		If Not bIsOsnapsOn Then
+			Rhino.Osnap vbFalse
+		End If
+		Exit Sub
+	End If
+
+	'Get the camera and target points
+	arrCameraPoint = Rhino.ViewCamera(strCurrentView)
+	If IsNull(arrCameraPoint) Then
+		Rhino.Print "Problem getting camera point"
+		'If Project was on, return it to that state
+		If bIsProjectOn Then
+			Rhino.ProjectOsnaps vbTrue
+		End If
+		'If Osnaps were off, return to that state
+		If Not bIsOsnapsOn Then
+			Rhino.Osnap vbFalse
+		End If
+		Exit Sub
+	End If
+	arrPoint = Rhino.ViewTarget(strCurrentView)
+	If IsNull(arrPoint) Then
+		Rhino.Print "Problem getting current target point"
+		'If Project was on, return it to that state
+		If bIsProjectOn Then
+			Rhino.ProjectOsnaps vbTrue
+		End If
+		'If Osnaps were off, return to that state
+		If Not bIsOsnapsOn Then
+			Rhino.Osnap vbFalse
+		End If
+		Exit Sub
+	End If
+	'Get the new target point
+	arrPointNew = Rhino.GetPoint("Select point in new target plane", arrPoint)
+	If IsNull(arrPointNew) Then 'No point was picked, exit script
+		Rhino.Print "No point picked"
+		'If Project was on, return it to that state
+		If bIsProjectOn Then
+			Rhino.ProjectOsnaps vbTrue
+		End If
+		'If Osnaps were off, return to that state
+		If Not bIsOsnapsOn Then
+			Rhino.Osnap vbFalse
+		End If
+		Exit Sub
+	End If
+	
+	'Convert the points to camera CPlane
+	arrPoint = Rhino.XformWorldToCPlane(arrPoint, arrViewCPlane)
+	arrPointNew = Rhino.XformWorldToCPlane(arrPointNew, arrViewCPlane)
+	'Assign the new Z value to the new camera point
+	arrTargetPoint = Array(arrPoint(0),arrPoint(1), arrPointNew(2))
+	'Convert the point back to world coordinates
+	arrTargetPoint = Rhino.XformCPlaneToWorld(arrTargetPoint, arrViewCplane)
+	
+	
+	'Set the target point
+	Rhino.EnableRedraw False
+	Rhino.ViewCameraTarget strCurrentView, arrCameraPoint, arrTargetPoint
+	Rhino.ViewCameraUp strCurrentView, arrUpVector
+	Rhino.EnableRedraw True
+	
+	'If Project was on, return it to that state
+	If bIsProjectOn Then
+		Rhino.ProjectOsnaps vbTrue
+	End If
+
+	'If Osnaps were off, return to that state
+	If Not bIsOsnapsOn Then
+		Rhino.Osnap vbFalse
+	End If
+	
+End Sub
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+
+
+'Clear out all the old smarttarget scripts
+Dim intCount, arrPaths, strPath
+intCount = Rhino.StartupScriptCount
+If intCount > 0 Then
+	arrPaths = Rhino.StartupScriptList
+	For Each strPath In arrPaths
+		If InStr(strPath, "smarttarget") Then
+			Rhino.DeleteStartupScript strPath
+		End If
+	Next
+End If
+
+Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+Rhino.AddAlias "SmartTarget", "_NoEcho _-RunScript (SmartTarget)"
+Rhino.AddAlias "SetTargetPlane", "_NoEcho _-RunScript (setTargetPlane)"

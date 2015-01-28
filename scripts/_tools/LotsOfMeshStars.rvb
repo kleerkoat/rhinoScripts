@@ -1,0 +1,144 @@
+'LotsOfMeshStars v01 
+'Script written by Jørgen Holo  
+'Thanks to willemderks.com for the Logistics Maps
+
+'Call LotsOfMeshStars()
+Sub LotsOfMeshStars()
+	
+	strV="v01"
+	
+	Rhino.enableredraw False
+	iEnd=200 'Width
+	iiEnd=200 'Length
+	dblArraySize = (iEnd)*(iiEnd)
+	
+	strView = Rhino.CurrentView
+	If Rhino.IsViewPerspective (strView)=False Then Rhino.print "Error: Please use a perspective view":Exit Sub
+	
+	dblMessage=Rhino.MessageBox ("This Work-In-Progress test will alter some settings in the document!"&VbNewLine&_
+		"So please use a new document for the test"&VbNewLine&VbNewLine&_
+		"Click OK to start.",1 , "WARNING! This is unstable stuff!")
+	If dblMessage=2 Then Rhino.Print "Test canceled":Exit Sub
+
+	'------------------- Let the games begin	
+	
+	Rhino.UnitAbsoluteTolerance 0.001
+	Rhino.enableRedraw False
+	Rhino.ShowGrid strView, False
+	Rhino.ShowGridAxes strView , False
+	Rhino.ViewCameraTarget strView, array(iEnd*2,iiEnd*2,50), array(iEnd*5,iiEnd*5,-(iEnd*iiEnd)/100)
+	Rhino.ViewCameraLens strView ,20
+	Rhino.ViewDisplayMode strView ,2
+
+	time1a=timer
+	
+	Rhino.print "Generating "&dblArraySize&" star shaped meshes. Each of 8 polygons, a total of "&dblArraySize*8
+
+	Dim arrVt(8)
+	arrVt(0) = Array(0,0,0)
+	arrVt(1) = Array(5,3,0)
+	arrVt(2) = Array(10,0,0)
+	arrVt(3) = Array(3,5,0)
+	arrVt(4) = Array(5,5,2)
+	arrVt(5) = Array(7,5,0)
+	arrVt(6) = Array(0,10,0)
+	arrVt(7) = Array(5,7,0)
+	arrVt(8) = Array(10,10,0)
+
+	Dim arrFV(7)
+
+	arrFV(0) = Array(0,1,4,4)
+	arrFV(1) = Array(2,4,1,1)
+	arrFV(2) = Array(0,4,3,3)
+	arrFV(3) = Array(2,5,4,4)
+	arrFV(4) = Array(3,4,6,6)
+	arrFV(5) = Array(5,8,4,4)
+	arrFV(6) = Array(6,4,7,7)
+	arrFV(7) = Array(8,7,4,4)
+
+	strMesh=Rhino.AddMesh (arrVt, arrFV)
+
+	
+	Dim arrObjects
+	ReDim arrObjects(dblArraySize-1)
+	
+
+	n=0
+	C=3.9 'constant for the formula
+	x=0.5
+	
+	For ii = 1 To iiEnd
+		Rhino.prompt round(100/iiEnd*ii,0)&" Percent completed"
+		For i = 1 To iEnd		
+			x= c*x*(1-x) 
+			arrObjects(n)=Rhino.CopyObject (strMesh , array(5,5,0) , array(10*i,10*ii,0))	
+			Rhino.RotateObject arrObjects(n),array(10*i,10*ii,0),360*x,array(0,0,1)
+			n=n+1
+		Next
+	Next
+	
+	Rhino.deleteobject strMesh
+	
+	time1b=timer
+	Rhino.enableredraw True
+	Rhino.print "Generating stars took "&round(time1b-time1a,1)&" seconds. Rotating view 90 degrees"
+	
+	Time2a=timer
+	For i= 1 To 90
+		Rhino.RotateView strView,0,1
+		Rhino.prompt i&" of 90 steps completed"
+	Next
+	Time2b=timer
+	Rhino.print "Rotating view with independent stars took "&round(time2b-time2a,1)&" seconds. Joining the meshes to one"
+	
+	Time3a=timer
+	Rhino.selectobjects arrObjects
+	Rhino.command "_join",False
+	arrMesh=Rhino.LastCreatedObjects
+	Rhino.UnselectAllObjects
+	Time3B=timer
+	Rhino.print "Rotating view with independent stars took "&round(time2b-time2a,1)&" seconds. Joining mesh took "&round(time3b-time3a,1)&" seconds."
+	
+	Time4a=timer
+	For i= 1 To 90
+		Rhino.RotateView strView,0,1
+		Rhino.prompt i&" of 90 steps completed"
+	Next
+	Time4b=timer
+	Rhino.print "Rotating view with joined stars took "&round(time4b-time4a,1)&" seconds."
+	Rhino.SelectObjects arrMesh
+	
+	
+	timeEnd=round(timer-time1a,2)
+	
+	strExe=Rhino.ExeVersion
+	strExeSr=Rhino.ExeServiceRelease
+	strBuild=Rhino.BuildDate
+	If Rhino.ExePlatform() = 1 Then
+		dblExePl="64"
+	Else
+		dblExePl="32"
+	End If
+	If isnull(strExe) Then 
+		strRhinoV ="Old Rhino"
+	Else
+		strRhinoV="Rhino v"&strExe&" sr"&strExeSr&" "&dblExePl&" bit"&VbNewLine&_
+			"(build: "&strBuild&")"
+	End If
+	
+	Rhino.prompt "Thank you for testing Holomark2 wip features"
+	
+	Rhino.TextOut strRhinoV&VbnewLine&VbnewLine&_
+		"HoloMark2 - Work in Progress - Stars test "&strV&" :"&VbNewLine&_
+		"Test took "&timeEnd&" seconds."&VbNewLine&_
+		"Meshes has a total of "&dblArraySize*8&" polygons."&VbNewLine&_
+		"Generating stars took "&round(time1b-time1a,1)&" seconds."&VbNewLine&_
+		"Rotating view with independent stars took "&round(time2b-time2a,1)&" seconds."&VbNewLine&_
+		"Joining mesh took "&round(time3b-time3a,1)&" seconds."&VbNewLine&_
+		"Rotating view with joined stars took "&round(time4b-time4a,1)&" seconds."&VbNewLine&VbNewLine&_
+		"Total score: "&round(60000/timeEnd,0), "WIP Test Score"
+	
+	Rhino.DeleteObjects arrMesh
+	
+	
+End Sub

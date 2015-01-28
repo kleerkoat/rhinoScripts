@@ -1,0 +1,32 @@
+' script for Rhinoceros - delete notes from objects
+Option Explicit
+
+Sub DeleteObjectNotes
+Dim arrObjects, StrObject, count, StrValue
+
+arrObjects = Rhino.GetObjects("Select objects to delete notes from", ,vbTrue, vbTrue)
+If Not IsArray(arrObjects) Then Exit Sub
+
+' find objects with data
+count = 0
+For Each StrObject in arrObjects
+	If Rhino.IsObjectData(StrObject) Then
+		StrValue = Rhino.GetObjectData(strObject, "ObjectNotes", "Text")
+		If Not IsNull(StrValue) Then
+			Rhino.DeleteObjectData StrObject, "ObjectNotes", "Text"
+			count = count + 1
+		End If
+	End If
+Next
+
+' return results
+If count = 0 Then
+	Rhino.Print "No objects with notes found in your selection"
+ElseIf count = 1 Then
+	Rhino.Print "Removed notes from one object."
+ElseIf count > 1 Then
+	Rhino.Print "Removed notes from " & count & " objects."
+End If
+
+End Sub
+DeleteObjectNotes

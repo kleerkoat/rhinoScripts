@@ -1,0 +1,12 @@
+Here is a quickly modified version of IntersectPlane that includes the alias
+
+TrimWithPlane
+
+To use the script, extract and save the .rvb file, then drag and drop it over an open V4 window to add the following aliases:
+
+IntersectPlane
+TrimWithPlane
+
+These can be used as 'commands' by typing or by adding  to a button.
+
+Let me know how that works...

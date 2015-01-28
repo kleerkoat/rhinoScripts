@@ -1,0 +1,26 @@
+﻿Option Explicit
+'Script written by Ryan Gilmore
+'Script version Thursday, September 20, 2012 9:42:59 AM
+
+'Call LayerMerge()
+Sub LayerMerge()
+	Dim strLayerToMerge, strLayerMerged
+	
+	strLayerToMerge = Rhino.GetLayer("Pick layer to merge:")
+	
+	If IsNull(strLayerToMerge) Then
+		Exit Sub
+	Else
+		strLayerMerged = Rhino.GetLayer("Pick layer to merge into:")
+		
+		If IsNull(strlayerMerged) Then
+			Exit Sub
+		Else 
+		End If
+		
+	End If
+		
+	
+	Rhino.MergeLayer strLayerMerged, strLayerToMerge
+	
+End Sub

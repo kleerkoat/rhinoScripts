@@ -1,0 +1,144 @@
+Option Explicit
+'Script written by Pascal
+' RMA
+'Script version Tuesday, December 06, 2011
+
+'Rhino.AddStartUpScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "FinAngle", "_NoEcho _-Runscript (FinAngle)"
+
+Private oldLen, oldAng
+
+If isEmpty(oldlen) Then
+	OldLen = 1
+End If
+
+
+If isEmpty(oldang) Then
+	OldAng = 10
+End If
+
+'Call FinAngle()
+
+Sub FinAngle()
+	Dim sCrv: sCrv = Rhino.GetObject("Select curve", 4, True)
+	If isNull(sCrv) Then Exit Sub
+	Dim BlnCLosed: blnClosed = False
+	If Rhino.IsCurveClosed(sCrv) Then
+		blnClosed = True
+	End If
+	Dim sSrf : SSrf = Rhino.GetObject("Select base surface.", 8)
+	If isNull(sSrf) Then Exit Sub
+	
+	Dim dblAng, dblLen
+	
+	dblAng = Rhino.getreal("Fin angle.", oldAng, 0, 90)
+	If isNull(dblANg) Then Exit Sub
+	OldAng = dblAng
+	
+	dbllen = Rhino.getreal("Fin depth.", oldlen, 10 * Rhino.UnitAbsoluteTolerance())
+	If isNull(dblLen) Then Exit Sub
+	OldLen = dblLen
+	
+	Dim aEdit: aEdit = Rhino.CullDuplicatePoints(Rhino.CurveEditPoints(sCrv))
+	Dim apar: apar = Rhino.CullDuplicateNumbers(Rhino.CurveEditPoints(sCrv, True))
+	
+	
+	Dim aLines, blnFlip, aItems, aDef, n, Flipped
+	aItems = array("FlipAngle", "No", "Yes", "FlipNormal", "No", "Yes")
+	adef = array(False, False)
+	n = 0
+	Flipped = 0
+	Dim tempsrf, intAng
+	intAng = 1
+	
+	Do
+		If n <> 0 Then Rhino.DeleteObjects tempSrf
+		
+		aLines = AddLines(sCrv, sSrf, aEdit, aPar, dblLen, dblang)
+		If Rhino.IsCurveClosed(sCrv) Then
+			tempSrf = makeSrf(alines, blnClosed)
+			
+		Else
+			tempSrf = makeSrf(alines, blnClosed)
+			
+		End If
+		
+		blnFlip = Rhino.GetBoolean("Set options:", aItems, aDef)
+		If Not isArray(blnFlip) Then Exit Sub
+		
+		If BlnFlip(0) = True Then
+			
+			dblAng = -dblAng
+			intAng = 2
+		Else 
+			intAng = 1
+		End If
+		
+	
+		If BlnFlip(1) = True Then
+			If intAng = 1 Then dblAng = -dblAng
+			Rhino.UnselectAllObjects()
+			Rhino.SelectObject sSrf
+			Rhino.Command "_Dir _Flip _Enter "
+			Rhino.UnselectAllObjects()
+			If Flipped = 0 Then 
+				Flipped = 1
+			Else
+				Flipped = 0
+			End If
+			
+		End If
+		
+		
+		n = n + 1
+	Loop While blnFlip(0) + BlnFlip(1) <> 0 
+	
+			
+	If Flipped = 1 Then 
+		Rhino.Enableredraw  False
+		Rhino.UnselectAllObjects()
+		Rhino.SelectObject sSrf
+		Rhino.Command "_Dir _Flip _Enter "
+		Rhino.Enableredraw  True
+	End If
+	
+	Rhino.DeleteObjects aLines
+	
+End Sub
+
+
+Function makeSrf(alines, blnClosed)
+
+	Dim tempSrf
+	If BlnClosed Then
+		tempSrf = Rhino.AddLoftSrf(aLines,,,,,, True)
+	
+	Else
+		tempSrf = Rhino.AddLoftSrf(aLines,,,,,, False)
+	
+	End If
+	Rhino.DeleteObjects aLines
+	makeSrf = tempSrf
+End Function
+
+Function AddLines(sCrv, sSrf, aPts, aPar, dbllen, dblang)
+	Rhino.EnableRedraw False
+	Dim aLines, edit_pt, start_par, n, vecnorm, plane
+	n = 0
+	ReDim alines(Ubound(aPts))
+	
+	For Each edit_pt In aPts
+		
+		start_par = Rhino.SurfaceClosestPoint(sSrf, edit_pt)
+		Vecnorm = Rhino.VectorScale(Rhino.SurfaceNormal(sSrf, start_par), dblLen)
+		
+		plane = Rhino.CurveperpFrame(sCrv, apar(n))
+		aLines(n) = Rhino.AddLine(edit_Pt, Rhino.PointAdd(edit_pt, vecnorm))
+	
+		Rhino.RotateObject aLines(n), plane(0), dblang, plane(3)
+		n = n + 1
+		
+	Next
+	AddLines = aLines
+	Rhino.EnableRedraw True
+End Function

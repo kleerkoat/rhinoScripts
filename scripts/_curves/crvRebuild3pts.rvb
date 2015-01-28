@@ -1,0 +1,27 @@
+'--------------------------------------------------------------
+'Command   :  cv3 (curve 3 points count)
+'Date      :  2011/02/01
+'Version   :  1.0
+'Organization   :  Rhino+
+'--------------------------------------------------------------
+Sub crvRebuild3pts
+
+Dim strCurve ,strCurves
+
+strCurves = Rhino.GetObjects("Select change curve 3 pionts count",4,True,True)
+
+If IsNull(strCurves) Then Exit Sub
+
+For Each strCurve In strCurves
+  
+  If Not IsNull(strCurve) Then
+
+    Rhino.RebuildCurve strCurve, 2, 3
+
+  End If
+
+Next
+
+End Sub
+
+'crvRebuild3pts'

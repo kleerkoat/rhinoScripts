@@ -1,0 +1,16 @@
+Option Explicit
+'Script written by <shehzad_irani>
+'Script copyrighted by <FREITAGMANN>
+'Script version 02 October 2009 16:09:46
+
+'Call PtBetween2Pts()
+Sub PtBetween2Pts()
+	Dim arrcen1, arrcen2
+	arrcen1 = Rhino.GetPoint("select first point")
+	arrcen2 = rhino.GetPoint("select second point")
+	Call Rhino.AddPoint(funcmid(arrcen1, arrcen2) )
+End Sub
+
+Function funcmid(ptA, ptB)
+	funcmid = array((ptA(0)+ptB(0))/2,(ptA(1)+ptB(1))/2,(ptA(2)+ptB(2))/2)
+End Function

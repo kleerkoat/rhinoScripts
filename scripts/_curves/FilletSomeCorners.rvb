@@ -1,0 +1,196 @@
+Option Explicit
+'Script written by Pascal
+' RMA
+'Script version Wednesday, February 22, 2012
+
+'Rhino.AddStartUpScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "FilletSomeCorners", "_NoEcho _-Runscript (FilletSomeCorners)"
+
+
+Private OldAng, OldRad
+
+If IsEmpty(OldAng) Then
+	OldAng = 10
+End If
+
+If IsEmpty(OldRad) Then
+	OldRad = 1
+End If
+
+'Call FilletSomeCorners()
+
+Sub FilletSomeCorners()
+	
+	Dim aCrvs: aCrvs = Rhino.GetObjects("Select curves to fillet.", 4,, True)
+	If Not isArray(aCrvs) Then Exit Sub
+	
+	Dim dblrad: dblrad = Rhino.GetReal("Fillet radius.", Oldrad)
+	If isNull(dblRad) Then Exit Sub
+	OldRad = dblRad
+	
+	Dim dblAng: dblAng = Rhino.GetReal("Set maximum angle to fillet.", OldAng, 0, 180)
+	If isNull(dblAng) Then Exit Sub
+	OldAng = dblAng
+	
+	Dim sCrv
+	Rhino.EnableRedraw False
+	For Each sCrv In aCrvs
+		FilletIt sCrv, dblRad, dblAng
+	Next
+	Rhino.EnableRedraw True
+End Sub
+
+Sub FilletIt(sCrv, dblRad, dblAng)
+
+
+	Rhino.SimplifyCurve sCrv, 16
+	
+	'	If Not Rhino.IsPolyCurve(sCrv) Then Exit Sub
+	
+	Rhino.EnableRedraw False
+	Dim aJoined: aJoined = CullEmptyElements(BustCurveAtAngle(sCrv, dblAng))
+	'Exit Sub
+	
+	
+	Dim sJoin
+	
+	Rhino.UnselectAllObjects()
+	Rhino.SelectObjects aJoined
+	
+	Rhino.Command "_NoEcho _FilletCorners " & dblRad & " _Enter"
+
+	Rhino.JoinCurves aJoined, True
+	Rhino.DeleteObject sCrv
+
+End Sub
+
+Function CullEmptyElements(arr)
+	Dim aresult(), i, n
+	n = 0
+	For i = 0 To ubound(arr)
+		
+		If Not isEmpty(arr(i)) Then 
+			ReDim Preserve aresult(n)
+			aresult(n) = arr(i)
+			n = n + 1
+		End If
+	Next
+	CullEmptyElements = aResult
+
+End Function
+
+Function BustCurveAtAngle(sCrv, dblAng)
+	
+	Dim aEx : aEx = Rhino.ExplodeCurves(sCrv, False)
+	
+	Dim TanIn, TanOut, aPar(), n, i
+	
+	For i = 1 To UBound(aEx) - 1
+		tanIn = Rhino.CurveTangent(aEx(i), Rhino.CurveDomain(aEx(i))(1))
+		tanOut = Rhino.CurveTangent(aEx(i + 1), Rhino.CurveDomain(aEx(i + 1))(0))
+		
+		If VectorAngle(tanIn, TanOut) < dblAng Then
+			ReDim Preserve aPar(n)
+			aPar(n) = Rhino.CurveClosestPoint(sCrv, Rhino.CurveEndPoint(aEx(i)))
+			n = n + 1
+		End If
+	Next
+	Dim aSplit, blnSplit
+	blnSplit = False
+	If isUpperBound(aPar) Then
+		aSplit = Rhino.SplitCurve(sCrv, aPar, False)
+		blnSplit = True
+	Else
+		aSplit = array(Rhino.CopyObject(sCrv))
+	End If
+	
+	If isArray(aSplit) Then
+		Rhino.MatchObjectAttributes aSplit, sCrv
+	End If
+	
+	If Rhino.IsCurveClosed(sCrv) Then
+		If blnSplit = True Then
+			Dim temp
+			tanIn = Rhino.CurveTangent(aEx(Ubound(aEx)), Rhino.CurveDomain(aEx(Ubound(aEx)))(1))
+			tanOut = Rhino.CurveTangent(aEx(0), Rhino.CurveDomain(aEx(0))(0))
+	
+			If VectorAngle(tanIn, TanOut) >= dblAng Then 
+				temp = Rhino.JoinCurves(array(aSplit(0), aSplit(Ubound(aSplit))), True)(0)
+			End If
+			removeNonExistent(aSplit)
+			BustCurveAtAngle = Rhino.JoinArrays(aSplit, array(temp))
+			
+		Else 
+			BustCurveAtAngle = aSplit	
+		End If
+		
+	Else
+		BustCurveAtAngle = aSplit
+	End If
+	
+	If isArray(aEx) Then Rhino.DeleteObjects aEx
+
+End Function
+
+Sub RemoveNonExistent(ByRef aID)
+	
+	Dim sID, aresult(), n
+	n = 0
+	For Each sID In aID
+	
+		If Rhino.IsCurve(sID) Then
+			ReDim Preserve aResult(n)
+			aresult(n) = sID
+			n = n + 1
+		End If
+	Next
+	
+	aID = aResult
+End Sub
+
+
+Function VectorAngle(Vec1, vec2)
+	
+	Vec1 = Rhino.VectorUnitize(Vec1)
+	Vec2 = Rhino.VectorUnitize(Vec2)
+	
+	Dim DP: DP = Vec1(0) * Vec2(0) + Vec1(1) * Vec2(1) + Vec1(2) * Vec2(2)
+	
+	If DP > .999999 Then
+		VectorAngle = 0
+	ElseIf DP < -.999999 Then  
+		VectorAngle = Rhino.ToDegrees(Rhino.Pi())
+	Else
+		VectorAngle = arcos(DP, False)
+	End If
+	
+End Function
+
+
+
+Function IsUpperBound(ByRef arr)
+
+	IsUpperBound = False
+
+	If IsArray(arr) Then
+
+		On Error Resume Next
+
+		UBound arr
+
+		If Err.Number = 0 Then IsUpperBound = True
+
+	End If
+
+End Function
+
+Function Arcos(dblAng, blnRad)
+	'dblAng input in radians
+	
+	If BlnRad = True Then 'output in radians
+		Arcos = Atn(-dblAng / Sqr(-dblAng * dblAng + 1)) + 2 * Atn(1)
+	Else 'output in degrees
+		Arcos = Rhino.ToDegrees(Atn(-dblAng / Sqr(-dblAng * dblAng + 1)) + 2 * Atn(1))
+	End If
+	
+End Function

@@ -1,0 +1,84 @@
+Option Explicit
+'Script written by Pascal
+'Tuesday, October 07, 2008 
+Sub FlowDots
+	
+	Dim str: str = "_Flow"
+	FlowEm(str)
+End Sub
+
+Sub FlowDotsSrf
+	
+	Dim str:	str = "_FlowAlongSrf"
+	FlowEm(str)
+End Sub
+
+
+
+Sub FlowEm(str)
+	
+	Dim aObj: aObj = Rhino.GetObjects("Select objects to flow.",,,True)
+	If Not IsArray(aObj) Then Exit Sub
+	
+	Dim sobj, apt, sText, n, aPtObj()
+	n = 0
+	
+	For Each sobj In aObj
+		If Rhino.ObjectType(sObj) = 8192 Then
+			aPt = Rhino.TextDotPoint(sObj)
+			sText = Rhino.TextDotText(sobj)
+			ReDim Preserve aptObj(n)
+			aPtObj(n) = Rhino.AddPoint(aPt)
+			Rhino.SetAttributeData aPtObj(n),"Dots","Dot",stext
+			n = n + 1
+		End If
+			
+	Next
+	
+	Rhino.SelectObjects(aObj)
+	If isUpperBound(aPtobj) Then Rhino.SelectObjects(aPtobj)
+	
+	Rhino.Command str
+	Dim aresult
+	If rhino.LastCommandResult= 0 Then
+		aResult = Rhino.LastCreatedObjects
+		
+		If isArray(aresult) Then
+			
+			For Each sobj In aResult
+				If Rhino.IsPoint(sobj) Then
+					sText = Rhino.GetAttributeData(sobj,"Dots", "Dot")
+					If Not IsNull(stext) Then
+						Rhino.AddTextDot  stext,Rhino.PointCoordinates(sObj)
+						Rhino.DeleteObject(sObj)
+					End If
+				End If
+			
+			Next
+					
+		End If
+	End If
+	
+	If isUpperBound(aPtobj) Then Rhino.DeleteObjects aPtObj
+
+End Sub
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "FlowDots","_NoEcho _-Runscript (FlowDots)"
+'Rhino.AddAlias "FlowDotsSrf","_NoEcho _-Runscript (FlowDotsSrf)"
+
+Function IsUpperBound(ByRef arr)
+
+	IsUpperBound = False
+
+	If IsArray(arr) Then
+
+		On Error Resume Next
+
+		UBound arr
+
+		If Err.Number = 0 Then IsUpperBound = True
+
+	End If
+
+End Function

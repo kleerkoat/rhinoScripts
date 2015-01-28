@@ -1,0 +1,43 @@
+<html>
+<head>
+<title>Isolate Selection</title>
+
+    <script language="VBScript">
+      <!--
+        Dim g_RhinoScript, arrObjs
+        Sub OnInitDialog()
+          window.returnValue = Null
+          Dim args
+          args = window.dialogArguments
+		  
+		  If IsArray(args(1)) Then
+		    arrObjs = args(1)
+		  Else
+		  	MsgBox "No Object(s) to Isolate"
+			window.close
+		  End If
+		  
+          If IsObject(args(0)) Then
+            Set g_RhinoScript = args(0)
+          Else
+            MsgBox "Error obtaining RhinoScript object"
+            window.close
+          End If
+        End Sub
+		
+		Sub UnIsolate()
+		  g_RhinoScript.UnlockObjects  (arrObjs)
+		  Set g_RhinoScript = Nothing
+		  window.close
+		End Sub
+
+    </script>
+
+</head>
+
+<body onLoad="OnInitDialog()" style="width: 180; height: 90; font-family: Arial, sans-serif">
+
+<input type="button" name="UIS" value="Unlock Isolation" onClick="UnIsolate()" style="width: 250; height: 100; border: thin solid THREEDSHADOW;  background-color:#F8B714">
+
+</body>
+</html>

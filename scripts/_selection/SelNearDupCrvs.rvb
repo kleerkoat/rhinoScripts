@@ -1,0 +1,42 @@
+Option Explicit
+'Script by Mitch Heynick
+'Version November 16, 2009
+'Call SelNearDupCrvs()
+Sub SelNearDupCrvs()
+
+	Dim arrcrvs,i,j,dblTol,arrRes,arrCSP1,arrCSP2,arrCEP2
+	dblTol=Rhino.UnitAbsoluteTolerance
+	
+	arrCrvs=Rhino.GetObjects("Select curves to check",4,,True,False)
+	dblTol=Rhino.GetReal("Tolerance?",dbltol,dbltol)
+
+	Call Rhino.EnableRedraw(False)
+	Call Rhino.Prompt("Working...")
+	For i=0 To Ubound(arrCrvs)-1
+		arrCSP1=Rhino.CurveStartPoint(arrCrvs(i))
+		For j=i+1 To Ubound(arrCrvs)			
+			'comparing endpoints first increases speed dramatically over just CrvDev
+			'but only good for open curves
+			If Not Rhino.IsCurveClosed(arrCrvs(i)) Then
+				arrCSP2=Rhino.CurveStartPoint(arrCrvs(j))
+				arrCEP2=Rhino.CurveEndPoint(arrCrvs(j))				
+				If Rhino.PointCompare(arrCSP1,arrCSP2,dblTol) Or Rhino.PointCompare(arrCSP1,arrCEP2,dblTol) Then
+					arrRes=Rhino.CurveDeviation(arrCrvs(i),arrCrvs(j))
+					If IsArray(arrRes) Then
+						If arrRes(2)<dblTol Then Call Rhino.SelectObject(arrCrvs(i))
+						'If arrRes(2)<dblTol Then Call Rhino.DeleteObject(arrCrvs(i))
+					End If				
+				End If
+			Else
+				arrRes=Rhino.CurveDeviation(arrCrvs(i),arrCrvs(j))
+				If IsArray(arrRes) Then
+					If arrRes(2)<dblTol Then Call Rhino.SelectObject(arrCrvs(i))
+					'If arrRes(2)<dblTol Then Call Rhino.DeleteObject(arrCrvs(i))
+				End If				
+			End If
+		Next
+	Next
+	Call Rhino.EnableRedraw(True)
+  Rhino.Print "SelNearDupCrvs Complete."
+End Sub
+

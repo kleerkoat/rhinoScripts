@@ -1,0 +1,57 @@
+Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version Tuesday, August 10, 2010 7:15:10 PM
+
+'Call CircularGridSnap()
+Sub CircularGridSnap()
+	Call Rhino.EnableRedraw(False)
+	Dim strGroup, arrPlane,dblRadius
+	strGroup="Circle Grid"
+	Call Rhino.AddGroup(strGroup)
+	Dim lngColor: lngColor=10461087 
+	'lngColor=Rhino.GetColor()
+	'Call Rhino.Print(lngColor)
+	arrPlane=Rhino.WorldXYPlane()
+	dblRadius=1
+	While dblRadius<1001
+		Dim strObject: strObject= Rhino.AddCircle(arrPlane, dblRadius)
+		dblRadius=dblRadius+1
+		Call Rhino.AddObjectToGroup(strObject, strGroup)
+		
+		
+		Call Rhino.ObjectColor(strObject, lngColor)
+
+	Wend
+	Dim arrObjects: arrObjects=Rhino.ObjectsByGroup(strGroup)
+	Call Rhino.LockObjects(arrObjects)
+	
+	Call Rhino.EnableRedraw(True)
+	
+	
+	Dim  arrStart, arrEnd
+	
+	
+
+	strObject = Rhino.GetObject("Select object to move")
+	Call Rhino.SelectObject(strObject)
+	If Not IsNull(strObject) Then
+
+		arrStart=Rhino.GetPoint("Point to move from")
+		'Dim strPoint: strPoint=Rhino.AddPoint(arrStart)
+		
+		Dim strPoint: strPoint=Rhino.Pt2Str(arrStart)
+
+		Call Rhino.MoveObjects(arrObjects,Array(0,0,0), arrStart)
+		Call Rhino.EnableRedraw(True)
+		Dim strComm: strComm=" -_Move " & strPoint & " _Pause" 
+		Call Rhino.Command(strComm)
+		
+		Call Rhino.UnlockObjects(arrObjects)
+		Call Rhino.DeleteObjects(arrObjects)
+		Call Rhino.UnselectAllObjects()
+		
+	End If
+	
+	End Sub
+

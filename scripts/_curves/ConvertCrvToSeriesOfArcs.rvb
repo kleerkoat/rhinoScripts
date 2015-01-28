@@ -1,0 +1,45 @@
+Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version Thursday, March 25, 2010 8:19:33 PM
+
+'Call ConvertCrvToSeriesOfArcs()
+Sub ConvertCrvToSeriesOfArcs()
+	Dim strObject, strObjects, arrPoints(), i,j,startPt,arrstrPt, arrAll, arrEcurve
+
+	strObjects = Rhino.GetObjects("Select curves")
+	If IsNull(strObjects) Then Exit Sub
+	
+	For i = 0 To Ubound(strObjects)
+		strObject = strObjects(i)
+		If Rhino.IsCurve(strObject) Then
+			
+			arrEcurve = rhino.ExplodeCurves(strObject)
+			
+			For j = 0 To Ubound(arrEcurve)
+		
+				If j = 0 Then
+					startPt = rhino.CurveStartPoint(arrEcurve(j))
+					'rhino.AddPoint startPt
+					arrstrPt = array(startPt)
+				End If
+				ReDim Preserve arrPoints(j)
+				arrPoints(j) = Rhino.CurveEndPoint(arrEcurve(j))
+
+				'Rhino.AddPoint arrPoints(j)
+			
+				arrAll = rhino.JoinArrays(arrstrPt,arrPoints)
+			Next
+			If IsArray(arrAll) Then
+
+				rhino.AddCurve arrAll
+
+			End If
+
+			rhino.Command "_seldup"
+
+		End If
+
+	Next
+
+End Sub

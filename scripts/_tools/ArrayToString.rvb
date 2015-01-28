@@ -1,0 +1,8 @@
+For i=0 to Ubound(arrItems)
+ If i=0 then
+   str=Cstr(arrItems(i))
+ Else
+   str=str&","&Cstr(arrItems(i))  'for a comma separated string
+ EndIf
+Next 
+

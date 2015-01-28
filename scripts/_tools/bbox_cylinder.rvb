@@ -1,0 +1,138 @@
+﻿Option Explicit
+'Script written and copyrighted by Jarek Bieda
+'Script version Sunday, June 29, 2008 1:48:36 PM
+
+Call Main()
+Sub Main()
+
+Dim arrObjects : arrObjects=Rhino.GetObjects("Select objects to frame with a BBoxCylinder",,True,True)
+If isnull(arrObjects) then Exit Sub
+
+Dim arrPt1, arrPt2, arrCurrentCP, tempCP
+Dim strResult,arrOptions(4)
+Dim arrBBox,idCylinder
+Dim strRadiusDir : strRadiusDir="X"
+Dim arrPlane : arrPlane=Rhino.WorldXYPlane()
+
+arrBBox=Rhino.BoundingBox(arrObjects)
+
+Do	
+	arrOptions(0)="World"
+	arrOptions(1)="CPlane"
+	arrOptions(2)="Pick"
+	arrOptions(3)="RadiusDir_"&strRadiusDir
+	arrOptions(4)="DONE"
+	
+	idCylinder=CylinderBbox(arrBBox,strRadiusDir,arrPlane)
+	
+	strResult=Rhino.GetString("Cylinder height direction?",,arrOptions)
+	if isnull(strResult) then : Call Rhino.DeleteObject(idCylinder) : Exit Sub : End If
+
+	Select Case Left(Ucase(strResult),3)
+	Case "WOR"
+		arrBBox=Rhino.BoundingBox(arrObjects)
+		arrPlane=Rhino.WorldXYPlane()
+		Call Rhino.DeleteObject(idCylinder)
+	Case "CPL"
+		arrBbox=Rhino.BoundingBox(arrObjects,Rhino.CurrentView())
+		arrPlane=Rhino.ViewCPlane(Rhino.CurrentView())
+		Call Rhino.DeleteObject(idCylinder)
+	Case "RAD"
+		if strRadiusDir="X" then
+			strRadiusDir="Y"
+		ElseIf strRadiusDir="Y" then
+			strRadiusDir="Fit"
+		Else 
+			strRadiusDir="X"
+		End If
+		Call Rhino.DeleteObject(idCylinder)
+	Case "PIC"
+		arrPt1=Rhino.GetPoint("1st direction point?")
+		if isnull(arrPt1) then 
+			Call Rhino.DeleteObject(idCylinder)
+		Else
+			arrPt2=Rhino.GetPoint("2nd direction point?",arrPt1)
+			if isnull(arrPt2) then
+				Call Rhino.DeleteObject(idCylinder)
+			Else
+				if Rhino.PointCompare(arrPt1,arrPt2) then
+					Call Rhino.DeleteObject(idCylinder)
+				Else
+					Call Rhino.EnableRedraw(False)
+					tempCP=Rhino.PlaneFromNormal(arrPt1,Rhino.VectorCreate(arrPt2,arrPt1))
+					arrPlane=Rhino.PlaneFromNormal(arrPt1,Rhino.VectorCreate(arrPt2,arrPt1))
+					arrCurrentCP=Rhino.ViewCPlane(Rhino.CurrentView())
+					Call Rhino.ViewCPlane(Rhino.CurrentView(),tempCP)
+					arrBbox=Rhino.BoundingBox(arrObjects,Rhino.CurrentView())
+					Call Rhino.ViewCPlane(Rhino.CurrentView(),arrCurrentCP)
+					Call Rhino.DeleteObject(idCylinder)	
+					Call Rhino.EnableRedraw(True)		
+				End If
+			End If
+		End If
+
+	
+	Case "DON",""
+		Exit Do
+	Case Else
+		Call Rhino.Print("Unknown command.")
+		Call Rhino.DeleteObject(idCylinder)
+	End Select
+
+Loop
+
+Call Rhino.SelectObject(idCylinder)
+
+End Sub
+
+Function CylinderBbox(byVal arrBbox,strRadiusDir,arrPlane)
+
+Dim arrBasePt, arrHeightPt, dblRadius
+Dim tempLine
+Dim dblFactor
+Dim arrCurrentCP
+
+Call Rhino.EnableRedraw(False)
+	tempLine=Rhino.AddLine(arrBbox(0),arrBbox(2))
+	arrBasePt=Rhino.CurveMidPoint(tempLine)
+	Call Rhino.DeleteObject(tempLine)
+	tempLine=Rhino.AddLine(arrBbox(4),arrBbox(6))
+	arrHeightPt=Rhino.CurveMidPoint(tempLine)
+	Call Rhino.DeleteObject(tempLine)
+
+if strRadiusDir="X" then
+	dblRadius=Rhino.Distance(arrBbox(0),arrBbox(1))/2
+	CylinderBbox=Rhino.AddCylinder(arrBasePt,arrHeightPt,dblRadius)
+Elseif strRadiusDir="Y" then
+	dblRadius=Rhino.Distance(arrBbox(0),arrBbox(3))/2
+	CylinderBbox=Rhino.AddCylinder(arrBasePt,arrHeightPt,dblRadius)
+Else
+	if Rhino.Distance(arrBbox(0),arrBbox(3))>Rhino.Distance(arrBbox(0),arrBbox(1)) then
+		dblFactor=Rhino.Distance(arrBbox(0),arrBbox(1))/Rhino.Distance(arrBbox(0),arrBbox(3))
+		dblRadius=Rhino.Distance(arrBbox(0),arrBbox(3))/2
+		CylinderBbox=Rhino.AddCylinder(arrBasePt,arrHeightPt,dblRadius)
+		arrCurrentCP=Rhino.ViewCPlane(Rhino.CurrentView())
+		Call Rhino.ViewCPlane(Rhino.CurrentView(),arrPlane)
+		CylinderBbox=Rhino.ScaleObject(CylinderBbox,arrBasePt,array(dblFactor,1,1))
+		Call Rhino.ViewCPlane(Rhino.CurrentView(),arrCurrentCP)
+	ElseIf Rhino.Distance(arrBbox(0),arrBbox(3))<Rhino.Distance(arrBbox(0),arrBbox(1)) then
+		dblFactor=Rhino.Distance(arrBbox(0),arrBbox(3))/Rhino.Distance(arrBbox(0),arrBbox(1))
+		dblRadius=Rhino.Distance(arrBbox(0),arrBbox(1))/2
+		CylinderBbox=Rhino.AddCylinder(arrBasePt,arrHeightPt,dblRadius)
+		arrCurrentCP=Rhino.ViewCPlane(Rhino.CurrentView())
+		Call Rhino.ViewCPlane(Rhino.CurrentView(),arrPlane)
+		CylinderBbox=Rhino.ScaleObject(CylinderBbox,arrBasePt,array(1,dblFactor,1))
+		Call Rhino.ViewCPlane(Rhino.CurrentView(),arrCurrentCP)
+	Else
+		dblRadius=Rhino.Distance(arrBbox(0),arrBbox(1))/2
+		CylinderBbox=Rhino.AddCylinder(arrBasePt,arrHeightPt,dblRadius)
+	End If
+End If
+Call Rhino.EnableRedraw(True)
+
+
+End Function
+
+
+
+

@@ -1,0 +1,102 @@
+Option Explicit
+
+'Script written by peter harris
+'Script copyrighted by peterwhatcreates, llc (www.peterwhatcreates.com)
+'Script version Monday, February 26, 2007 6:23:06 AM
+
+'OpenObjectsInNewWorkspace
+
+Sub OpenObjectsInNewWorkspace
+
+	Dim arrObjects, Object, strLayer, strFilePath, strFileName, arrViewNames, strView, intOverWrite
+	Dim oFS
+	
+	Set oFS = CreateObject("Scripting.FileSystemObject")
+
+	arrObjects = Rhino.GetObjects("Pick objects to open in a new workspace", 0, True, True, True)
+	If Not IsArray(arrObjects) Then Exit Sub
+	For Each Object In arrObjects
+		strLayer = Rhino.ObjectLayer(Object)
+		strLayer = Rhino.LayerName(strLayer, False)
+		If IsEmpty(strFileName) Then
+			strFileName = strLayer
+		Else
+			If strlayer <> strFileName Then
+				strFileName = Empty
+				Exit For
+			End If
+		End If
+	Next
+
+	If IsArray(arrObjects) Then
+		strFilePath = Rhino.DocumentPath
+		If IsNull(strFilePath) Then
+			Call Msgbox("Unsaved Document")
+			Exit Sub
+		End If
+		If Right(strFilePath, 9) = "CAD Data\" Then
+			strFilePath = Rhino.DocumentPath
+		Else
+			strFilePath = strFilePath & "CAD Data\"
+			If Not oFS.FolderExists(strFilePath) Then
+				oFS.CreateFolder(strFilePath)
+			End If
+		End If
+		
+		'Define File Name
+		If IsEmpty(strFileName) Then
+			strFileName = FileName()
+		End If
+		strFileName = Rhino.StringBox("Enter New File Name", strFileName, "File Name")
+		If IsNull(strFileName) Then Exit Sub
+		Do
+			If oFS.FileExists(strFilePath & strFileName & ".3dm") Then
+				intOverwrite = Rhino.MessageBox("File Exists, Overwrite?", 4, "File Already Exists")
+				If intOverWrite = 7 Then
+					strFileName = Rhino.StringBox("Enter New File Name", strFileName, "File Name")
+					If IsNull(strFileName) Then Exit Sub
+					intOverWrite = Null
+				Else Exit Do
+				End If
+			Else Exit Do
+			End If
+	
+		Loop
+		strFileName = strFileName & ".3dm"
+	
+			'Zoom Extents all views
+		arrViewNames = Rhino.ViewNames(True, 0)
+			If IsArray(arrViewNames) Then
+				Call Rhino.EnableRedraw(False)
+				For Each strView In arrViewNames
+					Call Rhino.AddNamedView(strView, strView)
+				Next
+			End If
+			Call Rhino.ZoomSelected(, True) 'Zoom Selected
+			Rhino.Command "_-export " & CHR(34) & strFilePath & strFileName & CHR(34)
+			Rhino.Command "_run " & CHR(34) & strFilePath & strFileName & CHR(34)
+			If IsArray(arrViewNames) Then
+				For Each strView In arrViewNames
+					Call Rhino.RestoreNamedView(strView, strView)
+					Call Rhino.DeleteNamedView(strView)
+				Next
+			End If
+			Call Rhino.EnableRedraw(True)
+			End If
+	
+		End Sub
+Function FileName()
+	Dim strFile, strLength
+	
+	strFile = Rhino.DocumentName
+	If isNull(strFile) Then
+		FileName = "Unsaved"
+		Exit Function
+	End If
+	strLength = len(strFile)
+	strLength = strLength - 4
+	strFile = Left(strFile, strLength)
+	
+	FileName = strFile
+	
+End Function

@@ -1,0 +1,518 @@
+Option Explicit
+'script written and copyrighted by David Rutten
+'many thanks to Jess Meartterer for point distribution theory
+
+Sub LightDomeTool()
+Dim NumPts, Colour, LightType, Intensity, index, Ascii, TempName, TempChar
+Dim fso, Location, File, Finished, Control, Schemes(18), GroupName
+Dim Dome, BBox, DomeX, DomeY, DomeZ, DomeRad, Min, Max
+Dim ColourDistribution(2), FillPattern
+Dim arrStrings(8), Compatibility
+
+Compatibility  = 0
+
+Schemes(0) = "Outside_cold"
+Schemes(1) = "Outside_warm"
+Schemes(2) = "Inside_cold"
+Schemes(3) = "Inside_warm"
+Schemes(4) = "Forest"
+Schemes(5) = "Ocean"
+Schemes(6) = "Red_light"
+Schemes(7) = "Sahara"
+Schemes(8) = "Polar"
+Schemes(9) = "Blooming_Oranges"
+Schemes(10)= "Jus_dOrange"
+Schemes(11)= "Algea"
+Schemes(12)= "Mandarin"
+Schemes(13)= "AgeToOh"
+Schemes(14)= "Chlorofyl"
+Schemes(15)= "Hemaglobin"
+Schemes(16)= "Olives_and_Feta"
+Schemes(17)= "Epidermis"
+Schemes(18)= "Prior_to_Technicolor"
+
+ColourDistribution(0) = "Split"
+ColourDistribution(1) = "DoubleSmooth"
+ColourDistribution(2) = "TripleSmooth"
+
+Rhino.UnSelectAllObjects
+
+Set fso = CreateObject("Scripting.FileSystemObject")
+Location = Rhino.InstallFolder&"Plug-ins\LightDomeSettings.txt"
+If (fso.FileExists(Location)) Then
+    Set File = fso.OpenTextFile(Location, 1)
+    index = 0
+    Do
+		File.SkipLine
+		index = index+1
+    Loop While File.AtEndOfStream = False
+	File.Close
+	
+	If index = 14 Then
+		Set File = fso.OpenTextFile(Location, 1)
+		File.SkipLine
+		File.SkipLine
+	    NumPts      = File.ReadLine
+	            	If Not IsNumeric(NumPts) Then NumPts = 100: Compatibility = compatibility +1
+	            	If NumPts < 10 Then NumPts = 10: Compatibility = compatibility +1
+	            	If NumPts > 500 Then NumPts = 500: Compatibility = compatibility +1
+	    Colour      = File.ReadLine
+	            	For index = 0 To 18
+	            		If Colour = Schemes(index) Then Exit For
+	            	Next
+	            	If index => UBound(Schemes) AND Colour <> Schemes(UBound(Schemes)) Then Colour = "Prior_to_Technicolor": Compatibility = compatibility +1
+
+	    FillPattern = File.ReadLine
+	            	If FillPattern <> "Split" And FillPattern <> "DoubleSmooth" And FillPattern <> "TripleSmooth" Then FillPattern = "Split": Compatibility = compatibility +1
+	    LightType   = File.ReadLine
+	            	If LightType <> "Pointlights" And LightType <> "Spotlights" And LightType <> "Directional" Then LightType = "Pointlights": Compatibility = compatibility +1
+	    Intensity   = File.ReadLine
+	            	If Not IsNumeric(Intensity) Then Intensity = 20: Compatibility = compatibility +1
+	            	If Intensity < 1 Then Intensity = 1: Compatibility = compatibility +1
+	            	If Intensity > 100 Then Intensity = 100: Compatibility = compatibility +1
+	    GroupName   = File.ReadLine
+	            	If Len(GroupName) = 0 Then GroupName = "Lightdome": Compatibility = compatibility +1
+	            	TempName = ""
+	            	For index = 1 To Len(GroupName)
+	            		TempChar = Mid(GroupName, index, 1)
+						Ascii = Asc(TempChar)
+                    	If Ascii >= 45 AND Ascii <= 57 Or Ascii >= 65 And Ascii <= 90 OR Ascii >= 97 And Ascii <= 122 Or Ascii = 95 Then
+                    		TempName = TempName&Mid(GroupName, index, 1)
+                    	Else
+                    		TempName = TempName&"_": Compatibility = compatibility +1
+                    	End If
+	            	Next
+					GroupName = TempName
+	    DomeX       = File.ReadLine
+	            	If Not IsNumeric(DomeX) Then DomeX = 0: Compatibility = compatibility +1
+	    DomeY       = File.ReadLine
+	            	If Not IsNumeric(DomeY) Then DomeY = 0: Compatibility = compatibility +1
+	    DomeZ       = File.ReadLine
+	            	If Not IsNumeric(DomeZ) Then DomeZ = 0: Compatibility = compatibility +1
+	    DomeRad     = File.ReadLine
+	            	If Not IsNumeric(DomeRad) Then DomeRad = 50: Compatibility = compatibility +1
+	            	If DomeRad < 0.1 Then DomeRad = 0.1: Compatibility = compatibility +1
+	    
+		If compatibility > 1 Then
+	    	Rhino.MessageBox "The lightdome script found " & Compatibility & " problems with you settings file."&vbNewLine&"This is probably because your settings were last saved be an"&vbNewLine&"older version of the lightdome tool."&vbNewLine&"They have been fixed.", 0, "Incompatibility warning"
+	    Else
+	    	If Compatibility = 1 Then
+	    		Rhino.MessageBox "The lightdome script found 1 problem with you settings file."&vbNewLine&"This is probably because your settings were last saved be an"&vbNewLine&"older version of the lightdome tool."&vbNewLine&"It has been fixed.", 0, "Incompatibility warning"
+			End If
+		End If
+	Else
+		Rhino.MessageBox "The lightdome script has detected an error in your settings file. Just to be sure the settings have been reverted to the default values.", 0, "Warning"
+	    NumPts      = "100"
+	    Colour      = "Prior_to_Technicolor"
+	    FillPattern = "Split"
+	    LightType   = "Pointlights"
+	    Intensity   = "20"
+	    GroupName   = "0"
+	    DomeY       = "0"
+	    DomeZ       = "0"
+	    DomeRad     = "50"
+	End If
+Else
+    NumPts      = "100"
+    Colour      = "Prior_to_Technicolor"
+    FillPattern = "Split"
+    LightType   = "Pointlights"
+    Intensity   = "20"
+    GroupName   = "0"
+    DomeY       = "0"
+    DomeZ       = "0"
+    DomeRad     = "50"
+End If
+
+If Rhino.IsGroup(GroupName) And Not Rhino.IsGroupEmpty(GroupName) Then GroupName = Rhino.AddGroup
+Finished = vbFalse
+Do
+
+	arrStrings(0) = "Lights_" & CInt(NumPts)
+	arrStrings(1) = "Intensity_" & CInt(Intensity)
+	arrStrings(2) = Colour
+    arrStrings(3) = FillPattern
+    arrStrings(4) = LightType
+    arrStrings(5) = "Groupname_" & Groupname
+    arrStrings(6) = "Dome"
+    arrStrings(7) = "Insert"
+    arrStrings(8) = "Help"
+
+    Control = Rhino.GetString("Lightdome", , arrStrings)
+    If VarType(Control) = vbNull Then Exit Sub
+    If Control = "" Then Exit Do
+
+    If IsNumeric(Control) Then
+        NumPts = CInt(Control)
+        If NumPts < 10 Then NumPts = 10
+    Else
+
+    Select Case UCase(Left(Control, 4))
+    Case "INSE"
+    	Exit Do
+	Case "LIGH"
+        NumPts = Rhino.GetInteger("Specify a number of lights", CLng(NumPts), 10)
+        If VarType(NumPts) = vbNull Then Exit Sub
+        If NumPts > 400 Then Rhino.MessageBox  "This value is very high. You will get a good result with 200 as well..."
+    Case "INTE"
+        Intensity = Rhino.GetInteger("Specify a dome intensity between 1 and 100...", CDbl(Intensity), 1, 100)
+        If VarType(Intensity) = vbNull Then Exit Sub
+    Case UCase(Left(arrStrings(2), 4))
+        Colour = Rhino.ListBox(Schemes, "Pick a colour scheme", "Light dome tool")
+        If VarType(Colour) = vbNull Then Exit Sub
+    Case UCase(Left(arrStrings(4), 4))
+        Select Case LightType
+        Case "Pointlights"  LightType = "Spotlights"
+        Case "Spotlights"   LightType = "Directional"
+        Case Else           LightType = "Pointlights"
+        End Select
+    Case "GROU"
+        GroupName = Rhino.GetString("Specify groupname for the lightdome", GroupName)
+        If VarType(GroupName) = vbNull Then Exit Sub
+        TempName = ""
+		For index = 1 To Len(GroupName)
+	    	TempChar = Mid(GroupName, index, 1)
+        	Rhino.Print TempChar
+			Ascii = Asc(TempChar)
+        	If Ascii >= 45 AND Ascii <= 57 Or Ascii >= 65 And Ascii <= 90 OR Ascii >= 97 And Ascii <= 122 Or Ascii = 95 Then
+        		TempName = TempName&Mid(GroupName, index, 1)
+        	Else
+        		TempName = TempName&"_"
+				compatibility = compatibility+1
+        	End If
+	    Next
+	    GroupName = TempName
+        If Rhino.IsGroup(GroupName) And Not Rhino.IsGroupEmpty(GroupName) Then GroupName = Rhino.AddGroup
+    Case "DOME"
+        Dome = Rhino.GetPoint("Pick a lightdome centre")
+        If VarType(Dome) = vbNull Then Exit Sub
+        DomeX = Dome(0)
+        DomeY = Dome(1)
+        DomeZ = Dome(2)
+        DomeRad = Rhino.GetDistance(Dome, CDbl(DomeRad) ,"Pick a lightdome radius")
+        If DomeRad = 0 Then DomeRad = 1
+    Case UCase(Left(arrStrings(3), 4))
+        Select Case FillPattern
+        Case "Split"  			FillPattern = "DoubleSmooth"
+        Case "DoubleSmooth"  	FillPattern = "TripleSmooth"
+        Case Else           	FillPattern = "Split"
+        End Select
+    Case "HELP"
+        HelpOnLightDome()
+    Case Else Exit Do
+    End Select
+    End If
+Loop
+
+Set File = fso.CreateTextFile(Location, True)
+File.WriteLine "User settings for the LightDome script"
+File.WriteLine ""
+File.WriteLine NumPts
+File.WriteLine Colour
+File.WriteLine FillPattern
+File.WriteLine LightType
+File.WriteLine Intensity
+File.WriteLine GroupName
+File.WriteLine CStr(DomeX)
+File.WriteLine CStr(DomeY)
+File.WriteLine CStr(DomeZ)
+File.WriteLine CStr(DomeRad)
+File.WriteLine ""
+File.WriteLine "settings succesfully saved..."
+File.Close
+
+If Not Rhino.IsGroup(GroupName) Then
+    Rhino.AddGroup GroupName
+End If
+
+Rhino.EnableRedraw vbFalse
+Rhino.Print "Distributing lights on dome..."
+Rhino.Sleep 10
+Finished = DivideInfo(CInt(NumPts), CDbl(Intensity), Colour, LightType, GroupName, FillPattern)
+If Finished = "suc6" Then Rhino.Print "Lightdome inserted"
+Rhino.Command CStr("_Scale w0,0,0 "&DomeRad), vbFalse
+Rhino.Command CStr("_Move w0,0,0 w"&DomeX&","&DomeY&","&DomeZ), vbFalse
+Rhino.EnableRedraw vbTrue
+End Sub
+LightDomeTool
+
+Function DistributePoints(NumPts)
+    Dim Sphere, Points, arrPoints(), index, Punt, pnt
+    Rhino.Command "-_MeshDensity _Around=100 _Vertical=100 Enter", vbFalse
+    Rhino.Command "-_MeshSphere 0,0,0 1", vbFalse
+    Rhino.Command "-_SelLast", vbFalse
+    Sphere = Rhino.SelectedObjects
+    Rhino.Command "-_ReduceMesh _FaceCount=" & 4*NumPts & " Enter", vbFalse
+    Rhino.Command "-_ReduceMesh _FaceCount=" & 4*NumPts & " Enter", vbFalse
+    Rhino.Command "-_ReduceMesh _FaceCount=" & 4*NumPts & " Enter", vbFalse
+    Rhino.Command "-_ExtractPt", vbFalse
+    Rhino.Prompt "Lightdome coordinates are being distributed...": Rhino.Sleep 10
+	Points = Rhino.SelectedObjects
+    Rhino.DeleteObjects Sphere
+    ReDim arrPoints(2, UBound(Points))
+    index = 0
+    For Each pnt in Points
+        Punt = Rhino.PointCoordinates(pnt)
+        If Punt(2) >= 0 Then
+            arrPoints(0, index) = Punt(0)
+            arrPoints(1, index) = Punt(1)
+            arrPoints(2, index) = Punt(2)
+            index = index+1
+        End If
+    Next
+    ReDim Preserve arrPoints(2, index)
+
+    Rhino.DeleteObjects Points
+    DistributePoints = arrPoints
+End Function
+
+Function DivideInfo(NumPts, Intensity, Colour, LightType, GroupName, FillPattern)
+    Dim LightArray, LightColour, LightTarget, LightScale
+    Dim PointCoord(2), index
+
+    LightArray = DistributePoints(NumPts)
+    If Not IsArray(LightArray) Then Exit Function
+    For index = 0 To Ubound(LightArray, 2)
+        PointCoord(0) = Round(LightArray(0,index), 4)
+        PointCoord(1) = Round(LightArray(1,index), 4)
+        PointCoord(2) = Round(LightArray(2,index), 4)
+        If PointCoord(0)<>0 And PointCoord(1)<>0 And PointCoord(2)<>0 Then
+            GetLight PointCoord, Colour, Intensity, LightType, GroupName, FillPattern
+        End If
+    Next
+    DivideInfo = "suc6"
+End Function
+
+Function ProqHalf(Value1, Value2, Part)
+    If Part < 0.5 Then ProqHalf = Value1 Else ProqHalf = Value2
+End Function
+
+Function ProqThird(Value1, Value2, Part)
+    If Part < 0.7 Then ProqThird = Value1 Else ProqThird = Value2
+End Function
+
+Function ProqGradient(Value1, Value2, Part)
+    ProqGradient = ((Value2-Value1)*Part) + Value1
+End Function
+
+Function GetLight(PointCoord, Colour, Intensity, LightType, GroupName, FillPattern)
+    Dim LObject, Origin(2), R, G, B, ColCoord(1)
+    Origin(0) = PointCoord(0)*0.9
+    Origin(1) = PointCoord(1)*0.9
+    Origin(2) = PointCoord(2)*0.9
+
+    ColCoord(0) = (PointCoord(0)/2)+0.5
+    ColCoord(1) = PointCoord(2)
+    Select Case Colour
+    Case "Outside_cold"
+        Select Case FillPattern
+        Case "DoubleSmooth" R=ProqGradient(2.3715,1.836,ColCoord(0)) : G=ProqGradient(2.55,1.8615,ColCoord(0)) : B=ProqGradient(2.4225,2.4225,ColCoord(0))
+        Case "TripleSmooth" R=ProqGradient(2.3715,1.836,ColCoord(0)) : R=ProqGradient(R,2.55, ColCoord(1)) : G=ProqGradient(2.55,1.8615,ColCoord(0)) : G=ProqGradient(G,2.55, ColCoord(1)) : B=ProqGradient(2.4225,2.4225,ColCoord(0)) : B=ProqGradient(B,2.55, ColCoord(1))
+        Case Else R=ProqHalf(2.3715,1.836,ColCoord(0)) : R=ProqThird(R,2.55, ColCoord(1)) : G=ProqHalf(2.55,1.8615,ColCoord(0)) : G=ProqThird(G,2.55, ColCoord(1)) : B=ProqHalf(2.4225,2.4225,ColCoord(0)) : B=ProqThird(B,2.55, ColCoord(1))
+        End Select
+    Case "Outside_warm"
+        Select Case FillPattern
+        Case "DoubleSmooth"  R=ProqGradient(2.22,2.55,ColCoord(0)) : G=ProqGradient(1.84,2.48,ColCoord(0)) : B=ProqGradient(1.35,2.22,ColCoord(0))
+        Case "TripleSmooth"  R=ProqGradient(2.22,2.55,ColCoord(0)) : R=ProqGradient(R,2.55, ColCoord(1)) : G=ProqGradient(1.84,2.48,ColCoord(0)) : G=ProqGradient(G,2.346, ColCoord(1)) : B=ProqGradient(1.35,2.22,ColCoord(0)) : B=ProqGradient(B,1.7595, ColCoord(1))
+        Case Else R=ProqHalf(2.22,2.55,ColCoord(0)) : R=ProqThird(R,2.55, ColCoord(1)) : G=ProqHalf(1.84,2.48,ColCoord(0)) : G=ProqThird(G,2.346, ColCoord(1)) : B=ProqHalf(1.35,2.22,ColCoord(0)) : B=ProqThird(B,1.7595, ColCoord(1))
+        End Select
+    Case "Inside_cold"
+        Select Case FillPattern
+        Case "DoubleSmooth"  R=ProqGradient(2.11,1.19,ColCoord(0)) : G=ProqGradient(2.11,1.36,ColCoord(0)) : B=ProqGradient(2.11,1.53,ColCoord(0))
+        Case "TripleSmooth"  R=ProqGradient(2.11,1.19,ColCoord(0)) : R=ProqGradient(R,0.8, ColCoord(1)) : G=ProqGradient(2.11,1.36,ColCoord(0)) : G=ProqGradient(G,0.8, ColCoord(1)) : B=ProqGradient(2.11,1.53,ColCoord(0)) : B=ProqGradient(B,1, ColCoord(1))
+        Case Else R=ProqHalf(2.11,1.19,ColCoord(0)) : R=ProqThird(R,0.8, ColCoord(1)) : G=ProqHalf(2.11,1.36,ColCoord(0)) : G=ProqThird(G,0.8, ColCoord(1)) : B=ProqHalf(2.11,1.53,ColCoord(0)) : B=ProqThird(B,1, ColCoord(1))
+        End Select
+    Case "Inside_warm"
+        Select Case FillPattern
+        Case "DoubleSmooth"  R=ProqGradient(2.55,2.55,ColCoord(0)) : G=ProqGradient(2.142,1.938,ColCoord(0)) : B=ProqGradient(1.3005,1.734,ColCoord(0))
+        Case "TripleSmooth"  R=ProqGradient(2.55,2.55,ColCoord(0)) : R=ProqGradient(R,1.2, ColCoord(1)) : G=ProqGradient(2.142,1.938,ColCoord(0)) : G=ProqGradient(G,1, ColCoord(1)) : B=ProqGradient(1.3005,1.734,ColCoord(0)) : B=ProqGradient(B,1, ColCoord(1))
+        Case Else R=ProqHalf(2.55,2.55,ColCoord(0)) : R=ProqThird(R,1.2, ColCoord(1)) : G=ProqHalf(2.142,1.938,ColCoord(0)) : G=ProqThird(G,1, ColCoord(1)) : B=ProqHalf(1.3005,1.734,ColCoord(0)) : B=ProqThird(B,1, ColCoord(1))
+        End Select
+    Case "Forest"
+        Select Case FillPattern
+        Case "DoubleSmooth"  R=ProqGradient(2.2695,0.9435,ColCoord(0)) : G=ProqGradient(2.55,1.53,ColCoord(0)) : B=ProqGradient(1.5045,1.02,ColCoord(0))
+        Case "TripleSmooth"  R=ProqGradient(2.2695,0.9435,ColCoord(0)) : R=ProqGradient(R,1.9125, ColCoord(1)) : G=ProqGradient(2.55,1.53,ColCoord(0)) : G=ProqGradient(G,1.989, ColCoord(1)) : B=ProqGradient(1.5045,1.02,ColCoord(0)) : B=ProqGradient(B,2.55, ColCoord(1))
+        Case Else R=ProqHalf(2.2695,0.9435,ColCoord(0)) : R=ProqThird(R,1.9125, ColCoord(1)) : G=ProqHalf(2.55,1.53,ColCoord(0)) : G=ProqThird(G,1.989, ColCoord(1)) : B=ProqHalf(1.5045,1.02,ColCoord(0)) : B=ProqThird(B,2.55, ColCoord(1))
+        End Select
+    Case "Ocean"
+        Select Case FillPattern
+        Case "DoubleSmooth"  R=ProqGradient(0.64,0.65,ColCoord(0)) : G=ProqGradient(2.24,1.05,ColCoord(0)) : B=ProqGradient(2.08,2.55,ColCoord(0))
+        Case "TripleSmooth"  R=ProqGradient(0.64,0.65,ColCoord(0)) : R=ProqGradient(R,1.35, ColCoord(1)) : G=ProqGradient(2.24,1.05,ColCoord(0)) : G=ProqGradient(G,2.06, ColCoord(1)) : B=ProqGradient(2.08,2.55,ColCoord(0)) : B=ProqGradient(B,2.35, ColCoord(1))
+        Case Else R=ProqHalf(0.64,0.65,ColCoord(0)) : R=ProqThird(R,1.35, ColCoord(1)) : G=ProqHalf(2.24,1.05,ColCoord(0)) : G=ProqThird(G,2.06, ColCoord(1)) : B=ProqHalf(2.08,2.55,ColCoord(0)) : B=ProqThird(B,2.35, ColCoord(1))
+        End Select
+    Case "Red_light"
+        Select Case FillPattern
+        Case "DoubleSmooth"  R=ProqGradient(2.5,2.55,ColCoord(0)) : G=ProqGradient(1.28,0.2,ColCoord(0)) : B=ProqGradient(1.14,0.3,ColCoord(0))
+        Case "TripleSmooth"  R=ProqGradient(2.5,2.55,ColCoord(0)) : R=ProqGradient(R,2.55, ColCoord(1)) : G=ProqGradient(1.28,0.2,ColCoord(0)) : G=ProqGradient(G,0.99, ColCoord(1)) : B=ProqGradient(1.14,0.3,ColCoord(0)) : B=ProqGradient(B,0.71, ColCoord(1))
+        Case Else R=ProqHalf(2.5,2.55,ColCoord(0)) : R=ProqThird(R,2.55, ColCoord(1)) : G=ProqHalf(1.28,0.2,ColCoord(0)) : G=ProqThird(G,0.99, ColCoord(1)) : B=ProqHalf(1.14,0.3,ColCoord(0)) : B=ProqThird(B,0.71, ColCoord(1))
+        End Select
+    Case "Sahara"
+        Select Case FillPattern
+        Case "DoubleSmooth"  R=ProqGradient(2.22,2.55,ColCoord(0)) : G=ProqGradient(1.84,2.15,ColCoord(0)) : B=ProqGradient(1.35,0.1,ColCoord(0))
+        Case "TripleSmooth"  R=ProqGradient(2.22,2.55,ColCoord(0)) : R=ProqGradient(R,1.35, ColCoord(1)) : G=ProqGradient(1.84,2.15,ColCoord(0)) : G=ProqGradient(G,2.06, ColCoord(1)) : B=ProqGradient(1.35,0.1,ColCoord(0)) : B=ProqGradient(B,2.5, ColCoord(1))
+        Case Else R=ProqHalf(2.22,2.55,ColCoord(0)) : R=ProqThird(R,1.35, ColCoord(1)) : G=ProqHalf(1.84,2.15,ColCoord(0)) : G=ProqThird(G,2.06, ColCoord(1)) : B=ProqHalf(1.35,0.1,ColCoord(0)) : B=ProqThird(B,2.5, ColCoord(1))
+        End Select
+    Case "Polar"
+        Select Case FillPattern
+        Case "DoubleSmooth"  R=ProqGradient(2.0655,0.7395,ColCoord(0)) : G=ProqGradient(2.091,0.7905,ColCoord(0)) : B=ProqGradient(2.55,1.836,ColCoord(0))
+        Case "TripleSmooth"  R=ProqGradient(2.0655,0.7395,ColCoord(0)) : R=ProqGradient(R,2.1165, ColCoord(1)) : G=ProqGradient(2.091,0.7905,ColCoord(0)) : G=ProqGradient(G,2.3715, ColCoord(1)) : B=ProqGradient(2.55,1.836,ColCoord(0)) : B=ProqGradient(B,2.55, ColCoord(1))
+        Case Else R=ProqHalf(2.0655,0.7395,ColCoord(0)) : R=ProqThird(R,2.1165, ColCoord(1)) : G=ProqHalf(2.091,0.7905,ColCoord(0)) : G=ProqThird(G,2.3715, ColCoord(1)) : B=ProqHalf(2.55,1.836,ColCoord(0)) : B=ProqThird(B,2.55, ColCoord(1))
+        End Select
+    Case "Blooming_Oranges"
+        Select Case FillPattern
+        Case "DoubleSmooth"  R=ProqGradient(2.55,0.3,ColCoord(0)) : G=ProqGradient(1.4,2,ColCoord(0)) : B=ProqGradient(0.3,0.3,ColCoord(0))
+        Case "TripleSmooth"  R=ProqGradient(2.55,0.3,ColCoord(0)) : R=ProqGradient(R,2, ColCoord(1)) : G=ProqGradient(1.4,2,ColCoord(0)) : G=ProqGradient(G,2, ColCoord(1)) : B=ProqGradient(0.3,0.3,ColCoord(0)) : B=ProqGradient(B,2, ColCoord(1))
+        Case Else R=ProqHalf(2.55,0.3,ColCoord(0)) : R=ProqThird(R,2, ColCoord(1)) : G=ProqHalf(1.4,2,ColCoord(0)) : G=ProqThird(G,2, ColCoord(1)) : B=ProqHalf(0.3,0.3,ColCoord(0)) : B=ProqThird(B,2, ColCoord(1))
+        End Select
+    Case "Jus_dOrange"
+        Select Case FillPattern
+        Case "DoubleSmooth"  R=ProqGradient(2.55,1.48,ColCoord(0)) : G=ProqGradient(1.4,0.1,ColCoord(0)) : B=ProqGradient(0.3,2.11,ColCoord(0))
+        Case "TripleSmooth"  R=ProqGradient(2.55,1.48,ColCoord(0)) : R=ProqGradient(R,2, ColCoord(1)) : G=ProqGradient(1.4,0.1,ColCoord(0)) : G=ProqGradient(G,2, ColCoord(1)) : B=ProqGradient(0.3,2.11,ColCoord(0)) : B=ProqGradient(B,2, ColCoord(1))
+        Case Else R=ProqHalf(2.55,1.48,ColCoord(0)) : R=ProqThird(R,2, ColCoord(1)) : G=ProqHalf(1.4,0.1,ColCoord(0)) : G=ProqThird(G,2, ColCoord(1)) : B=ProqHalf(0.3,2.11,ColCoord(0)) : B=ProqThird(B,2, ColCoord(1))
+        End Select
+    Case "Algea"
+        Select Case FillPattern
+        Case "DoubleSmooth"  R=ProqGradient(1.73,0.3,ColCoord(0)) : G=ProqGradient(2.55,1.44,ColCoord(0)) : B=ProqGradient(0.47,2.55,ColCoord(0))
+        Case "TripleSmooth"  R=ProqGradient(1.73,0.3,ColCoord(0)) : R=ProqGradient(R,2, ColCoord(1)) : G=ProqGradient(2.55,1.44,ColCoord(0)) : G=ProqGradient(G,2, ColCoord(1)) : B=ProqGradient(0.47,2.55,ColCoord(0)) : B=ProqGradient(B,2, ColCoord(1))
+        Case Else R=ProqHalf(1.73,0.3,ColCoord(0)) : R=ProqThird(R,2, ColCoord(1)) : G=ProqHalf(2.55,1.44,ColCoord(0)) : G=ProqThird(G,2, ColCoord(1)) : B=ProqHalf(0.47,2.55,ColCoord(0)) : B=ProqThird(B,2, ColCoord(1))
+        End Select
+    Case "Mandarin"
+        Select Case FillPattern
+        Case "DoubleSmooth"  R=ProqGradient(2,2.55,ColCoord(0)) : G=ProqGradient(2,2.15,ColCoord(0)) : B=ProqGradient(2,0.1,ColCoord(0))
+        Case "TripleSmooth"  R=ProqGradient(2,2.55,ColCoord(0)) : R=ProqGradient(R,2, ColCoord(1)) : G=ProqGradient(2,2.15,ColCoord(0)) : G=ProqGradient(G,2, ColCoord(1)) : B=ProqGradient(2,0.1,ColCoord(0)) : B=ProqGradient(B,2, ColCoord(1))
+        Case Else : R=ProqHalf(2,2.55,ColCoord(0)) : R=ProqThird(R,2, ColCoord(1)) : G=ProqHalf(2,2.15,ColCoord(0)) : G=ProqThird(G,2, ColCoord(1)) : B=ProqHalf(2,0.1,ColCoord(0)) : B=ProqThird(B,2, ColCoord(1))
+        End Select
+    Case "AgeToOh"
+        Select Case FillPattern
+        Case "DoubleSmooth"  R=ProqGradient(2,0.3,ColCoord(0)) : G=ProqGradient(2,1.44,ColCoord(0)) : B=ProqGradient(2,2.55,ColCoord(0))
+        Case "TripleSmooth"  R=ProqGradient(2,0.3,ColCoord(0)) : R=ProqGradient(R,2, ColCoord(1)) : G=ProqGradient(2,1.44,ColCoord(0)) : G=ProqGradient(G,2, ColCoord(1)) : B=ProqGradient(2,2.55,ColCoord(0)) : B=ProqGradient(B,2, ColCoord(1))
+        Case Else R=ProqHalf(2,0.3,ColCoord(0)) : R=ProqThird(R,2, ColCoord(1)) : G=ProqHalf(2,1.44,ColCoord(0)) : G=ProqThird(G,2, ColCoord(1)) : B=ProqHalf(2,2.55,ColCoord(0)) : B=ProqThird(B,2, ColCoord(1))
+        End Select
+    Case "Chlorofyl"
+        Select Case FillPattern
+        Case "DoubleSmooth"  R=ProqGradient(2,1.73,ColCoord(0)) : G=ProqGradient(2,2.55,ColCoord(0)) : B=ProqGradient(2,0.47,ColCoord(0))
+        Case "TripleSmooth"  R=ProqGradient(2,1.73,ColCoord(0)) : R=ProqGradient(R,2, ColCoord(1)) : G=ProqGradient(2,2.55,ColCoord(0)) : G=ProqGradient(G,2, ColCoord(1)) : B=ProqGradient(2,0.47,ColCoord(0)) : B=ProqGradient(B,2, ColCoord(1))
+        Case Else R=ProqHalf(2,1.73,ColCoord(0)) : R=ProqThird(R,2, ColCoord(1)) : G=ProqHalf(2,2.55,ColCoord(0)) : G=ProqThird(G,2, ColCoord(1)) : B=ProqHalf(2,0.47,ColCoord(0)) : B=ProqThird(B,2, ColCoord(1))
+        End Select
+    Case "Hemaglobin"
+        Select Case FillPattern
+        Case "DoubleSmooth"  R=ProqGradient(2,2.45,ColCoord(0)) : G=ProqGradient(2,0.4,ColCoord(0)) : B=ProqGradient(2,0.4,ColCoord(0))
+        Case "TripleSmooth"  R=ProqGradient(2,2.45,ColCoord(0)) : R=ProqGradient(R,2, ColCoord(1)) : G=ProqGradient(2,0.4,ColCoord(0)) : G=ProqGradient(G,2, ColCoord(1)) : B=ProqGradient(2,0.4,ColCoord(0)) : B=ProqGradient(B,2, ColCoord(1))
+        Case Else R=ProqHalf(2,2.45,ColCoord(0)) : R=ProqThird(R,2, ColCoord(1)) : G=ProqHalf(2,0.4,ColCoord(0)) : G=ProqThird(G,2, ColCoord(1)) : B=ProqHalf(2,0.4,ColCoord(0)) : B=ProqThird(B,2, ColCoord(1))
+        End Select
+    Case "Olives_and_Feta"
+        Select Case FillPattern
+        Case "DoubleSmooth" R=ProqGradient(2,2,ColCoord(0)) : G=ProqGradient(2,2.4,ColCoord(0)) : B=ProqGradient(2,2.55,ColCoord(0))
+        Case "TripleSmooth" R=ProqGradient(2.3,2,ColCoord(0)) : R=ProqGradient(R,2.55, ColCoord(1)) : G=ProqGradient(2.55,2.4,ColCoord(0)) : G=ProqGradient(G,2.55, ColCoord(1)) : B=ProqGradient(2.3,2.55,ColCoord(0)) : B=ProqGradient(B,2.2, ColCoord(1))
+        Case Else R=ProqHalf(2.3,2,ColCoord(0)) : R=ProqThird(R,2.55, ColCoord(1)) : G=ProqHalf(2.55,2.4,ColCoord(0)) : G=ProqThird(G,2.55, ColCoord(1)) : B=ProqHalf(2.3,2.55,ColCoord(0)) : B=ProqThird(B,2.2, ColCoord(1))
+        End Select
+    Case "Epidermis"
+        Select Case FillPattern
+        Case "DoubleSmooth"  R=ProqGradient(2,2.55,ColCoord(0)) : G=ProqGradient(2,1.6,ColCoord(0)) : B=ProqGradient(2,1.22,ColCoord(0))
+        Case "TripleSmooth"  R=ProqGradient(2,2.55,ColCoord(0)) : R=ProqGradient(R,2, ColCoord(1)) : G=ProqGradient(2,1.6,ColCoord(0)) : G=ProqGradient(G,2, ColCoord(1)) : B=ProqGradient(2,1.22,ColCoord(0)) : B=ProqGradient(B,2, ColCoord(1))
+        Case Else R=ProqHalf(2,2.55,ColCoord(0)) : R=ProqThird(R,2, ColCoord(1)) : G=ProqHalf(2,1.6,ColCoord(0)) : G=ProqThird(G,2, ColCoord(1)) : B=ProqHalf(2,1.22,ColCoord(0)) : B=ProqThird(B,2, ColCoord(1))
+        End Select
+    Case Else
+        Select Case FillPattern
+        Case "DoubleSmooth" R=ProqGradient(0.4,2,ColCoord(0)) : G=ProqGradient(0.4,2,ColCoord(0)) : B=ProqGradient(0.4,2,ColCoord(0))
+        Case "TripleSmooth" : R=ProqGradient(0.4,2,ColCoord(0)) : R=ProqGradient(R,1, ColCoord(1)) : G=ProqGradient(0.4,2,ColCoord(0)) : G=ProqGradient(G,1, ColCoord(1)) : B=ProqGradient(0.4,2,ColCoord(0)) : B=ProqGradient(B,1, ColCoord(1))
+        Case Else R=ProqHalf(0.4,2,ColCoord(0)) : R=ProqThird(R,1, ColCoord(1)) : G=ProqHalf(0.4,2,ColCoord(0)) : G=ProqThird(G,1, ColCoord(1)) : B=ProqHalf(0.4,2,ColCoord(0)) : B=ProqThird(B,1.2, ColCoord(1))
+        End Select
+    End Select
+
+    Select Case LightType
+    Case "Pointlights"
+        LObject = Rhino.AddPointLight(PointCoord)
+    Case "Spotlights"
+        LObject = Rhino.AddSpotLight(Origin, 0.1, PointCoord)
+    Case "Directional"
+        LObject = Rhino.AddDirectionalLight(PointCoord, Origin)
+    Case Else
+        Rhino.Print "Diepe stront"
+    End Select
+    Rhino.LightColor    LObject, RGB(CInt(R*Intensity),CInt(G*Intensity),CInt(B*Intensity))
+    Rhino.ObjectColor   LObject, RGB(CInt(R*75),CInt(G*75),CInt(B*75))
+    Rhino.AddObjectToGroup  LObject, GroupName
+    Rhino.SelectObject  LObject
+    GetLight = "OK"
+End Function
+
+Sub HelpOnLightDome()
+Dim msg, Continue
+msg = ""
+msg = msg&"Whenever you need to make a rendering of a digital model,"&vbNewLine
+msg = msg&"you need to place lights in the scene. Usually a few lights"&vbNewLine
+msg = msg&"will do but occasionally you'll need an 'omni-light'."&vbNewLine
+msg = msg&"So called Omni-lights or Lightdomes don't have a fixed source"&vbNewLine
+msg = msg&"but seem to irradiate from everywhere. Much like ambient"&vbNewLine
+msg = msg&"lights as a matter of fact except lightdomes generate shadows."&vbNewLine&vbNewLine
+msg = msg&"Unfortunately there is no such thing as an omni-light in"&vbNewLine
+msg = msg&"Flamingo or Rhino so we need to fake the effect. You can"&vbNewLine
+msg = msg&"use this tool to do exactly that."&vbNewLine&vbNewLine
+msg = msg&"Proceed to command-line control?"
+Continue = Rhino.MessageBox (msg, 4, "LightDome help")
+If Continue = 7 Then Exit Sub
+msg = ""
+msg = msg&"The command-line is divided into several sections. Each one"&vbNewLine
+msg = msg&"of these sections controls a value or setting you may alter."&vbNewLine
+msg = msg&"In order to gain access to these sections click on the section"&vbNewLine
+msg = msg&"name or type in the underlined character."&vbNewLine&vbNewLine
+msg = msg&"[LIGHTS:    ]"&vbNewLine
+msg = msg&"The 'lights' sections controls the number of lights to be"&vbNewLine
+msg = msg&"placed. A minimum of 10 is required and you'll rarely need more"&vbNewLine
+msg = msg&"than 300. The 'lights' section is only an approximate value..."&vbNewLine&vbNewLine
+msg = msg&"[INTENSITY:    ]"&vbNewLine
+msg = msg&"The 'intensity' section will control the brightness of the"&vbNewLine
+msg = msg&"lightcolour. Note that intensity is not related to the number"&vbNewLine
+msg = msg&"of lights. If you create a dome with twice as much lights and"&vbNewLine
+msg = msg&"the same intensity it will be twice as bright. Intensity can be"&vbNewLine
+msg = msg&"defined as any whole number between 1 and 100."&vbNewLine&vbNewLine
+msg = msg&"[SCHEME:    ]"&vbNewLine
+msg = msg&"With the intensity control you can adjust the brightness of"&vbNewLine
+msg = msg&"the lights and with the scheme control you can define their"&vbNewLine
+msg = msg&"colour. At this moment you can choose out of 20 pre-defined"&vbNewLine
+msg = msg&"schemes. It is not possible yet to define your own."&vbNewLine
+msg = msg&"Every scheme has it's own optimal settings for intensity,"&vbNewLine
+msg = msg&"number of lights and fillpatterns. You'll have to determine"&vbNewLine
+msg = msg&"these settings for yourself by trial and error."
+Rhino.MessageBox msg, 0, "LightDome help"
+msg = ""
+msg = msg&"[FILLPATTERN:    ]"&vbNewLine
+msg = msg&"Every scheme consists of three colours. Depending on a lights"&vbNewLine
+msg = msg&"position on the dome it will inherit one of these colours."&vbNewLine
+msg = msg&"At least... that's how it used to be in V1. Now you can pick"&vbNewLine
+msg = msg&"3 different fillpatterns. The default and original one called"&vbNewLine
+msg = msg&"'Split' will simple determine to which colour the light"&vbNewLine
+msg = msg&"is closest and then assign that colour. The two new fillpatterns"&vbNewLine
+msg = msg&"work on a gradient bases. They will blend the lightcolour using"&vbNewLine
+msg = msg&"all 3 of just 2 of the predefined colours. You can easily"&vbNewLine
+msg = msg&"check the result of the blend-methods because the lights have"&vbNewLine
+msg = msg&"a matching wireframecolour"&vbNewLine&vbNewLine
+msg = msg&"[TYPE:    ]"&vbNewLine
+msg = msg&"Rhino comes with 5 standard lights. With the lightdome tool"&vbNewLine
+msg = msg&"you can place three of these types. Linear and rectangular"&vbNewLine
+msg = msg&"lights have not been implemented. However point-, spot- and"&vbNewLine
+msg = msg&"directional-lights are available. Pointlights will render the"&vbNewLine
+msg = msg&"quickest and spotlights will give you the best shadow control."&vbNewLine
+msg = msg&"It is up to you which lighttype to use."
+Rhino.MessageBox msg, 0, "LightDome help"
+msg = ""
+msg = msg&"[GROUPNAME:    ]"&vbNewLine
+msg = msg&"Every lightdome is placed within a group. You can define the"&vbNewLine
+msg = msg&"name of that group with this control. Note that if a groupname"&vbNewLine
+msg = msg&"already exists in the model the new name will not be accepted."&vbNewLine&vbNewLine
+msg = msg&"[DOME]"&vbNewLine
+msg = msg&"With the dome control you can position and scale the lightdome."&vbNewLine
+msg = msg&"When you activate the dome control you will be asked to pick a"&vbNewLine
+msg = msg&"lightdome centre and radius. Note that lights in rhino and"&vbNewLine
+msg = msg&"flamingo have no fall-off value thus a large lightdome will"&vbNewLine
+msg = msg&"cast more light than a smaller one. It is also adviced to place"&vbNewLine
+msg = msg&"the dome slightly above the horizon in order to prevent infinite"&vbNewLine
+msg = msg&"shadows."&vbNewLine&vbNewLine
+msg = msg&"You can exit the command line control by hitting 'enter' or by"&vbNewLine
+msg = msg&"typing a non-logical character. Please note that there is no way"&vbNewLine
+msg = msg&"to abort the lightdome once you started the tool. You have to"&vbNewLine
+msg = msg&"complete it."
+
+Rhino.MessageBox msg, 0, "LightDome help"
+End Sub

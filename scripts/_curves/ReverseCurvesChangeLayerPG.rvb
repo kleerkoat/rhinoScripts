@@ -1,0 +1,125 @@
+Option Explicit
+'Script by Mitch Heynick, based off original script written by Don Lewis, but then noodled by Pascal, and polished by Ryan
+'Version 9 September, 2011
+
+'Call ReverseCurvesChangeLayerPG()
+Sub ReverseCurvesChangeLayerPG()
+	
+	Dim arrObjs,strObj,strObjLayer,strChkLayer,blnMatch,ub,i
+	
+	arrObjs=Rhino.GetObjects("Select ROUTE curves to process.",4,,True)
+	If Not IsArray(arrObjs) then Exit Sub
+	ub=Ubound(arrObjs)
+	
+	dim sCrv
+	
+	for each sCrv in arrObjs
+		MakeCrvClockWise sCrv
+	Next
+	
+	strObjLayer=Rhino.ObjectLayer(arrObjs(0))
+	
+	blnMatch=True
+	'check to see all objects are on same layer
+	If ub>0 Then		
+		For i=1 to ub
+			strChkLayer=Rhino.ObjectLayer(arrObjs(i))
+			If strChkLayer<>strObjLayer Then
+				blnMatch=False : Exit For
+			End If			
+		Next	
+	End If
+
+	Dim strParent,strPrompt,strLayer,dupCrv
+	strParent=Rhino.ParentLayer(strObjLayer)
+
+	If blnMatch And Not IsNull(strParent) Then
+		If Rhino.IsLayer(strParent&"::KNIFE") Then
+			strLayer=strParent&"::KNIFE"		
+		Else 'need to ask user for destination layer
+			strLayer=Rhino.AddLayer("KNIFE",RGB (0,0,255),,,strParent)
+		End If
+	End If	
+	
+	If Not IsNull(strLayer) Then
+		Dim msg
+		If ub=0 then msg=" curve" Else msg=" curves"
+		msg=msg&" reversed and sent to "
+		Call ReverseChangeLayer(arrObjs,strLayer)		
+		Call Rhino.Print(Cstr(ub+1)&msg&strLayer&" layer")
+	End If
+End Sub
+
+Sub ReverseChangeLayer(objs,layer)
+	Dim obj,dupCrv
+	For each obj in objs
+		dupCrv = Rhino.CopyObject(obj)
+		Call Rhino.ReverseCurve(dupCrv)
+		Call Rhino.ObjectLayer(obj,layer)
+	Next	
+End Sub
+
+Function MakeCrvClockWise(sCrv)
+	
+	dim aLine, pt, vectan, aBB, aInt, n, Tol
+	dim temp, xform
+	
+	
+	Tol = Rhino.UnitAbsoluteTolerance()
+	n = 0
+	if Rhino.IsCurveClosed(sCrv) then
+			
+		xform = Rhino.XformPlanarProjection(Rhino.ViewCPlane())
+		temp = Rhino.TransformObject(sCrv,xform,true)
+		aBB = Rhino.BoundingBox (temp,Rhino.CurrentView())
+		aLine = array(aBB(0), aBB(1))
+	
+		aInt = Rhino.LineCurveIntersection(aLine,temp,Tol)
+		If not isArray(aInt) then
+	
+			Rhino.DeleteObject temp
+		End If
+		if aInt(0,0) = 1 then 
+			pt = aint(0,1)
+		else
+			pt = aInt(0,3)
+		End if
+	
+		vecTan = Rhino.CurveTangent(Temp, Rhino.CurveClosestPoint(sCrv,pt))
+		Rhino.DeleteObject temp
+		
+		If VectorAngle(Vectan,array(1,0,0)) < 90 then Rhino.ReverseCurve sCrv
+
+	End If
+	
+End Function
+
+Function VectorAngle(Vec1, vec2)
+	
+	Vec1 = Rhino.VectorUnitize(Vec1)
+	Vec2 = Rhino.VectorUnitize (Vec2)
+	
+	Dim DP: DP = Vec1(0) * Vec2(0) + Vec1(1) * Vec2(1) +  Vec1(2) * Vec2(2)
+	
+	If DP  > .999999 then
+		VectorAngle = 0
+	ElseIf DP < -.999999 then  
+		VectorAngle = Rhino.ToDegrees(Rhino.Pi())
+	Else
+		VectorAngle = arcos(DP, False)
+	End If
+	
+End Function
+
+
+
+Function Arcos(dblAng, blnRad)
+	'dblAng input in radians
+	
+	If BlnRad = True then 'output in radians
+		Arcos = Atn(-dblAng / Sqr(-dblAng * dblAng + 1)) + 2 * Atn(1)
+	Else 'output in degrees
+		Arcos = Rhino.ToDegrees(  Atn(-dblAng / Sqr(-dblAng * dblAng + 1)) + 2 * Atn(1))
+	End if
+	
+End Function

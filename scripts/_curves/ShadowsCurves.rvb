@@ -1,0 +1,97 @@
+Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version Thursday, February 03, 2011
+
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "ShadowsCurves", "_-Runscript (ShadowsCurves)"
+
+'Call ShadowsCurves()
+Sub ShadowsCurves()
+
+	Dim aObj: aObj = Rhino.GetObjects("Select objects for shadows.", 4 + 8 + 16,, True)
+	If Not isArray(aObj) Then Exit Sub
+	Dim crntVName: crntVname = Rhino.CurrentView()
+	
+	Dim aPt: aPt = Rhino.GetPoint("Set eye point")
+	If Not isArray(aPt) Then Exit Sub
+
+	Dim crntView: crntView = Rhino.CurrentView()
+	Dim lens: lens = Rhino.ViewCameraLens(crntView)
+	Dim proj: proj = Rhino.ViewProjection(crntView)
+	Dim CrntPlane: crntPlane = Rhino.ViewCPlane()
+	Dim aDir(1)
+	aDir(0) = apt
+	aDir(1) = Rhino.GetPoint("Set light direction.", aPt)
+	If Not isArray(aDir(1)) Then Exit Sub
+
+	Dim sCrntView: sCrntView = Rhino.AddNamedView("crntView", Rhino.CurrentView())
+	
+	Rhino.EnableRedraw False
+	
+	Rhino.ViewProjection , 1
+	Rhino.ViewCameraTarget , apt, Rhino.PointAdd(apt, Rhino.VectorUnitize(Rhino.VectorCreate(aDir(1), aDir(0))))
+
+	'if proj = 2 then Rhino.ViewCameraLens Rhino.CurrentView(),lens
+	'DrawPLaneFrame PLane, 10
+	Rhino.SelectObjects aObj
+	Rhino.ZoomSelected()
+	Dim plane: Plane = Rhino.ViewCameraPlane()
+	Dim aCorn: aCorn = Rhino.ViewNearCorners()
+	
+	Dim apts(3), i
+	For i = 0 To 3
+		aPts(i) = Rhino.LinePlaneIntersection(array(aCorn(i), Rhino.PointAdd(aCorn(i), PLane(3))), CrntPlane)	
+	Next
+	
+	Rhino.Command "_Silhouette", False
+	
+	If Rhino.LastCommandResult() = 0 Then
+		Dim alast: aLast = Rhino.LastCreatedObjects()
+	End If
+
+	'Rhino.Sleep 2000
+	Dim starg: starg = Rhino.AddSrfPt(aPts)
+	Dim aProj2: aProj2 = Rhino.ProjectCurveToSurface(aLast, starg, PLane(3))
+		Rhino.DeleteObject starg
+	Rhino.DeleteObjects aLast
+	Rhino.RestoreNamedView sCrntView, crntView, True
+	Rhino.DeleteNamedView crntView	
+	Rhino.RenameView Rhino.CurrentView(), crntVName
+	
+	If isArray(aProj2) Then Rhino.SelectObjects aProj2
+	Rhino.EnableRedraw True
+	
+End Sub
+
+
+Function AveragePoints(aPts)
+	'Finds the average coordinates of an array
+	'of points.
+
+	Dim X, Y, Z
+	Dim i
+	
+	X = 0
+	Y = 0
+	Z = 0
+
+	For i=0 To UBound(aPts)
+			
+		'add all the X values
+		X = X + aPts(i)(0)
+	
+		'add all th Y values
+		Y = Y + aPts(i)(1)			
+	
+		'add all the Z values
+		Z = Z + apts(i)(2)
+	Next
+	
+	'Divide by the number of points to
+	'get the average  for each
+	'create the output array from the 3 averages
+	AveragePoints = array(X / (UBound(aPts) + 1), Y / (UBound(aPts) + 1), Z / (UBound(aPts) + 1))
+
+End Function

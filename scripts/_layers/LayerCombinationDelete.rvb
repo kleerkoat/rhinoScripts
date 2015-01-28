@@ -1,0 +1,33 @@
+Option Explicit
+'Script written by <Simon Aulis Kallioinen>
+'Script copyrighted by <>
+'Script version den 15 december 2008 22:27:50
+
+'Call LayerCombinationDelete()
+Sub LayerCombinationDelete()
+	Dim arrLayers, strLayer, strCombName, strValue, arrCombinations, strCombination, arrCombAndLayer, strResult, blnVisible, blnLocked
+	
+	arrCombinations = Rhino.GetDocumentData("LayerCombinationNames")
+			
+	If IsArray(arrCombinations) Then
+		
+		strResult = Rhino.GetString ("Layer combination to delete:", , arrCombinations)
+		If strResult="" Then
+	
+			strResult = Rhino.ListBox(arrCombinations, "Layer combination to delete")
+ 
+			If IsNull(strResult) Then
+				Rhino.Print("Deletion was cancelled")
+				Exit Sub
+			Else
+			End If
+		End If
+		Call Rhino.DeleteDocumentData ("LayerCombination " & strResult)
+		
+		Call Rhino.DeleteDocumentData ("LayerCombinationNames", strResult)
+		
+		Rhino.Print("Combination " & strResult & " was deleted")
+		
+	End If
+	
+End Sub

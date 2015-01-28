@@ -1,0 +1,111 @@
+'--------------------------------------------------------------
+'Command   :  ext (Extended trim)
+'Date      :  2011/10/14
+'Version   :  ƒ¿111014
+'Organization   :  Rhino+
+'--------------------------------------------------------------
+Sub ExtendedTrim()
+
+Dim strCurve,strCurve1,strSurface,point1,point2,coordinatespoint1,coordinatespoint2,arrVector
+
+  Rhino.Command "_NoEcho _CPlane _View"
+
+strCurve = Rhino.GetObject("Select trim curve",4)
+If IsNull(strCurve) Then
+  Rhino.Command("_NoEcho _DupEdge")
+  strCurve1=Rhino.FirstObject
+'--------------------------------------------------------------------------edge trim
+'----------------------------------------------------vector set
+  strSurface = Rhino.GetObject("Select trim surface",8)
+  If Not IsNull(strSurface) Then
+   
+    Rhino.Command "_NoEcho _CPlane _View"
+    Rhino.Command "_NoEcho _Point 0,0,0"
+    
+    point1 = Rhino.firstObject
+    coordinatespoint1 = Rhino.PointCoordinates(point1)
+
+    Rhino.Command "_NoEcho _Point 0,0,1"
+    point2 = Rhino.firstObject
+    coordinatespoint2 = Rhino.PointCoordinates(point2)
+
+
+    arrVector = Rhino.VectorCreate (coordinatespoint1, coordinatespoint2)
+
+    Rhino.DeleteObject point1
+    Rhino.DeleteObject point2
+
+'----------------------------------------------------
+      projectcurve=Rhino.ProjectCurveToSurface(strCurve1,strSurface,arrVector)
+      If Not IsNull(projectcurve) Then
+
+      Rhino.SelectObject Rhino.firstObject
+      Rhino.SelectObject strSurface
+      Rhino.Command "_NoEcho _ExtendCrvOnSrf"
+      extendcurveonsurfe = Rhino.firstObject
+
+      Rhino.Command "_Trim pause pause enter"
+'----------------------------------------------------
+
+      Rhino.DeleteObject extendcurveonsurfe
+      Rhino.command "_NoEcho _SelNone"
+      Rhino.command "_NoEcho _CPlane _Previous"
+      
+      End If
+      
+  Rhino.command "_NoEcho _SelNone"
+  Rhino.command "_NoEcho _CPlane _Previous" 
+  Rhino.DeleteObject strCurve1          
+  End If 
+   
+ '---------------------------------------------------------------------------  
+ 
+ 
+ '--------------------------------------------------------------------------curve trim
+
+Else
+  strCurve1=strCurve
+
+  strSurface = Rhino.GetObject("Select trim surface",8)
+  If Not IsNull(strSurface) Then
+'----------------------------------------------------vector set
+    Rhino.Command "_NoEcho _CPlane _View"
+    Rhino.Command "_NoEcho _Point 0,0,0"
+    
+    point1 = Rhino.firstObject
+    coordinatespoint1 = Rhino.PointCoordinates(point1)
+
+    Rhino.Command "_NoEcho _Point 0,0,1"
+    point2 = Rhino.firstObject
+    coordinatespoint2 = Rhino.PointCoordinates(point2)
+
+
+    arrVector = Rhino.VectorCreate (coordinatespoint1, coordinatespoint2)
+
+    Rhino.DeleteObject point1
+    Rhino.DeleteObject point2
+
+'----------------------------------------------------
+      projectcurve=Rhino.ProjectCurveToSurface(strCurve1,strSurface,arrVector)
+      If Not IsNull(projectcurve) Then
+
+      Rhino.SelectObject Rhino.firstObject
+      Rhino.SelectObject strSurface
+      Rhino.Command "_NoEcho _ExtendCrvOnSrf"
+      extendcurveonsurfe = Rhino.firstObject
+
+      Rhino.Command "_Trim pause pause enter"
+'----------------------------------------------------
+
+      Rhino.DeleteObject extendcurveonsurfe
+      Rhino.command "_NoEcho _SelNone"
+      Rhino.command "_NoEcho _CPlane _Previous"
+      
+      End If
+      
+  Rhino.command "_NoEcho _SelNone"
+  Rhino.command "_NoEcho _CPlane _Previous"           
+  End If
+  End If
+
+End Sub

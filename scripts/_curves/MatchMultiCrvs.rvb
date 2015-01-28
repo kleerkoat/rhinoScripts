@@ -1,0 +1,120 @@
+Option Explicit
+'Script by Mitch Heynick
+'Version April 21, 2011
+
+'Rhino V4 or V5
+'Works only on two sets of curves that are connected at endpoints
+'All curves must have a matching partner
+
+Private oldMMode,oldOE,oldJoinM,oldAvgCrvs
+If IsEmpty(oldMMode) Then oldMMode="Position"
+If IsEmpty(oldOE) Then oldOE="Position"
+If IsEmpty(oldJoinM) Then oldJoinM="None"
+If IsEmpty(oldAvgCrvs) or vartype(oldAvgCrvs)<> 11 Then oldAvgCrvs=False
+
+'Call MatchConnectedCrvs()
+Sub MatchMultiCrvs()
+	
+	'script description to command line
+  Rhino.Print ("Works only on two sets of curves that are connected at endpoints. All curves must have a matching partner")
+	'UI
+	Dim arrCrvSet1,arrCrvSet2,ub
+	arrCrvSet1=Rhino.GetObjects("Select curves to change (one side)",4)
+	If Not IsArray(arrCrvSet1) Then Exit Sub
+	arrCrvSet2=Rhino.GetObjects("Select target curves for match (other side)",4)
+	If Not IsArray(arrCrvSet2) Then Exit Sub
+	ub=Ubound(arrcrvSet1)
+	
+	Dim strCh,bool,arrChoice,mode,join,pres,avg	
+	arrChoice=Array("_Position","_Tangency","_Curvature")
+	strCh=Rhino.GetString("Match mode?",oldMMode,arrChoice)
+	If IsNull(strCh) Then Exit Sub
+	mode=strCh : oldMMode=strCh
+	
+	arrChoice=Array("_None","_Join","_Merge")
+	strCh=Rhino.GetString("Join or merge curves?",oldJoinM,arrChoice)
+	If IsNull(strCh) Then Exit Sub
+	join=strCh : oldJoinM=strCh
+	
+	arrChoice=Array("_Nothing","_Position","_Tangency","_Curvature")
+	strCh=Rhino.GetString("Preserve other end?",oldOE,arrChoice)
+	If IsNull(strCh) Then Exit Sub
+	pres=strCh : oldOE=strCh
+	
+	arrChoice=Array("AverageCrvs","No","Yes")
+	bool=Rhino.GetBoolean("Average curves?",arrChoice,array(oldAvgCrvs))
+	If Not IsArray(bool) Then Exit Sub
+	If bool(0) Then avg="_Yes" Else avg="_No"
+	oldAvgCrvs=bool(0)
+	
+	If Ubound(arrcrvSet2)<>ub Then 
+		Call Rhino.Print("Number of curves in each set does not match")
+		exit Sub
+	End If
+	
+	'Find matches
+	Dim arrOrderedCrvs1(),arrOrderedCrvs2(),arrMatch(),arrRes,noMatch,i
+	Redim arrOrderedCrvs1(ub), arrOrderedCrvs2(ub), arrMatch(ub)
+	
+	noMatch=False	
+	Call Rhino.UnselectAllObjects
+	Call Rhino.EnableRedraw(False)
+	
+	For i=0 to ub
+		
+		arrRes=FindMatchingCrv(arrCrvSet1(i),arrCrvSet2,ub)		
+		If not IsArray(arrRes) Then 
+			Call Rhino.SelectObject(arrCrvSet1(i))
+			noMatch=True
+		Else
+			arrOrderedCrvs1(i)=arrCrvSet1(i)
+			arrOrderedCrvs2(i)=arrCrvSet2(arrRes(0))
+			arrMatch(i)=Array(arrRes(1),arrRes(2))	
+		End If
+	Next
+	
+	If noMatch Then
+		Call Rhino.Print("Unable to find match for highlighted curves") 
+		Call Rhino.EnableRedraw(True) : Exit Sub
+	End If
+	
+	'Match curves
+	Dim strMOpts,strComm
+	strMOpts=" _Mode="&mode&" _Join="&join&" _PreserveOtherEnd="&pres&" _AverageCurves="&avg
+		
+	For i=0 to ub		
+		If arrMatch(i)(0)=1 Then Call Rhino.ReverseCurve(arrOrderedCrvs1(i))
+		If arrMatch(i)(1)=1 Then Call Rhino.ReverseCurve(arrOrderedCrvs2(i))
+				
+		strComm="_-Match _SelID "&arrOrderedCrvs1(i)&" _SelID "&arrOrderedCrvs2(i)
+		strComm=strComm&strMOpts&" _Enter"
+		Call Rhino.Command(strComm,False)
+
+		If arrMatch(i)(0)=1 Then Call Rhino.ReverseCurve(arrOrderedCrvs1(i))
+		If arrMatch(i)(1)=1 Then Call Rhino.ReverseCurve(arrOrderedCrvs2(i))
+	Next
+	Call Rhino.EnableRedraw(True)
+End Sub
+
+Function FindMatchingCrv(crv,arrCrvs,ub)
+	FindMatchingCrv=Null
+	Dim arrCSP1,arrCEP1,arrCSP2,arrCEP2,match,mp1,mp2,dblTol,j
+	match=False
+	dblTol=Rhino.UnitAbsoluteTolerance
+	arrCSP1=Rhino.CurveStartPoint(crv)
+	arrCEP1=Rhino.CurveEndPoint(crv)
+	For j=0 to ub			
+		arrCSP2=Rhino.CurveStartPoint(arrCrvs(j))
+		arrCEP2=Rhino.CurveEndPoint(arrCrvs(j))
+		If Rhino.PointCompare(arrCSP1,arrCSP2,dblTol) Then
+			mp1=0 : mp2=0 : match=True		
+		ElseIF Rhino.PointCompare(arrCSP1,arrCEP2,dblTol) Then
+			mp1=0 : mp2=1 : match=True			
+		ElseIf Rhino.PointCompare(arrCEP1,arrCSP2,dblTol) Then
+			mp1=1 : mp2=0 : match=True
+		ElseIf Rhino.PointCompare(arrCEP1,arrCEP2,dblTol) Then
+			mp1=1 : mp2=1 : match=True
+		End If
+		If match Then FindMatchingCrv=Array(j,mp1,mp2): Exit for
+	Next	 
+End Function

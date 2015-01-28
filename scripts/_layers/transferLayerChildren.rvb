@@ -1,0 +1,39 @@
+Option Explicit
+
+'Call transferLayerChildren()
+Sub transferLayerChildren()
+	
+	Dim arrLayer(1), arrLayerChildren(1), i, j, arrObjects, sourceLayer, destinationLayer
+
+	Rhino.ClearCommandHistory
+	
+	arrLayer(0) = "Parent_01" 'parent layer to transfer to
+	arrLayer(1) = "Parent_02" 'parent layer to transfer from
+	
+	arrLayerChildren(0) = Rhino.LayerChildren (arrLayer(0)) 'gets layer to transfer to children
+	arrLayerChildren(1) = Rhino.LayerChildren (arrLayer(1)) 'gets layer to transfer from children	
+
+	For i=0 to Ubound(arrLayerChildren(1)) 'get all the transfer from layer children
+		For j=0 to Ubound(arrLayerChildren(0)) 'get all the transfer from layer children
+			If arrLayerChildren(1)(i) = arrLayerChildren(0)(j) Then
+				sourceLayer = arrLayer(1) & "::" & arrLayerChildren(1)(i)
+				destinationLayer = arrLayer(0) & "::" & arrLayerChildren(0)(j)
+				
+				Rhino.Print sourceLayer & " = " & destinationLayer
+						
+				If Rhino.IsLayer(sourceLayer) Then
+					If Rhino.IsLayerEmpty (sourceLayer) Then
+						Rhino.Print "layer: " & sourceLayer & " is empty"
+					Else
+						arrObjects = Rhino.ObjectsByLayer (sourceLayer)
+						Call Rhino.ObjectLayer (arrObjects , destinationLayer)					
+					End If
+				Else
+					Rhino.Print "The layer: " & sourceLayer & " does not exist."
+				End If
+				
+			End If
+		Next
+	Next
+	
+End Sub

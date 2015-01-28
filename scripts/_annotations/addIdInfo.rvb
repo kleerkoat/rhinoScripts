@@ -1,0 +1,14 @@
+﻿'-RunScript (
+Sub addIdInfo
+	
+	Dim Author,copyright,contactdata,strnotes1
+	Author = "Author: My Design Firm"
+	copyright= "Copyright: 2011"
+	contactdata= "Contact: www.MyDesign.com"
+	strnotes1 = rhino.notes
+	
+	rhino.notes strnotes1 & vbNewLine & Author & vbNewLine & copyright & vbNewLine & contactdata & vbNewLine & "Date:" & CStr(date) & " at " & CStr(time)
+	
+End Sub
+addIdInfo
+'	)

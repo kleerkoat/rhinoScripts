@@ -1,0 +1,192 @@
+' ****************************** RhinoScript.org ******************************
+'
+'   Sort Elements by Distance to a Reference Point, version 1
+'
+'   by maher, published Sep 19, 2011
+'
+'
+'   This is a script to order objects based on their distance from a reference point. You can select point, curves, surfaces, or any combination.
+'   
+'   two types of points are needed: 
+'   1-a sort reference point, which can be defined by the user (click in 3d space), or by selecting from Bounding Box points, or it can be a default 0,0,0 (world origin)
+'   2-Points on the elements that we want to sort. Two methods are available
+'           a-Centroid: objects centroide or middle point; of course, if you happen to be sorting points, the point is used as the reference.
+'           b-ClosestPoint: this finds the closest point on the element to the sort reference point.
+'   
+'   
+'
+'
+'
+'
+'   This RhinoScript Tool has been downloaded from RhinoScript.org.
+'
+'   Rhino versions: Rhino 4 (at least service release 8)
+'
+'   LICENSE INFORMATION:
+'   This script is published under the GNU General Public License, version 3
+'   or any later version, and thus comes WITHOUT ANY WARRANTY. You can get
+'   the complete license text here: www.rhinoscript.org/gpl
+'
+' ****************************** RhinoScript.org ******************************
+
+
+
+Option Explicit
+'Script written by <Maher>
+'Script copyrighted by <insert company name>
+'Script version 19 September 2011 07:57:01
+
+'Call SortElementsByDistanceToReferencePointV1()
+Sub SortElementsByDistanceToReferencePointV1()
+	
+	'Select objects to sort.
+	Dim ARR_Objects
+	ARR_Objects = Rhino.GetObjects("Select objects to sort by distance")
+	'selection error handling
+	If isNull(ARR_Objects) Then Exit Sub 
+	If Ubound(ARR_Objects)<1 Then 
+		Rhino.Print("1 object selected. Nothing to sort. Script aborted")
+		Exit Sub
+	End If
+	
+	'select sorting type
+	Dim STR_SortBy
+	STR_SortBy = Rhino.GetString("Sort objects by" , "Centeroid", array("Centeroid", "ClosestPoint"))
+	If isNull(STR_SortBy) Then Exit Sub
+	
+	'select sort reference point method
+	Dim SortReference
+	SortReference = Rhino.GetString ("Define a reference point to sort objects by ", "WorldOrigin", Array("Click_Point", "BBox_Point", "WorldOrigin"))
+	If isNull(SortReference) Then Exit Sub
+	
+	'define the sorting reference point 
+	Dim PT_SortRef
+	If SortReference = "WorldOrigin" Then
+		PT_SortRef=Array(0,0,0)
+		
+	ElseIf SortReference = "BBox_Point" Then
+		Rhino.EnableRedraw False
+		Dim arrBbox: arrBbox = Rhino.Boundingbox(ARR_Objects)
+		arrBbox= Rhino.CullDuplicatePoints(arrBbox)
+		
+		Dim i
+		Dim Labels
+		ReDim Labels ((UBound(arrBbox)))
+		For i = 0 To Ubound(Labels)
+			labels(i) = Rhino.AddTextDot(i, arrBbox(i))
+		Next
+		Rhino.EnableRedraw True
+		
+		Dim num: num = Rhino.GetInteger("Enter Number: which Point to use as Sort reference",0,0,Ubound(Labels))
+		If isNull(num) Or Not isNumeric(num) Then Exit Sub
+		
+		PT_SortRef = arrBbox(num)
+		Rhino.DeleteObjects labels
+		
+	ElseIf SortReference="Click_Point" Then
+		PT_SortRef = Rhino.GetPoint("Click to define a sort reference point")
+	End If
+	
+	'redefine ARR_Objects by what the "Sort" function creates...
+	ARR_Objects = SortArrayInPlace(ARR_Objects,STR_SortBy, PT_SortRef)
+	Rhino.Print"Sort Completed..."
+	'just to test the order. a function to make labels.
+	Call MakeLabels (ARR_Objects)
+	
+End Sub
+
+
+
+'this is a bubble sort algorith 
+'it works like this
+'start from the o index in the list
+'loop to find the smallest value in the list in comparison to the index 0 in the list
+'swap both elements
+'then repeat again until finished from the list.
+Function SortArrayInPlace( objs,sortBy, sortRef)
+	Rhino.Print"Sorting elements..."
+	Dim i,j
+	Dim dblDistance,dblDistance2
+	Dim PT_Obj_Ref,PT_Obj2_Ref
+	Dim closest, closestIndex
+	Dim tmp, ref
+
+	For i = 0 To UBound( objs )
+		'find the reference point on element i based on the sorting method define by user
+		PT_Obj_Ref= GetRefPointOnObject(i, objs,sortBy, sortRef)
+		'measure distance between element i and sort reference
+		dblDistance = Rhino.Distance(PT_Obj_Ref, sortRef)
+		
+		'loop again to find if there is an element at index j with shortest distance in comparison to element at index i
+		For j = i To UBound(objs)
+			'get the point on the element
+			PT_Obj2_Ref= GetRefPointOnObject(j, objs,sortBy, sortRef)
+			'measure the distance
+			dblDistance2 = Rhino.Distance(PT_Obj2_Ref, sortRef)
+			
+			'we swap elements at index i and j if we found that element j is closer to the sort reference point than element i
+			If dblDistance2<dblDistance Then
+				dblDistance = dblDistance2
+				tmp= objs( i )
+				objs( i) = objs(  j )
+				objs( j ) = tmp
+			End If
+		Next
+	Next
+	
+	'the function returns the sorted array as a result.	
+	SortArrayInPlace=objs
+
+End Function
+
+
+Function GetRefPointOnObject(x, objs, sortBy, sortRef)
+	Dim Ref_Pt
+	'first we need to find the reference point on the object to measure distance from sort ref. point
+	Select Case sortBy
+		'if the method is define reference point on object via center. here are the special cases
+		Case "Centeroid"
+			If Rhino.IsCurve (objs(x)) And Rhino.IsCurveClosed(objs(x)) Then
+				Ref_Pt = Rhino.CurveAreaCentroid(objs(x))(0)	
+			ElseIf Rhino.IsCurve (objs(x)) And Not(Rhino.IsCurveClosed(objs(x))) Then
+				Ref_Pt = Rhino.CurveMidPoint(objs(x))				
+			ElseIf Rhino.IsPoint(objs(x)) Then
+				Ref_Pt = Rhino.PointCoordinates(objs(x))
+			ElseIf Rhino.IsSurface(objs(x)) Or Rhino.IsPolysurface(objs(x)) Then
+				Ref_Pt = Rhino.SurfaceAreaCentroid(objs(x))(0)					
+			End If
+		Case "ClosestPoint" 'this option will find the closes point on the object to the reference point, and use that to measure distance to sort ref. point
+			If Rhino.IsCurve (objs(x)) Then
+				Dim ptParm: ptParm = Rhino.CurveClosestPoint (objs(x), sortRef)
+				Ref_Pt = Rhino.EvaluateCurve(objs(x), ptParm)
+			ElseIf Rhino.IsPoint(objs(x)) Then
+				Ref_Pt = Rhino.PointCoordinates(objs(x))
+			ElseIf Rhino.IsSurface(objs(x)) Then
+				Dim uv: uv = Rhino.SurfaceClosestPoint(objs(x),sortRef)
+				Ref_Pt = Rhino.EvaluateSurface(objs(x), uv)
+			ElseIf Rhino.IsPolysurface(objs(x)) Then
+				Ref_Pt = Rhino.SurfaceAreaCentroid(objs(x))(0)
+			End If
+	End Select	
+	GetRefPointOnObject=Ref_Pt
+End Function
+
+
+
+
+'adds labels
+Function MakeLabels(ARR_Objects)
+	Rhino.EnableRedraw False
+	Dim i,pt
+	For i=0 To Ubound (ARR_Objects)
+		If Rhino.IsCurve(ARR_Objects(i)) Then
+			pt = Rhino.CurveMidPoint(ARR_Objects(i))
+		ElseIf Rhino.IsPoint(ARR_Objects(i)) Then
+			pt = Rhino.PointCoordinates(ARR_Objects(i))
+		Else
+			pt = Rhino.SurfaceAreaCentroid(ARR_Objects(i))(0)
+		End If
+		rhino.AddTextDot i, pt				
+	Next
+	Rhino.EnableRedraw True
+End Function

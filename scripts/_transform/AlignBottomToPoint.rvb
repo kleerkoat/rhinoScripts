@@ -1,0 +1,47 @@
+Option Explicit
+'Script written by Mitch
+'Script version Monday, August 31, 2009
+'Updated 9 September 2010
+'Aligns lowest point of objects to a point or Z Height
+
+'Call AlignBottomToPoint()
+
+Sub AlignBottomToPoint()
+	
+	Dim arrObjs, strObj, arrBB, dblZBB, dblZHt
+	Dim arrMoV, arrSPt, arrPObj, strUP
+	
+	Dim str1,str2,str3,str4,str5
+	str1="Select objects to align"
+	str2="Enter Z height or pick point to align to"
+	str3="PickPoint"
+	str4="PointOnObject"
+	str5="Pick point on object to align to"
+	
+	arrObjs=Rhino.GetObjects(str1,4+8+16+32,,True)
+	
+	strUP=Rhino.GetString(str2,str3,Array(str4))
+	If IsNull(strUP) Then Exit Sub
+	
+	If strUP=str4 Then
+		arrPobj=Rhino.GetObjectEx(str5,1+4+8+16+32,False)
+		If Not IsArray(arrPobj) Then Exit Sub		
+		arrSPt=arrPobj(3)
+		dblZHt=arrSpt(2)
+	ElseIf strUP=str3 Then
+		arrSPt=Rhino.GetPoint(str3)
+		If Not IsArray(arrSPt) Then Exit Sub		
+		dblZHt=arrSpt(2)
+	ElseIf IsNumeric(strUP) Then
+		dblZHt=Cdbl(strUP)
+	Else
+		Exit Sub		
+	End If
+
+	For each strObj in arrObjs		
+		arrBB=Rhino.BoundingBox(strObj)
+		dblZBB=arrBB(0)(2)
+		arrMoV=Array(0,0,(dblZHt-dblZBB))
+		Call Rhino.MoveObject(strObj,arrMoV)
+	Next	
+End Sub

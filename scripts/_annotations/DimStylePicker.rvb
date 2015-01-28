@@ -1,0 +1,32 @@
+
+'Copyright ©  Tobias Nagel   - 2005
+Option Explicit
+
+Sub DimStylePicker()
+Dim arrDimStyles, arrItems(), strItem, arrModes(), intItems, intCount, strCurrentStyle, intResult
+strCurrentStyle = Rhino.CurrentDimStyle
+arrDimStyles = Rhino.DimStyleNames
+Redim arrItems(Ubound(arrDimStyles)), arrModes(Ubound(arrDimStyles))
+intCount = 0
+For Each strItem In arrDimStyles
+If strItem = strCurrentStyle Then
+arrModes(intCount) = 2
+Else
+arrModes(intCount) = 0
+End If
+intCount = intCount + 1
+Next
+intCount = 0
+intResult = Rhino.PopupMenu(arrDimStyles, arrModes)
+For Each strItem In arrDimStyles
+If intResult = intCount Then
+Rhino.CurrentDimStyle arrDimStyles(intCount)
+Exit For
+End If
+intCount = intCount + 1
+Next
+If Not intResult = -1 Then
+Rhino.Command "! _Leader"
+End If
+End Sub
+

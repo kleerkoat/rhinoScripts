@@ -1,0 +1,22 @@
+ Option Explicit
+ 
+ Sub MarkCenterPoints()
+   Dim curves, crv, pt, arr
+   curves = Rhino.GetObjects("Select closed planar curves", 4, ,True)
+   If IsArray(curves) Then
+     Rhino.EnableRedraw False
+     For Each crv In curves
+       pt = vbNull
+       If Rhino.IsCircle(crv) Then
+         pt = Rhino.CircleCenterPoint(crv)
+       Else
+         arr = Rhino.CurveAreaCentroid(crv)
+         If IsArray(arr) Then pt = arr(0)
+       End If
+       If IsArray(pt) Then
+         Rhino.SelectObject Rhino.AddPoint(pt)
+       End If
+     Next        
+     Rhino.EnableRedraw True
+   End If
+ End Sub

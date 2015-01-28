@@ -1,0 +1,23 @@
+I will list the updates for you.
+
+ 
+
+Sniper no longer damages tank
+
+re-enabled host kick
+
+Flak does less damage vs hawk
+
+Flak respawn time increased
+
+Homer 50% harder to dodge
+
+Bruiser skill vs buildings reduced
+
+Grenade ammo pick up reduced  from 3 to 1
+
+Bigger home region size in ctf and tdm
+
+ 
+
+Done. 

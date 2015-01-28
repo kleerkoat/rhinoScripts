@@ -1,0 +1,67 @@
+! -_RunScript (
+Option Explicit
+
+Function Determinant(M)
+  ReDim N(16)
+  N( 0) = M(2,2) * M(3,3)
+  N( 1) = M(3,2) * M(2,3)
+  N( 2) = M(1,2) * M(3,3)
+  N( 3) = M(3,2) * M(1,3)
+  N( 4) = M(1,2) * M(2,3)
+  N( 5) = M(2,2) * M(1,3)
+  N( 6) = M(0,2) * M(3,3)
+  N( 7) = M(3,2) * M(0,3)
+  N( 8) = M(0,2) * M(2,3)
+  N( 9) = M(2,2) * M(0,3)
+  N(10) = M(0,2) * M(1,3)
+  N(11) = M(1,2) * M(0,3)
+  N(12)=N( 0)*M(1,1)+N( 3)*M(2,1)+N( 4)*M(3,1)-N( 1)*M(1,1)-N( 2)*M(2,1)-N( 5)*M(3,1)
+  N(13)=N( 1)*M(0,1)+N( 6)*M(2,1)+N( 9)*M(3,1)-N( 0)*M(0,1)-N( 7)*M(2,1)-N( 8)*M(3,1)
+  N(14)=N( 2)*M(0,1)+N( 7)*M(1,1)+N(10)*M(3,1)-N( 3)*M(0,1)-N( 6)*M(1,1)-N(11)*M(3,1)
+  N(15)=N( 5)*M(0,1)+N( 8)*M(1,1)+N(11)*M(2,1)-N( 4)*M(0,1)-N( 9)*M(1,1)-N(10)*M(2,1)
+  Determinant = M(0,0)*N(12)+M(1,0)*N(13)+M(2,0)*N(14)+M(3,0)*N(15)
+End Function
+
+
+Sub PartsReport
+  
+  Dim BlockNames, BlockName
+  Dim BlockInstances, BlockInstance
+  Dim BlockMatrix
+  Dim VolumeScaleFactor, Cost, TotalCost
+  Dim strFilename, strFilter, objFSO, objStream
+
+  strFilter = "Text File (*.txt)|*.txt|All Files (*.*)|*.*||"
+  strFilename = Rhino.SaveFileName("Save part report as", strFilter,"C:\","PARTS.TXT")
+  Set objFSO = CreateObject("Scripting.FileSystemObject")
+  Set objStream = objFSO.CreateTextFile(strFilename, True)
+
+  BlockNames = Rhino.BlockNames(vbTrue)
+  TotalCost = 0
+  If IsArray(BlockNames) Then
+    For Each BlockName In BlockNames
+      BlockInstances = Rhino.BlockInstances(BlockName)
+      If IsArray(BlockInstances) Then
+        For Each BlockInstance In BlockInstances
+          If Rhino.IsObjectSelected(BlockInstance) Then
+            BlockMatrix = Rhino.BlockInstanceXform(BlockInstance)
+            If IsArray(BlockMatrix) Then
+              VolumeScaleFactor = Abs(Determinant(BlockMatrix))
+              Cost = CalculateCost(BlockName,VolumeScaleFactor)
+              TotalCost = TotalCost + Cost
+              objStream.WriteLine(BlockName & ", " & Cost )
+            End If
+          End If
+        Next
+      End If
+    Next
+  End If
+  objStream.WriteLine(" ")
+  objStream.WriteLine(" Total Cost : " & TotalCost)
+  objStream.Close
+
+End Sub
+
+PartsReport
+
+)

@@ -1,0 +1,72 @@
+'--------------------------------------------------------------
+'Command   :  expib (Extend pipe both)
+'Date      :  2011/10/02
+'Version   :  α111002
+'Organization   :  Rhino+
+'--------------------------------------------------------------
+
+Sub ExtendPipeBoth()
+
+
+Dim arrObjects, dblLength,piperadias
+Dim arrTypes(1), strType ,intType
+
+
+arrObjects = Rhino.GetObjects("Select curves to extend",4,True,True)
+Rhino.CopyObjects arrObjects 
+
+If IsArray(arrObjects) Then
+
+piperadias = 5
+pipeRadius = Rhino.GetReal("Pipe radius",piperadias)
+If Not IsNull(pipeRadius) Then
+  
+dblLength = 50
+dblLength = Rhino.GetReal("Length to extend", dblLength)
+
+If Not IsNull(dblLength) Then
+
+arrTypes(0) = "Line"
+arrTypes(1) = "Smooth"
+
+strType = Rhino.GetString("Extend type",arrTypes(1) , arrTypes)
+
+Select Case strType
+Case "Line" realType = 0
+Case "Smooth" realType = 1
+End Select
+
+Rhino.EnableRedraw False  
+
+For Each strCurve In arrObjects
+
+If IsNull(strType) Then Exit Sub
+
+If Not IsNull(strCurve) Then
+
+If IsNumeric(dblLength) Then
+Rhino.ExtendCurveLength  strCurve,realType , 2, dblLength
+strObject = Rhino.firstObject
+
+
+Rhino.Command "! _-Pipe _SelID " & strObject & " _Cap=N " &  pipeRadius & " _Enter _Enter"
+
+End If
+
+End If
+
+Next
+
+pipe = Rhino.FirstObject
+Rhino.SelectObject pipe
+Rhino.DeleteObjects arrObjects
+
+
+End If
+End If
+End If
+
+Rhino.EnableRedraw True
+End Sub
+
+

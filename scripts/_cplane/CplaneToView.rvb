@@ -1,0 +1,35 @@
+
+'Script written by Pascal
+'Script version Thursday, August 06, 2009 
+
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+'Rhino.AddAlias "CplaneToView", "_NoEcho _-Runscript (CplaneToView)"
+'Rhino.AddAlias "CplaneToViewOrigin", "_NoEcho _-Runscript (CplaneToViewOrigin)"
+'orients the current cplane to the view without moving its origin.
+'Call CplaneToViewOrigin()
+Sub CplaneToView()
+	
+	Rhino.EnableRedraw(False) 
+	Spt = Rhino.Pt2Str(Rhino.ViewCPlane()(0),,True)
+	Rhino.Command "_noEcho _Cplane _View "
+	Rhino.Command "_noEcho _Cplane W" & spt
+	Rhino.EnableRedraw(True)
+	
+End Sub
+
+
+Sub CplaneToViewOrigin()
+	
+	aPt =Rhino.GetPoint ("Set cplane origin") 
+	
+	If  isArray(aPt) Then 
+		
+		Rhino.EnableRedraw(False)
+		Spt = Rhino.Pt2Str(apt,,True)
+		Rhino.Command "_noEcho _Cplane _View "
+		Rhino.Command "_noEcho _Cplane W" & spt
+		Rhino.EnableRedraw(True)
+		
+	End If
+	
+End Sub

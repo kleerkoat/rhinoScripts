@@ -1,0 +1,499 @@
+﻿Option Explicit
+'Script written by Pascal
+'Company: RMA
+'Script version Friday, August 17, 2007
+
+'Call Continue()
+	
+'ContinueCurve()
+'ContinuePolyline()
+'ContinueInterp()
+'ContinueEdge()
+
+
+Sub ContinueEdge
+	
+	Dim c : c = True
+	Rhino.Command "_DupEdge Pause _Enter "',False
+	
+	If Rhino.LastCommandResult= 0 Then
+		Dim sCrv :	sCrv = Rhino.FirstObject
+	Else Exit Sub
+	End If
+	
+	If isNull(sCrv) Then Exit Sub
+	
+	Dim aPt:	aPt = Rhino.GetPointOnCurve(sCrv,"Click on the curve near the end to extend")
+	If Not IsArray(aPt) Then Exit Sub
+	Dim Param: param = Rhino.CurveClosestPoint(sCrv,apt)
+	Dim aSetup : aSetup = CurveSetup(sCrv,param)
+	Dim intType : intType = 2
+	ContinueCrv  sCrv, intType, aSetup(0), aSetup(1),aSetup(2), aSetup(3),aSetup(4),C
+
+End Sub
+
+Sub Continue
+	Dim C : C = False
+	Dim intType
+	
+	Rhino.UnselectAllObjects
+	
+	Dim aCrv:aCrv = Rhino.GetCurveObject (" Select curve near the end to continue")	
+	If Not isArray(aCrv) Then Exit Sub	
+	
+	Dim sCrv:sCrv = aCrv(0)
+	If isNull(sCrv) Then Exit Sub
+	
+	Dim Param: param = aCrv(4)
+	
+	Dim sLayer : slayer = Rhino.ObjectLayer(sCrv)
+	Dim lngColor: lngColor = Rhino.ObjectColor(sCrv)
+	Dim aSetup : aSetUp = CurveSetup(sCrv, param)
+	Dim intCt : intCt = aSetup(0)
+	
+	If Rhino.IsPolyline(sCrv) Then 
+		intType = 1
+	ElseIf Rhino.IsPolyCurve(sCrv)Then
+		If Rhino.IsArc(sCrv,IntCt-1) Or Rhino.IsLine(sCrv,intCt-1) Then 
+			intType = 1
+		Else intType = 2
+		End If
+	
+	ElseIf Rhino.IsLine(sCrv) Or Rhino.IsArc(sCrv) Then
+		intType = 1	
+		
+	Else intType = 2	
+	End If
+	
+	
+	ContinueCrv  sCrv, intType, aSetup(0), aSetup(1),aSetup(2), aSetup(3),aSetup(4),C
+		
+End Sub
+
+
+Sub ContinuePolyline()'intType = 1
+	Dim C : C = False
+	Rhino.UnselectAllObjects
+	
+	Dim aCrv:	aCrv = Rhino.GetCurveObject (" Select curve near the end to continue")
+	
+	If Not isArray(aCrv) Then Exit Sub
+		
+	Dim sCrv:sCrv = aCrv(0)
+
+	If isNull(sCrv) Then Exit Sub
+	Dim Param: param = aCrv(4)
+	
+	Dim sLayer : slayer = Rhino.ObjectLayer(sCrv)
+	Dim lngColor: lngColor = Rhino.ObjectColor(sCrv)
+	
+	Dim aSetup : aSetUp = CurveSetup(sCrv, param)
+	Dim intType : intType = 1
+	ContinueCrv  sCrv, intType, aSetup(0), aSetup(1),aSetup(2), aSetup(3),aSetup(4),C
+	
+End Sub
+
+Sub ContinueCurve()'intType = 2
+	
+	Dim C : C = False
+
+	Rhino.UnselectAllObjects
+	Dim aCrv:	aCrv = Rhino.GetCurveObject (" Select curve near the end to continue")
+	If Not isArray(aCrv) Then Exit Sub
+	
+	Dim sCrv:sCrv = aCrv(0)
+	If isNull(sCrv) Then Exit Sub
+	
+	Dim Param: param = aCrv(4)
+	Dim sLayer : slayer = Rhino.ObjectLayer(sCrv)
+	Dim lngColor: lngColor = Rhino.ObjectColor(sCrv)
+	Dim aSetup : aSetUp = CurveSetup(sCrv, param)
+
+	Dim intType : intType = 2
+	ContinueCrv  sCrv, intType, aSetup(0), aSetup(1),aSetup(2), aSetup(3),aSetup(4),C
+	
+End Sub
+
+Sub ContinueInterp()'intType = 3 
+	Dim C : C = False
+	
+	Rhino.UnselectAllObjects
+	
+	Dim aCrv:	aCrv = Rhino.GetCurveObject (" Select curve near the end to continue")
+	If Not isArray(aCrv) Then Exit Sub
+	
+	Dim sCrv:	sCrv = aCrv(0)
+	If isNull(sCrv) Then Exit Sub
+	
+	Dim Param: Param = aCrv(4)
+	
+	Dim sLayer : slayer = Rhino.ObjectLayer(sCrv)
+	Dim lngColor: lngColor = Rhino.ObjectColor(sCrv)
+	
+	Dim aSetup : aSetUp = CurveSetup(sCrv, Param)
+	Dim intType : intType = 3
+	ContinueCrv  sCrv, intType, aSetup(0), aSetup(1),aSetup(2), aSetup(3),aSetup(4),C
+	
+End Sub
+
+Sub ContinueCrv(sCrv, intType, intCt, Plane, aEnd, sEnd, sDir, C)
+	
+	'CurveSetup  = array(IntCt,Plane, aEnd, sEnd, sDir)	
+		
+	Dim str  'the string to feed Rhino.Command
+	Dim aPts , aPtStr, intDeg
+	Dim strSnap :strSnap = " AlongLine " & sEnd &sDir
+	Dim A, B
+	
+	A = False ' switch to say whether to add a polyline and join (true) or
+	'make a new spline and delete the entire orignal(False)
+	
+	B = False' switch to say whther to replace the entire curve with a new curve
+	'or only the last segment of a polycurve when the extension is a control point curve.
+	
+	
+	'turn of drawing
+	Rhino.EnableRedraw(False)
+	
+	
+	
+	
+	'**************************************************************************
+	'Polyline curve extension, ContinuePolyline
+	'**************************************************************************
+	
+	
+	If intType = 1 Then 'Polyline extension
+		
+		If Rhino.IsLine(sCrv) Or Rhino.IsPolyline(sCrv) Then
+			
+			'if the curve is just a line, default the polyline to drawing lines
+			str = "_Polyline " & sEnd  & "_Mode=_Line "
+		
+		ElseIf Rhino.IsArc(sCrv) Then
+				
+			'if the curve is just an arc, default the polyline to drawing a tangent arc
+			str = "_Polyline " & sEnd  & "_Mode=_Arc _Direction " &sDir
+							
+		Else
+	
+			If Rhino.IsPolyCurve(sCrv) Then
+
+				If Rhino.IsArc(sCrv,IntCt-1) Then 
+			
+					'if the end segment is an arc, default the polyline to drawing a tangent arc
+					str = "_Polyline " & sEnd  & "_Mode=_Arc _Direction " &sDir
+				
+				ElseIf Rhino.IsLine(sCrv,IntCt-1) Then 
+				
+					'otherwise a line
+					str = "_Polyline " & sEnd  & "_Mode=_Line "
+
+				End If
+						
+			Else
+				
+				str = "_Polyline " & sEnd  & "_Mode=_Arc _Direction " &sDir
+				'	str = "_Polyline " & sEnd & "_Mode=_Line " 
+				
+			End If
+	
+		End If
+		A = True 'Join to the original curve, do not replace the original
+		
+		
+		
+		
+		'**************************************************************************
+		'Control Point Curve extension, ContinueCurve
+		'**************************************************************************
+		
+	ElseIf intType = 2 Then 
+		
+		'if the end segment is an arc, default the polyline to drawing a tangent arc
+		If C = True Then
+		
+			str = "_Curve " & 3 & " " &sEnd &strSnap		
+						
+		ElseIf Rhino.IsArc(sCrv) Or Rhino.IsLine(sCrv) Or Rhino.isPolyline(sCrv) Then
+			
+			'if the curve is just an arc, default the polyline to drawing a tangent arc
+			str = "_Curve " & 3 & " " &sEnd &strSnap
+			A = True
+		
+			
+			'If the curve is a polycurve but the last segment is a spline
+			'leave the curve alone except for the last segment, redraw that only.
+			
+		ElseIf Rhino.IsPolyCurve(sCrv) Then
+			
+			If Rhino.IsArc(sCrv,IntCt-1) Then 
+			
+				'if the end segment is an arc, default the polyline to drawing a tangent arc
+				aPts = Rhino.CurvePoints(sCrv,intCt-1)
+				aPtStr = GetPlanePointStrings(aPts, Plane)
+				intDeg = Rhino.CurveDegree(sCrv,intCt-1)
+				
+				str = "_Curve " & 3 & " " &sEnd &strSnap
+				A = True
+				
+			ElseIf Rhino.IsLine(sCrv,IntCt-1) Then 
+				
+				'otherwise a line
+				aPts = Rhino.CurvePoints(sCrv,intCt-1)
+				aPtStr = GetPlanePointStrings(aPts, Plane)
+				intDeg = Rhino.CurveDegree(sCrv,intCt-1)
+				
+				str = "_Curve " & 3 & " " &sEnd &strSnap
+				A = True
+			Else 
+			
+				aPts = Rhino.CurvePoints(sCrv, intCt-1)
+				aPtStr = GetPlanePointStrings(aPts, Plane)
+				intDeg = Rhino.CurveDegree(sCrv)
+				
+				str = "_Curve " & CStr(intDeg) & " " & Join(aPtStr)
+				B = True
+				
+			End If
+			
+		Else
+		
+			aPts = Rhino.CurvePoints(sCrv)
+			aPtStr = GetPlanePointStrings(aPts, Plane)
+			intDeg = Rhino.CurveDegree(sCrv)
+				
+			str = "_Curve " & CStr(intDeg) & " " & Join(aPtStr) 
+			A = False
+			
+		End If	
+		
+		'**************************************************************************
+		'InterpCrv curve extension, ContinueInterp
+		'**************************************************************************	
+		
+	ElseIf IntType = 3 Then
+		
+		
+		If Rhino.IsArc(sCrv) Or Rhino.IsLine(sCrv) Or Rhino.isPolyline(sCrv) Then
+			
+			'if the curve is just an arc, default the polyline to drawing a tangent arc
+			str = "_InterpCrv _Degree=3 _StartTangent " &sEnd &sDir
+			A = True
+		
+			
+			'If the curve is a polycurve but the last segment is a spline
+			'leave the curve alone except for the last segment, redraw that only.
+			
+		ElseIf Rhino.IsPolyCurve(sCrv) Then
+			
+			If Not Rhino.IsArc(sCrv,intCt-1) Or Rhino.isLine(Scrv,intCt-1) Then
+				aPts = Rhino.CurveEditPoints(sCrv,,intCt-1)
+			
+				aPtStr = GetPlanePointStrings(aPts, Plane)
+				intDeg = Rhino.CurveDegree(sCrv,intCt-1)
+				
+				str = "_InterpCrv " & CStr(intDeg) & " " & Join(aPtStr) 
+				B = True
+				
+			End If
+					
+		Else
+		
+			aPts = Rhino.CurveEditPoints(sCrv)
+			aPtStr = GetPlanePointStrings(aPts, Plane)
+			intDeg = Rhino.CurveDegree(sCrv)
+				
+			str = "_InterpCrv " & CStr(intDeg) & " " & Join(aPtStr)
+			A = False
+		End If	
+		
+	End If
+	
+	'turn on drawing to the viewport
+	Rhino.EnableRedraw(True)
+
+	If C = True Then A = True
+
+	'run the appropriate command string to for drawing
+	Rhino.Command str, False
+
+	If Rhino.LastCommandResult= 0 Then
+		'	Dim aNew: aNew  = Rhino.LastCreatedObjects
+		
+		'	If Not isarray(aNew) Then Exit Sub
+		'	Dim sNew : sNew = aNew(0)
+		Dim sNew : sNew = Rhino.FirstObject
+		'		Msgbox Ubound(anew)
+		
+		'		If Ubound(aNew)>0 Then
+		'			Dim  j
+		'			For j = 1 To Ubound(aNew)
+		'				Rhino.DeleteObject aNew(j)
+		'			Next
+		'		End If
+			
+			
+		If  isNull(sNew) Then Exit Sub
+
+		
+		Dim slayer : sLayer = Rhino.ObjectLayer(sCrv)
+		Dim lngColor: lngColor = Rhino.ObjectColor(sCrv)
+		
+		If A = True Then
+			'if the curve was not a spline or the extension is a polyline
+			'join the new polycurve or polyline to the orignal
+			Dim aNewCurve : aNewCurve = Rhino.JoinCurves (array(sCrv,sNew))
+				
+			'delete the orignals- asking JoinCurves to delete them seems not to be reliable
+			Rhino.Deleteobject sCrv
+			Rhino.DeleteObject sNew
+			Rhino.SimplifyCurve aNewCurve(0)
+					
+		ElseIf B = True Then
+				
+			Dim aCrvs : aCrvs = Rhino.ExplodeCurves(sCrv)
+			'	aCrvs =ReverseArray(ACrvs)
+			Rhino.DeleteObject sCrv
+				
+			If IsArray(aCrvs) Then
+				Dim aJoin(), n	
+	
+				Dim Bound: Bound = Ubound(aCrvs)
+				Rhino.DeleteObject aCrvs(Bound)
+				
+				For n = 0 To Bound-1
+					ReDim Preserve aJoin(n)
+					aJoin(n) = aCrvs(n)
+				Next
+					
+				Dim	aNewCrv : aNewCrv =	Rhino.JoinCurves(aJoin)
+				Dim sNewCurve :	sNewCurve = aNewCrv(0)
+				Rhino.DeleteObjects aJoin
+				Dim Result: Result = Rhino.JoinCurves (array(Snew, sNewCurve))
+				If isNull (result) Then Exit Sub
+				Rhino.ObjectLayer Result, sLayer
+				Rhino.ObjectColor Result, lngColor
+				Rhino.DeleteObject sNew
+				Rhino.DeleteObject sNewCurve	
+					
+			End If
+					
+		Else 
+			
+			'if the curve was a spline we drew a new one so delete the orignal
+			Rhino.ObjectLayer sNew, sLayer
+			Rhino.ObjectColor snew, lngColor
+			Rhino.DeleteObject sCrv
+				
+		End If
+
+	End If
+
+		
+End Sub
+
+Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+Rhino.addAlias "ContinuePolyline", "_NoEcho _-Runscript ContinuePolyline"
+Rhino.addAlias "ContinueCurve", "_NoEcho _-Runscript ContinueCurve"
+Rhino.addAlias "ContinueInterp", "_NoEcho _-Runscript ContinueInterp"
+Rhino.addAlias "ContinueEdge", "_NoEcho _-Runscript ContinueEdge"
+Rhino.addAlias "Continue", "_NoEcho _-Runscript Continue"
+
+Function GetPlanePointStrings(aPts, Plane)
+	'convert an array of points to strings
+	
+	Dim aPlanePt, strPlanePt,aOutput(), aPt, i
+	i = 0
+	
+	For Each aPt In apts
+		aPlanept = Rhino.XformWorldToCPlane(apt,plane)
+		strPlanePt = Rhino.Pt2Str(aPlanept,,True)
+		ReDim Preserve aOutput (i)
+		aOutput(i) = strPlanePt
+		i = i + 1
+	Next
+
+	GetPlanePointStrings = aOutput
+	
+End Function
+
+
+Function GetCurveDirectionPoint(sCrv, aEnd)
+	
+	'find the curve direction point at the end
+	Dim Plane : Plane = Rhino.ViewCplane
+	Dim aParam : aparam = Rhino.CurveDomain(sCrv)
+
+	Dim Dir : dir = Rhino.CurveEvaluate(sCrv,aParam(1),1)
+	Dim aDir : aDir  = dir(1)
+
+		
+	Dim dirPt: DirPt = Rhino.PointAdd(aEnd,aDir)
+
+	Dim aDirPlane :	aDirPlane = Rhino.XformWorldToCPlane(dirpt,Plane)
+	Dim sDir : sDir = Rhino.Pt2Str(aDirPlane,,True)
+	
+	
+	GetCurveDirectionPoint = sDir
+End Function
+
+
+Function CurveSetup(sCrv, param)
+	
+	
+	'get the curve mid point parameter
+	Dim aMid : aMid  = Rhino.CurveMidPoint(sCrv)
+	Dim MidParam : MidParam = Rhino.CurveClosestPoint(sCrv,aMid)
+	
+	'get the end of the curve to extend
+	'	Dim aExt : aExt = Rhino.GetPointOnCurve(sCrv, "Click near the end to extend")
+		
+	'	If isNull(aExt) Then Exit Function
+	
+	'get the parameter value of the pick point
+	'Dim ExtParam : ExtParam = Rhino.CurveClosestPoint(sCrv,aExt)
+	
+	'check if the end to be extended is the start of the curve
+	Dim ExtendStart : ExtendStart = False
+	
+	If Param < MidParam Then
+		ExtendStart = True
+	End If
+
+	'if so, flip the curve to it will extend from the end.
+	If ExtendStart = True Then
+		Rhino.ReverseCurve (sCrv)
+	End If
+	
+	'get the number of subcurves if it is a polycurve
+	Dim IntCt : IntCt = Rhino.PolyCurveCount(sCrv)
+	
+	'get the current cplane
+	Dim Plane : Plane = Rhino.ViewCplane
+	'get the curve end point
+	Dim aEnd : aEnd = Rhino.CurveEndPoint(sCrv)
+	
+	'convert to cplane coords
+	Dim aEndPlane : aEndPLane  = Rhino.XformWorldToCPlane(aEnd, Plane)
+	
+	'convert to a string
+	Dim sEnd : sEnd = Rhino.Pt2Str(aEndPlane,,True)
+
+	'find the curve tangent direction at the end to be extended
+	Dim sDir : sDir = GetCurveDirectionPoint(sCrv, aEnd)
+	
+	Dim aResult: aResult = array(IntCt,Plane, aEnd, sEnd, sDir)
+	
+	CurveSetup = aResult
+	
+End Function
+
+
+Function GetInterpPoints(sCrv)
+	
+	
+	
+	
+	
+End Function

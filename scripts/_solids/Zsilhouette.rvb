@@ -1,0 +1,26 @@
+'--------------------------------------------------------------
+'Command   :  zsil (Zsilhouette)
+'Date      :  2011/03/16
+'Version   :  2.0
+'Organization   :  Rhino+
+'--------------------------------------------------------------
+
+Option Explicit
+
+Sub Zsilhouette
+
+Dim strObjects
+
+strObjects = Rhino.GetObjects("Select surface and polysurface",8+16,True,True)
+If Not IsArray(strObjects) Then Exit Sub
+
+Rhino.EnableRedraw False
+
+Rhino.SelectObjects strObjects
+Rhino.Command "_NoEcho _SetView _CPlane _Top _Silhouette enter _UndoView"
+
+Rhino.EnableRedraw True
+
+End Sub
+
+zsil

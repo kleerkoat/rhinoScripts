@@ -1,0 +1,336 @@
+' ****************************** RhinoScript.org ******************************
+'
+'   Peristaltic Pipes, version 1.1
+'
+'   by Paolo Basso, published May 08, 2008
+'
+'
+'   Special multipipes... The initial aim was to make natural forms as muscles or plants.
+'   You can choose the form of the section, the range of the section radius and other parameters.
+'
+'
+'
+'
+'   This RhinoScript Tool has been downloaded from RhinoScript.org.
+'
+'   Rhino versions: Rhino 4
+'
+'   LICENSE INFORMATION:
+'   This script is published under the GNU General Public License, version 3
+'   or any later version, and thus comes WITHOUT ANY WARRANTY. You can get
+'   the complete license text here: www.rhinoscript.org/gpl
+'
+' ****************************** RhinoScript.org ******************************
+
+
+
+Option Explicit
+'Script written by Paolo Basso (www.scriptinarnasco.blogspot.com)
+'Script released under the Creative Commons Attribution-Share Alike 3.0
+'(http://creativecommons.org/licenses/by/3.0/legalcode)
+'Script version giovedÃ¬ 3 aprile 2008 11.19.57
+
+'Call PeristalticPipes()
+Sub PeristalticPipes()
+	Dim i,n
+	Dim Section,strType,Rmin,Rmax,PtsMin,PtsMax,startR,endR,start,endz
+	
+	Dim intLCID
+	' set the current locale to en-us to force usage of the comma seperator "."
+	intLCID = Rhino.LocaleID
+	SetLocale("en-us")
+	
+	Section = Rhino.GetDocumentData("Peristaltic Pipes", "Section")
+	If IsNull(Section) Then 
+		Section = "Circle" 
+		n=8
+	ElseIf CStr(strType)="Polygon" Then
+		Section=CStr(Section)
+		n=Rhino.GetDocumentData("Section","Number of segments")
+		If IsNull(n) Then	n = 4 Else n = int(n)
+	Else 
+		Section = CStr(Section)
+		n=8
+	End If
+		
+	strType = Rhino.GetDocumentData("Peristaltic Pipes", "Type")
+	If IsNull(strType) Then	strType = "Normal" Else strType = CStr(strType)
+	
+	Rmin = Rhino.GetDocumentData("Peristaltic Pipes", "Rmin")
+	If IsNull(Rmin) Then	Rmin = 0.8 Else Rmin = CDbl(Rmin)
+	
+	Rmax = Rhino.GetDocumentData("Peristaltic Pipes", "Rmax")
+	If IsNull(Rmax) Then	Rmax = 3 Else Rmax = CDbl(Rmax)
+	
+	PtsMin = Rhino.GetDocumentData("Peristaltic Pipes", "PtsMin")
+	If IsNull(PtsMin) Then	PtsMin = 5 Else PtsMin = int(PtsMin)
+	
+	PtsMax = Rhino.GetDocumentData("Peristaltic Pipes", "PtsMax")
+	If IsNull(PtsMax) Then	PtsMax = 30 Else PtsMax = int(PtsMax)
+	
+	start = Rhino.GetDocumentData("Peristaltic Pipes", "startR")
+	If IsNull(start) Then	start = "Random" Else start = CStr(start)
+	
+	startR = Rhino.GetDocumentData( "startR","Input")
+	If IsNull(startR) Then	startR = 0.8 Else startR = CDbl(startR)
+	
+	endz = Rhino.GetDocumentData("Peristaltic Pipes", "endR")
+	If IsNull(endz) Then	endz = "Random" Else endz = CStr(endz)
+	
+	endR = Rhino.GetDocumentData( "endR","Input")
+	If IsNull(endR) Then	endR = 0.8 Else endR = CDbl(endR)
+	 
+	Dim Ready,Result
+	Ready=0
+	Do While Ready = 0
+		Result = Rhino.GetString("Peristaltic Pipes", , Array("Section"&Section,"Rmin","Rmax","startR","endR","PtsMin"&PtsMin,"PtsMax"&PtsMax,"Type"&strType,"GO") )
+		If isnull(Result) Then Exit Sub
+		Select Case Result
+			Case "Section"&Section
+				Section = Rhino.GetString("Section", , Array("Circle","Ellipse","Polygon","Random") )
+				If IsNull(Section) Then Section = "Circle" 
+				Rhino.SetDocumentData "Peristaltic Pipes", "Section", Section
+				If Section="Polygon" Then
+					n=Rhino.GetDocumentData("Section","Number of segments")
+					If IsNull(n) Then	n = 4 Else n = int(n)
+					n= Rhino.GetInteger("Number of segments", n, 3 )
+					If IsNull(n) Then	n = 4
+					Rhino.SetDocumentData "Section", "Number of segments", n
+				Else
+					n=8
+				End If
+			Case "Rmin"
+				Rmin= Rhino.GetReal("Rmin", CDbl(Rmin),0.00001,CDbl(Rmax) )
+				If IsNull(Rmin) Then	Rmin = 0.8
+				Rhino.SetDocumentData "Peristaltic Pipes", "Rmin", CDbl(Rmin)
+			Case "Rmax"
+				Rmax= Rhino.GetReal("Rmax", CDbl(Rmax),CDbl(Rmin) )
+				If IsNull(Rmax) Then	Rmax = 3
+				Rhino.SetDocumentData "Peristaltic Pipes", "Rmax", CDbl(Rmax)
+			Case "startR"
+				start=Rhino.GetString("startR", , Array("Input","Random") )
+				If IsNull(start) Then start = "Random"
+				If start="Input" Then
+					startR= Rhino.GetReal("startR", CDbl(startR),CDbl(Rmin),CDbl(Rmax) )
+					If IsNull(startR) Then	startR = 0.8
+					Rhino.SetDocumentData "startR","Input", CDbl(startR)
+				End If
+				Rhino.SetDocumentData  "Peristaltic Pipes", "startR", CStr(start)
+			Case "endR"
+				endz=Rhino.GetString("endR", , Array("Input","Random") )
+				If IsNull(endz) Then endz = "Random"
+				If endz="Input" Then
+					endR= Rhino.GetReal("endR", CDbl(endR),CDbl(Rmin),CDbl(Rmax) )
+					If IsNull(endR) Then	endR = 0.8
+					Rhino.SetDocumentData  "endR","Input", CDbl(endR)
+				End If
+				Rhino.SetDocumentData "Peristaltic Pipes", "endR", CStr(endz)
+			Case "PtsMin"&PtsMin
+				PtsMin= Rhino.GetInteger("PtsMin", int(PtsMin),3,int(PtsMax) )
+				If IsNull(PtsMin) Then	PtsMin = 5
+				Rhino.SetDocumentData "Peristaltic Pipes", "PtsMin", int(PtsMin)
+			Case "PtsMax"&PtsMax
+				PtsMax= Rhino.GetInteger("PtsMax", int(PtsMax),int(PtsMin) )
+				If IsNull(PtsMax) Then	PtsMax = 30
+				Rhino.SetDocumentData "Peristaltic Pipes", "PtsMax", int(PtsMax)
+			Case "Type"&strType
+				strType = Rhino.GetString("Type", , Array("Normal","Loose","Straight","Tight","Developable") )
+				If IsNull(strType) Then	strType = "Normal"
+				Rhino.SetDocumentData "Peristaltic Pipes", "Type", strType
+			Case "GO"
+				Ready=1
+		End Select
+	Loop
+		
+	
+	Dim crvs : crvs = Rhino.GetObjects("Select curves to pipe...", 4, False, True)
+	If IsNull(crvs) Then Exit Sub
+	Call Rhino.EnableRedraw(False)
+	For i=0 To UBound(crvs)
+		Call peristalticPipe(crvs(i),Section,n,Rmin,Rmax,start,endz,startR,endR,PtsMin,PtsMax,strType)	
+	Next
+	Call Rhino.EnableRedraw(True)
+End Sub
+
+Function peristalticPipe(crv,section,n,Rmin,Rmax,start,endz,startR,endR,PtsMin,PtsMax,strType)
+	peristalticPipe=Null	
+	Dim i,j
+	Dim domain:domain = Rhino.CurveDomain (crv)
+	Dim l:l=Rhino.CurveLength (crv)
+	'Dim rangeR:rangeR=Array((l/100,l/40))
+	Dim rangeR:rangeR=Array(Rmin,Rmax)
+	'Dim arrPnts:arrPnts = Rhino.CurveEditPoints(crv)
+	'Dim rangePts:rangePts=Array(UBound(arrPnts)*4,UBound(arrPnts)*6)
+	Dim rangePts:rangePts=Array(PtsMin,PtsMax)
+	Dim nPts:nPts=0
+	Do While nPts<rangePts(0) 
+		nPts=int(Rnd*(rangePts(1)+1))
+	Loop
+	nPts=nPts-1
+	Dim pt(),plane(),x(),circle(),sortedCircle(),ellipse(),sortedEllipse(),polygon(),sortedPolygon(),rndSection()
+	ReDim pt(nPts)
+	ReDim plane(nPts)
+	ReDim x(nPts)
+	ReDim circle(nPts)
+	ReDim sortedCircle(nPts)
+	ReDim ellipse(nPts)
+	ReDim sortedEllipse(nPts)
+	ReDim polygon(nPts)
+	ReDim sortedPolygon(nPts)
+	ReDim rndSection(nPts)
+	Dim vertex,pts()
+	Dim R:R=0
+	Dim R1:R1=0
+		Dim crvCurvature, crvPoint, crvTangent, crvPerp, crvNormal
+	For i = 0 To nPts
+		If section="Random" Then
+			n=2
+			Do While n<3 Or n>8
+				n=Fix(Rnd*7)
+			Loop 
+		End If 
+		'pt(i)=Rhino.EvaluateCurve (crv, (domain(1)*Rnd))
+		If Rmin=Rmax Then
+			R=Rmin
+		Else
+			Do While R<rangeR(0) 
+				R=Rnd*rangeR(1)	
+			Loop
+			Do While R1<rangeR(0) 
+				R1=Rnd*rangeR(1)	
+			Loop	
+		End If
+		
+		If i=0 Then 
+			x(i)=domain(0)
+			crvCurvature = Rhino.CurveCurvature(crv, x(i))
+			plane(i)= Rhino.CurvePerpFrame(crv,x(i))
+			If isnull(plane(i)) Then
+				If isnull(crvCurvature) Then
+					Call rhino.Print("0")
+					crvPoint = Rhino.EvaluateCurve(crv, x(i))
+					crvTangent = Rhino.CurveTangent(crv, x(i))
+					crvPerp = Array(0,0,1)
+					crvNormal = Rhino.VectorCrossProduct(crvTangent, crvPerp)
+					plane(i)= Rhino.PlaneFromFrame(crvPoint, crvPerp, crvNormal)
+				Else
+					crvPoint = crvCurvature(0)
+					crvTangent = crvCurvature(1)
+					crvPerp = Rhino.VectorUnitize(crvCurvature(4))
+					crvNormal = Rhino.VectorCrossProduct(crvTangent, crvPerp)
+					plane(i)= Rhino.PlaneFromFrame(crvPoint, crvPerp, crvNormal)
+				End If	
+			End If
+			If start="Input" Then
+				R=startR
+				R1=startR/2				
+			End If		
+		ElseIf i=nPts Then 
+			x(i)=domain(1)
+			crvCurvature = Rhino.CurveCurvature(crv, x(i))
+			plane(i)= Rhino.CurvePerpFrame(crv,x(i))
+			If isnull(plane(i)) Then
+				If isnull(crvCurvature) Then
+					Call rhino.Print("1")
+					crvPoint = Rhino.EvaluateCurve(crv, x(i))
+					crvTangent = Rhino.CurveTangent(crv, x(i))
+					crvPerp = Array(0,0,1)
+					crvNormal = Rhino.VectorCrossProduct(crvTangent, crvPerp)
+					plane(i)= Rhino.PlaneFromFrame(crvPoint, crvPerp, crvNormal)
+				Else
+					crvPoint = crvCurvature(0)
+					crvTangent = crvCurvature(1)
+					crvPerp = Rhino.VectorUnitize(crvCurvature(4))
+					crvNormal = Rhino.VectorCrossProduct(crvTangent, crvPerp)
+					plane(i)= Rhino.PlaneFromFrame(crvPoint, crvPerp, crvNormal)
+				End If		
+			End If
+			If endz="Input" Then
+				R=endR
+				R1=endR/2
+			End If
+		Else 
+			Do 
+				x(i)=domain(1)*Rnd
+				If x(i)>domain(0) And x(i)<domain(1) Then Exit Do
+			Loop
+			crvCurvature = Rhino.CurveCurvature(crv, x(i))
+			plane(i)= Rhino.CurvePerpFrame(crv,x(i))
+			If isnull(plane(i)) Then
+				If isnull(crvCurvature) Then
+					Call rhino.Print("rnd")
+					crvPoint = Rhino.EvaluateCurve(crv, x(i))
+					crvTangent = Rhino.CurveTangent(crv, x(i))
+					crvPerp = Array(0,0,1)
+					crvNormal = Rhino.VectorCrossProduct(crvTangent, crvPerp)
+					plane(i)= Rhino.PlaneFromFrame(crvPoint, crvPerp, crvNormal)
+				Else
+					crvPoint = crvCurvature(0)
+					crvTangent = crvCurvature(1)
+					crvPerp = Rhino.VectorUnitize(crvCurvature(4))
+					crvNormal = Rhino.VectorCrossProduct(crvTangent, crvPerp)
+					plane(i)= Rhino.PlaneFromFrame(crvPoint, crvPerp, crvNormal)
+				End If
+			End If
+		End If
+		Call rhino.Print("")
+		'Call rhino.Print(pt2str(crvpoint))
+		'Call rhino.Print(pt2str(crvtangent))
+		'Call rhino.Print(pt2str(crvperp))
+		'Call rhino.Print(pt2Str(crvnormal))
+		'Call rhino.Print("")
+		'If i=nPts Then R=Rhino.CircleRadius (circle(0))
+		circle(i)= Rhino.AddCircle(plane(i),R)
+		ellipse(i)=Rhino.AddEllipse(plane(i),R,R1)
+		R=R1=0
+
+		vertex = Rhino.DivideCurve(circle(i), n)
+			ReDim pts(UBound(vertex)+1)
+			For j=0 To UBound(vertex)+1
+				If j=UBound(vertex)+1 Then 
+					pts(j)=vertex(0)
+				Else
+					pts(j)=vertex(j)	
+			End If
+			Next
+			polygon(i)=Rhino.AddPolyline (pts)
+
+	Next
+	Dim y:y = Rhino.SortNumbers(x, True)
+	For i=0 To nPts
+		For j=0 To nPts
+			If y(i)=x(j) Then
+				sortedCircle(i)=circle(j)
+				sortedPolygon(i)=polygon(j)
+				sortedEllipse(i)=ellipse(j)
+			End If
+		Next
+		If Fix(Rnd*3)=0 Then
+			rndSection(i)=sortedCircle(i)
+		ElseIf Fix(Rnd*3)=1 then
+			rndSection(i)=sortedPolygon(i)
+		Else
+			rndSection(i)=sortedEllipse(i)
+		End If	
+	Next
+	Dim intType
+	Select Case strType
+		Case "Normal"
+			intType=0
+		Case "Loose"
+			intType=1
+		Case "Straight"
+			intType=2
+		Case "Tight"
+			intType=3
+		Case "Developable"
+			intType=4
+	End Select
+	If section="Circle" Then peristalticPipe= Rhino.AddLoftSrf(sortedCircle,,,intType)
+	If section="Ellipse" Then peristalticPipe= Rhino.AddLoftSrf(sortedEllipse,,,intType)
+	If section="Polygon" Then peristalticPipe= Rhino.AddLoftSrf(sortedPolygon,,,intType)
+	If section="Random" Then peristalticPipe= Rhino.AddLoftSrf(rndSection,,,intType)
+	Call Rhino.DeleteObjects(circle)
+	Call Rhino.DeleteObjects(polygon)
+	Call Rhino.DeleteObjects(ellipse)
+End Function

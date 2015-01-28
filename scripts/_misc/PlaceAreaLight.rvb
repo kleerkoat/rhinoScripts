@@ -1,0 +1,684 @@
+Option Explicit
+	Private oldSize
+If IsEmpty(oldSize) Then
+	oldSize = 10
+End If
+ 
+Sub PlaceAreaLight()
+	'Places a square rectangular light by asking for size, target point 
+	'and center of rectangle. Plane is oriented to light towards the target point/
+	'4 point objects are added and grouped to the light- these re used later 
+	'as handles For adjusing the light.
+ 
+ 
+	Dim  strLine, strPt, strCircle, arrBB, arrBBBase, dblSize
+	Dim arrPlacement, arrSel, strArea, arrForPoints, arrHandlePoints
+ 
+	'get the size of the light
+	dblSize = Rhino.getReal("Light size" , OldSize, .01) 
+ 
+	If IsNumeric(dblSize) Then
+		oldSize = dblSize
+	Else Exit Sub
+	End If
+ 
+	'get the target and light locations
+	arrPlacement =   Rhino.GetPoints(True,, "Light target", "Center of rectangle", 2)
+	If Not IsUpperBound(arrPlacement) Then'Or  UBound(arrPlacement)<> 1 Then
+		Exit Sub
+	End If
+ 
+	'Draw a line from target to light point  
+	Rhino.EnableRedraw(False)
+	strLine =  Rhino.addLine (arrPlacement(1), arrPlacement(0))
+ 
+	'get a plane from the  start point of the line.
+	Dim Plane 
+	Plane = Rhino.CurvePerpFrame(strLine, 0)
+	Rhino.DeleteObject strLine
+ 
+	Dim arrPlane(3)
+	arrPlane(0) = Plane(0)
+	arrPlane(1) = Rhino.pointAdd (plane(0), plane(1))
+	arrPlane(2) = Rhino.pointAdd (plane(0), plane(2))
+	arrPlane(3) = Rhino.pointAdd (plane(0), plane(3))
+ 
+	'Set a cplane to the line
+	Rhino.Command "_Cplane _3Point W" & Rhino.Pt2Str(arrPlane(0)) &" W" _
+		& Rhino.Pt2Str(arrPlane(1)) &" W" & Rhino.Pt2Str(arrPlane(2)) &" _Enter"
+ 
+	'Make a circle on the origin of the new plane and
+	'get its Cplane aligned bounding box in CPlane coordinates
+ 
+	If Rhino.LastCommandResult = 0 Then
+		Dim View, arrBBW, arrBBBaseW
+		View = Rhino.CurrentView
+'		strCircle = Rhino.AddCircle (Plane, .5*dblSize)
+     strCircle = Rhino.AddCircle (Plane, dblSize/2)'TEST for Micha
+		arrBB = Rhino.BoundingBox (strCircle, View , False)
+		arrBBW = Rhino.BoundingBox (strCircle, View)
+		Rhino.DeleteObject strCircle 
+ 
+		'Get the 3 points needed to define the rectangular light
+		arrBBBase = Array(arrBB(0), arrBB(1), arrBB(2))
+		arrBBBaseW = Array(arrBBW(0), arrBBW(1), arrBBW(2))
+	Else
+		Rhino.Command "_Cplane _Previous "
+		Rhino.EnableRedraw(True)
+		Exit Sub
+	End If
+ 
+	'Make the light
+	Rhino.Command "_RectangularLight " & Rhino.Pt2Str(arrBBBase(2)) &" " _
+		& Rhino.Pt2Str(arrBBBase(1)) &" " _
+		& Rhino.Pt2Str(arrBBBase(0)) &" _Enter"
+ 
+	If Rhino.LastCommandResult = 0 Then
+		Rhino.UnselectAllObjects
+		Rhino.Command "_SelLast"
+		arrSel = Rhino.SelectedObjects(True)
+		If isUpperBound(arrSel) Then
+  		Rhino.UnselectAllObjects
+  		strArea = arrSel(0)
+  		Else Exit Sub
+		End If
+	End If
+ 
+	'Get the mid point of two sides of the bounding box and light  
+	Dim arrhandles(1)
+	arrHandles(0) = AveragePoints(Array(arrBBW(0),arrBBW(1)))
+	arrHandles(1) = AveragePoints(Array(arrBBW(0),arrBBW(3)))
+ 
+	'Add the point objects
+	arrForPoints = Rhino.joinArrays (arrPlacement, arrHandles)
+	If IsArray(arrForPoints) Then
+		arrHandlePoints = Rhino.addPoints(arrForPoints)   
+	End If
+ 
+	'organize the attribute data to add to the points
+	Dim strEntry, strSection, arrEntries, arrData
+	strSection = "AreaLightHandles"
+	arrEntries = Array("Target", "Center", "Handle1", "Handle2", "Light") 
+	arrData = Array(arrHandlePoints(0), arrHandlePoints(1),arrHandlePoints(2), arrHandlePoints(3), strArea)
+	' add the attribute data
+	For Each strPt In arrData
+		Dim p 
+		p = 0
+		For Each strEntry In arrEntries
+			Rhino.SetAttributeData strPt, strSection, arrEntries(p), ArrData(p)
+			p =  p+ 1
+		Next 
+	Next
+ 
+	'create a group and add the points and light to the group
+	Dim strGroup, arrAdd  
+	strGroup = Rhino.AddGroup
+	arrAdd = Array(arrHandlePoints(0), arrHandlePoints(1), arrHandlePoints(2),arrHandlePoints(3),strArea)
+	Rhino.AddObjectsToGroup  arrAdd, strGroup
+ 
+	'reset the cplane  
+	Rhino.Command "_Cplane _Previous "
+ 
+	Rhino.EnableRedraw(True)
+ 
+End Sub
+ 
+ 
+'////////////////////////////
+'\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+ 
+ 
+'scale1d an 'custom' (made with PlaceAreaLight)
+'area light In its plane or normal To its plane.
+ 
+Sub ResizeAreaLight
+	Dim Check, strPoint, arrCen, strCen, strRef
+	Dim arrPoint, strMessage, strArea
+ 
+	Dim q
+	q=0
+	Do
+ 
+		If q<1 Then
+			strMessage = "Area light point to adjust"
+		Else strMessage = "Area light point to adjust. Press Enter to accept"
+		End If
+ 
+		'Get the point to adjust
+		strPoint = Rhino.GetObject (strMessage,1,, True)
+		If IsNull(strPoint) Then
+			Exit Sub
+		End If
+ 
+		'Make sure there is an rectangular light associated with the point
+		If Rhino.IsAttributeData(strPoint) Then
+			check = Rhino.GetAttributeData(strPoint, "AreaLighthandles")
+		Else 
+			MsgBox "This point does not have the needed data to adjust a light. Please pick a point attached to a rectangular light."
+			Exit Sub
+		End If
+ 
+		'Get the rectangular light and the other associated points from the point attribute data. 
+		If Not IsNull(check) Then
+			If q<1 Then 
+				Dim arrHandles(3)
+				arrhandles(0) =  Rhino.GetAttributeData(strPoint, "AreaLightHandles", "Center")
+				arrhandles(1) = Rhino.GetAttributeData(strPoint, "AreaLightHandles", "Target")
+				arrhandles(2) = Rhino.GetAttributeData(strPoint, "AreaLightHandles", "Handle1")
+				arrhandles(3) = Rhino.GetAttributeData(strPoint, "AreaLightHandles", "Handle2")
+			End If
+			strArea = Rhino.GetAttributeData(strPoint, "AreaLightHandles", "Light")
+		End If
+ 
+		'Check that the rectagular light referenced by the points actually exists.
+		If Not IsLight(strArea) Then
+			MsgBox "The light attached to this point no longer exists."
+			Exit Sub
+		End If
+ 
+		'let the user reselect points     
+		If strPoint  = arrHandles(0) Or strPoint  = arrHandles(1)  Then
+			Do
+				MsgBox "Please select an edge  point to resize the light"
+				strPoint = Rhino.GetObject ("Area light point to adjust",1,, True)
+			Loop Until IsNull(strPoint) Or strPoint = arrhandles(2) Or strPoint = arrhandles(3)
+		End If
+ 
+		arrPoint = Rhino.PointCoordinates(strPoint)
+ 
+		'Determine if the centerpoint has been selected
+		' and get the point coordinates
+		If strPoint = arrHandles(0) Then
+			arrCen = Rhino.PointCoordinates(arrHandles(1))
+		Else
+			arrCen = Rhino.PointCoordinates(arrHandles(0))
+		End If
+ 
+		' get the Cplane coordinates so they can be fed to Rhino.Command 
+		Dim Plane:Plane = Rhino.ViewCPlane
+		Dim arrCenPlane:arrCenPlane = XFormWorldToCplane(arrCen, Plane)
+		Dim arrPointPlane:arrPointPlane = XformWorldToCplane(arrPoint,Plane)
+		
+ 
+		strCen = Rhino.Pt2Str(arrCenPlane)
+		strRef = Rhino.pt2str(arrPointPlane)
+ 
+		'Scale the light and points  
+		Rhino.UnselectAllObjects
+		Rhino.SelectObject strArea
+		Rhino.SelectObjects arrHandles
+		Rhino.Command "_Scale1d " &strCen & " " &strRef &" "
+		Rhino.UnselectAllObjects
+ 
+		q = q+1
+ 
+	Loop Until IsNull(strPoint)
+ 
+End Sub
+ 
+ 
+'////////////////////////////
+'\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+ 
+Sub SlideAreaLight
+	Dim Check, strPoint, arrCen, strCen, arrPoint, strArea, strRef
+	Dim strMessage, arrCenPlane, arrPointPlane
+	Dim q
+	q=0
+ 
+	Do
+		If q<1 Then
+			strMessage = "Area light point to adjust"
+		Else strMessage = "Area light point to adjust. Press Enter to accept"
+		End If
+ 
+		'The user selects the point to adjust    
+		strPoint = Rhino.GetObject (strMessage,1,, True)
+		If IsNull(strPoint) Then
+			Exit Sub
+		End If
+ 
+		'make sure there is an rectangular light associated with the point
+		If Rhino.IsAttributeData(strPoint) Then
+			check = Rhino.GetAttributeData(strPoint, "AreaLighthandles")
+		Else 
+			MsgBox "This point does not have the needed data to adjust a light. Please pick a point attached to a rectangular light."
+			Exit Sub
+		End If
+ 
+		'Get the rectangular light and and other associated points. 
+		If Not IsNull(check) Then
+			If q<1 Then 
+				Dim arrHandles(3)
+				arrhandles(0) =  Rhino.GetAttributeData(strPoint, "AreaLightHandles", "Center")
+				arrhandles(1) = Rhino.GetAttributeData(strPoint, "AreaLightHandles", "Target")
+				arrhandles(2) = Rhino.GetAttributeData(strPoint, "AreaLightHandles", "Handle1")
+				arrhandles(3) = Rhino.GetAttributeData(strPoint, "AreaLightHandles", "Handle2")
+			End If
+		End If
+		strArea = Rhino.GetAttributeData(strPoint, "AreaLightHandles", "Light")   
+ 
+		'Check that the rectagular light referenced by the points actually exists.
+		If Not IsLight(strArea) Then
+			MsgBox "The light attached to this point no longer exists."
+			Exit Sub
+		End If
+ 
+ 
+		'check if the target point has been selected    
+		If strPoint  = arrHandles(1) Then
+			Do
+				MsgBox "Please select an edge or center point to slide the light"
+				strPoint = Rhino.GetObject ("Area light point to adjust",1,, True)
+			Loop Until IsNull(strPoint) Or strPoint = arrhandles(2) Or strPoint = arrhandles(3)
+		End If
+ 
+		arrPoint = Rhino.PointCoordinates(strPoint)
+ 
+		'Determine if the center or target point has been selected
+		'get the point  coordinates 
+		If strPoint = arrHandles(0) Then
+			arrCen = Rhino.PointCoordinates(arrHandles(1))
+		Else
+			arrCen = Rhino.PointCoordinates(arrHandles(0))
+		End If
+ 
+ 
+		'get the Cplane coordinates so they can be fed to
+		'Rhino.Command 
+		Dim Plane:Plane = Rhino.ViewCPlane
+		arrCenPlane = XFormWorldToCplane(arrCen, Plane)
+		arrPointPlane = XformWorldToCplane(arrPoint,Plane)
+ 
+		strCen = Rhino.Pt2Str(arrCenPlane)
+		strRef = Rhino.pt2str(arrPointPlane)
+ 
+		If strPoint = ArrHandles(0) Then
+ 
+			'Scale the light and points      
+			Rhino.UnselectAllObjects
+			Rhino.SelectObject strArea
+			Rhino.SelectObjects arrHandles
+			Rhino.Command "_Scale1d " &strCen & " " &strRef &" "
+ 
+		Else
+ 
+			'Move the light and points       
+			Rhino.UnselectAllObjects
+			Rhino.SelectObject strArea
+			Rhino.SelectObjects arrHandles
+			Rhino.Command "_Move " &strRef & " AlongLine " &StrRef &" " &strCen &" "
+		End If
+ 
+		Rhino.UnselectAllObjects
+ 
+		q = q+1
+ 
+	Loop Until IsNull(strPoint)
+ 
+End Sub
+ 
+ 
+'////////////////////////////
+'\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+ 
+ 
+Sub OrientAreaLight
+ 
+ 
+	Dim Check, strPoint, arrCen, arrPoint, strArea, strSphere, arrHandlePlane
+ 
+	Dim q
+	q = 0
+ 
+ 
+	Do
+		If q<1 Then
+			Dim strMessage:	strMessage =  "Area light point to adjust"
+		Else strMessage = "Area light point to adjust. Press Enter to accept"
+		End If
+ 
+ 
+		strPoint = Rhino.GetObject ("Area light point to adjust",1,, True)
+		If IsNull(strPoint) Then
+			Exit Sub
+		End If
+ 
+		If Rhino.IsAttributeData(strPoint) Then
+			Check = Rhino.GetAttributeData(strPoint, "AreaLighthandles")
+		Else 
+			MsgBox "This point does not have the needed data to adjust a light. Please pick a point attached to a rectangular light."
+			Exit Sub
+		End If
+ 
+ 
+		If Not IsNull(Check) Then
+			If q<1 Then
+				Dim arrHandles(3)
+				arrhandles(0) = Rhino.GetAttributeData(strPoint, "AreaLightHandles", "Target")
+				arrhandles(1) = Rhino.GetAttributeData(strPoint, "AreaLightHandles", "Center")
+				arrhandles(2) = Rhino.GetAttributeData(strPoint, "AreaLightHandles", "Handle1")
+				arrhandles(3) = Rhino.GetAttributeData(strPoint, "AreaLightHandles", "Handle2")
+ 
+			End If
+			strArea = Rhino.GetAttributeData(strPoint, "AreaLightHandles", "Light")
+ 
+ 
+			If Not IsLight(strArea) Then
+				MsgBox "The light attached to this point no longer exists."
+				Exit Sub
+			End If
+ 
+		End If
+ 
+		Dim A 
+		A = False
+ 
+		If strPoint = arrHandles(0) Then
+			arrCen = Rhino.PointCoordinates(arrHandles(1))
+			arrPoint = Rhino.PointCoordinates(arrHandles(0))
+			A = True
+		ElseIf strPoint = arrhandles(1) Then
+			arrCen = Rhino.PointCoordinates(arrHandles(0))
+			arrPoint = Rhino.PointCoordinates(arrHandles(1))
+		ElseIf strPoint = arrhandles(2) Or strPoint = arrHandles(3) Then
+			TiltAreaLight strArea,arrHandles, strPoint
+		End If
+ 
+		If strPoint = arrHandles(0) Or strPoint = arrHandles(1) Then
+			Dim Plane:Plane = Rhino.ViewCPlane
+			Dim arrCenplane : arrCenPlane = XFormWorldToCplane(arrCen, Plane)
+			Dim arrPointPlane : arrPointPlane = XformWorldToCplane(arrPoint,Plane)
+ 
+			Dim strCen: strCen = Rhino.Pt2Str(arrCenPlane)
+			Dim strRef: strRef = Rhino.pt2str(arrPointPlane)
+ 
+ 
+			If A = False Then
+				Rhino.Command "_Sphere "& strCen & " " & strRef &" "
+ 
+				If Rhino.LastCommandResult = 0 Then
+					strSphere = Rhino.FirstObject
+					Rhino.UnselectAllObjects
+					Rhino.SurfaceIsocurveDensity strSphere , -1
+					Rhino.SelectObject strSphere
+					' Rhino.Command "_SetObjectDisplayMode Mode=Ghosted "
+				Else Exit Sub
+				End If
+ 
+				Rhino.UnselectAllObjects
+				Rhino.SelectObject strArea
+				Rhino.SelectObjects arrHandles
+				Rhino.Command "_Orient _Copy=No _Scale=None " &strCen & " " &strRef &" " _
+					& strCen & " " &"Onsrf _SelID " &strSphere 
+				Rhino.DeleteObject strSphere
+ 
+			Else
+ 
+				Rhino.UnselectAllObjects
+				Rhino.SelectObject strArea
+				Rhino.SelectObjects arrHandles
+				Rhino.Command "_Orient _Copy=No _Scale=1d " &strCen & " " &strRef &" " _
+					& strCen & " "
+ 
+			End If
+		End If
+ 
+		q = q +1
+		Rhino.UnselectAllObjects
+	Loop Until IsNull(strPoint)
+ 
+End Sub
+ 
+ 
+'////////////////////////////
+'\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+ 
+Sub RotateAreaLight
+ 
+ 
+	Dim Check, strPoint, arrPoint, arrHandle, strHandle, strArea
+	Dim arrAxis1, strAxis1, arrAxis2, strAxis2
+	Dim strMessage
+ 
+ 
+ 
+	Dim q: q = 0
+ 
+	Do
+		If q<1 Then
+			strmessage =  "Area light point to adjust"
+		Else strMessage = "Area light point to adjust. Press Enter to accept"
+		End If
+ 
+		'The user selects the point to adjust   
+		strPoint = Rhino.GetObject ("Area light point to adjust",1,, True)
+		If IsNull(strPoint) Then
+			Exit Sub
+		End If
+ 
+		'Make sure there is an rectangular light associated with the point 
+		If Rhino.IsAttributeData(strPoint) Then
+			check = Rhino.GetAttributeData(strPoint, "AreaLighthandles")
+		Else 
+			MsgBox "This point does not have the needed data to adjust a light. Please pick a point attached to a rectangular light."
+			Exit Sub
+		End If
+ 
+		'Get the rectangular light and and other assocoated points.    
+		If Not IsNull(Check) Then 
+			If q<1 Then
+				Dim arrHandles(3)
+				arrhandles(0) =  Rhino.GetAttributeData(strPoint, "AreaLightHandles", "Target")
+				arrhandles(1) = Rhino.GetAttributeData(strPoint, "AreaLightHandles", "Center")
+				arrhandles(2) = Rhino.GetAttributeData(strPoint, "AreaLightHandles", "Handle1")
+				arrhandles(3) = Rhino.GetAttributeData(strPoint, "AreaLightHandles", "Handle2")
+			End If
+			strArea = Rhino.GetAttributeData(strPoint, "AreaLightHandles", "Light")
+		End If
+ 
+		'Check that the rectagular light referenced by the points actually exists.
+		If Not IsLight(strArea) Then
+			MsgBox "The light attached to this point no longer exists."
+			Exit Sub
+		End If
+ 
+		'check if the target or center point has been selected   
+		If strPoint = arrHandles(0) Or strPoint = arrhandles(1) Then
+			Do
+				MsgBox "Please select an edge point to rotate the light"
+				strPoint = Rhino.GetObject ("Area light point to adjust",1,, True)
+			Loop Until IsNull(strPoint) Or strPoint = arrhandles(2) Or strPoint = arrhandles(3)
+		End If
+ 
+		'Get the point coordinates  
+		arrHandle = Rhino.PointCoordinates(strPoint)
+		arrAxis1 = Rhino.PointCoordinates(arrHandles(1))
+ 
+		'Decide which points to use as a rotation axis      
+		If strPoint = arrHandles(2) Then
+			arrAxis2 = Rhino.PointCoordinates(arrHandles(3))    
+		Else
+			arrAxis2 = Rhino.PointCoordinates(arrHandles(2))
+		End If
+ 
+		'get the Cplane coordinates so they can be fed to
+		'Rhino.Command  
+		Dim Plane:Plane = Rhino.ViewCplane
+		Dim arrAxis1Plane: arrAxis1Plane =  Rhino.XformWorldToCplane (arrAxis1, plane)
+		Dim arrAxis2Plane: arrAxis2Plane =  Rhino.XformWorldToCplane (arrAxis2, plane)
+		Dim arrHandlePlane: arrHandlePlane = Rhino.XformWorldToCplane (arrhandle, Plane)
+ 
+		'Make strings from the point coordinates to feed Rhino.Command      
+		strAxis1 = Rhino.pt2Str(arrAxis1Plane)
+		strAxis2 = Rhino.pt2Str(arrAxis2Plane)
+		strHandle = Rhino.Pt2Str(arrHandlePlane)
+ 
+		'Rotate the light and points   
+		Rhino.UnselectAllObjects
+		Rhino.SelectObject strArea
+		Rhino.SelectObjects arrHandles
+		Rhino.Command "_Rotate3d _Copy=No " &strAxis1 & " " &strAxis2 &" " _
+			& strHandle & " "     
+ 
+		Rhino.UnselectAllObjects
+		q = q +1
+	Loop Until IsNull(strPoint)
+End Sub
+ 
+'////////////////////////////
+'\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+ 
+Sub TiltAreaLight (strArea, arrHandles, strPoint)
+ 
+	Dim  arrHandle, strHandle, arrHandlePlane
+	Dim arrAxis1, strAxis1, arrAxis2, strAxis2
+	Dim arrAxisPlane, arrAxis1Plane, arrAxis2Plane
+ 
+ 
+	'get the Cplane coordinates so they can be fed to
+	'Rhino.Command 
+	Dim Plane:Plane = Rhino.ViewCplane
+ 
+	arrHandle = Rhino.PointCoordinates(strPoint)
+	arrHandlePlane = Rhino.XformWorldToCplane (arrhandle, plane)
+ 
+	arrAxis1 = Rhino.PointCoordinates(arrHandles(1))
+	arrAxis1Plane =  Rhino.XformWorldToCplane (arrAxis1, plane)
+ 
+	arrAxis2 = Rhino.PointCoordinates(arrHandles(0))
+	arrAxis2Plane =  Rhino.XformWorldToCplane (arrAxis2, plane) 
+ 
+	strAxis1 = Rhino.pt2Str(arrAxis1Plane)
+	strAxis2 = Rhino.pt2Str(arrAxis2Plane)
+	strHandle = Rhino.Pt2Str(arrHandlePlane)
+ 
+	'Rotate the light and points
+	Rhino.UnselectAllObjects
+	Rhino.SelectObject strArea
+	Rhino.SelectObjects arrHandles
+	Rhino.Command "_Rotate3d _Copy=No " &strAxis1 & " " &strAxis2 &" " _
+		& strHandle & " "    
+	Rhino.UnselectAllObjects
+ 
+End Sub
+ 
+ 
+'////////////////////////////
+'\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+ 
+Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+Rhino.AddAlias "AreaLightPlace", "! _-Runscript PlaceAreaLight"
+Rhino.AddAlias "AreaLightSlide", "! _-Runscript SlideAreaLight"
+Rhino.AddAlias "AreaLightOrient", "! _-Runscript OrientAreaLight"
+Rhino.AddAlias "AreaLightRotate", "! _-Runscript RotateAreaLight" 
+Rhino.AddAlias "AreaLightResize", "! _-Runscript ResizeAreaLight" 
+ 
+'////////////////////////////
+'\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+ 
+ 
+Function AveragePoints(arrPts)
+ 
+ 
+	Dim arrX(), dblX, XSum, AverageX
+	Dim arrY(),dblY, YSum, AverageY
+	Dim arrZ(),dblZ, ZSum, AverageZ
+	Dim Result
+	Dim U, i
+ 
+	U = UBound (arrPts)
+ 
+	For i = 0 To U
+		ReDim Preserve arrX(i)
+		arrX(i) = arrPts(i)(0)
+		ReDim Preserve arrY(i)
+		arrY(i) = arrPts(i)(1)
+		ReDim Preserve arrZ(i)
+		arrZ(i) = arrPts(i)(2)
+	Next
+ 
+	If IsArray(arrX) Then
+		For Each dblX In arrX
+			XSum = Xsum+dblX
+		Next
+	End If
+ 
+	If IsArray(arrY) Then
+		For Each dblY In arrY
+			YSum = Ysum+dblY
+		Next
+	End If
+ 
+	If IsArray(arrZ) Then
+		For Each dblZ In arrZ
+			ZSum = Zsum+dblZ
+		Next
+	End If
+ 
+	AverageX=  Round(XSum/(U+1), 4)
+	AverageY = Round(YSum/(U+1), 4)
+	AverageZ = Round(Zsum/(U+1), 4)
+ 
+	Result = Array(AverageX,AverageY,AverageZ)
+	AveragePoints = Result
+ 
+End Function
+ 
+ 
+'//////////////////////////////////
+'//////////////////////////////////
+ 
+ 
+Function WorldToCplanePts(arrPts)
+ 
+	Dim arrPlane , i
+	arrPlane = Rhino.ViewCplane
+	For i = 0 To UBound (arrPts)
+ 
+		Result = Rhino.XformWorldToCplane (arrPts(i), arrPlane)
+		ReDim Preserve arrOutput(i)
+		arrOutput(i) = Result
+	Next
+	WorldToCplanePts = arrOutput
+ 
+End Function
+ 
+ 
+'//////////////////////////////////
+'//////////////////////////////////
+ 
+Function CPlaneToWorldPts(arrPts)
+ 
+	Dim arrPlane 
+	arrPlane = Rhino.ViewCplane
+	For i = 0 To UBound (arrPts)
+ 
+		Result = Rhino.XFormCplaneToWorld (arrPts(i), arrPlane)
+		ReDim Preserve arrOutput(i)
+		arrOutput(i) = Result
+	Next
+ 
+	CPlaneToWorldPts = arrOutput
+ 
+End Function
+ 
+ 
+'//////////////////////////////////
+'//////////////////////////////////
+ 
+Function IsUpperBound(ByRef arr)
+ 
+  IsUpperBound = False
+ 
+  If IsArray(arr) Then
+ 
+    On Error Resume Next
+ 
+    UBound arr
+ 
+    If Err.Number = 0 Then IsUpperBound = True
+ 
+  End If
+ 
+End Function

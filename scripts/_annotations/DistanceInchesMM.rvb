@@ -1,0 +1,17 @@
+Option Explicit
+'Script written by Ryan Gilmore
+'Script version Tuesday, July 17, 2012 1:24:49 PM
+'Call DistanceInchesMM()
+Sub DistanceInchesMM()
+	Dim arrLine, dblDistanceIN, dblDistanceIN, dblDistanceMM, dblRoundMM, dblRoundIN
+	dblDistanceIN = Rhino.GetDistance
+	
+	'arrLine = Rhino.GetLine
+	'If IsArray(arrLine) Then
+		'dblDistanceIN = Rhino.Distance(arrLine(0), arrLine(1))
+		dblDistanceMM = dblDistanceIN * 25.4
+		dblRoundMM = Round((dblDistanceMM), 3)
+		dblRoundIN = Round((dblDistanceIN), 3)
+		Rhino.Print "Distance (Point to Point): " & CStr (dblRoundMM) & "mm   " & CStr(dblRoundIN) & "in"
+	'End If
+End Sub

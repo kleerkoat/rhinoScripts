@@ -1,0 +1,47 @@
+'Rhinoscript: basic associative procedures
+'From KokkugiaWiki
+'
+'associative modeling through scripting
+'although we are focusing on developing scripts for generative design processes, we will digress briefly in order to explore the associative logics utilised in parametric models.
+'rhinocript enables us to quickly develop 3d models that are capable of having all their driving parameters (the variables in the script) as dependent on each other.
+'
+'generating profiles along a curve
+'we will start with a very basic set up: generating profiles on a curve. the script below increases the size of the cross section as it loops through the positions on the curve. see if you can change this so that the radius of the circles is dblRad + 5/dist where dist is a new variable that is the distance to a point in space that you must select while running the script.(so the point is easily repositionable) 
+
+
+
+Option Explicit
+'------------------------------------------------------------------------------
+' sweep profiles along curve
+' Author: Rob Stuart-Smith | 2008 | www.kokkugia.com
+'------------------------------------------------------------------------------
+
+'Call basicAssociativeProcedures()
+Sub basicAssociativeProcedures()
+	
+	Dim arrCrv,i,j,k,arrPlane, profiles, segments,noProfiles,dblRad,arrPts,dblPara,strSrf
+		
+	arrCrv = Rhino.GetObjects("pick curves")
+	noProfiles = Rhino.GetInteger("how many cross sections", 6)
+	segments = 4 'variable for how many segments in crosssection -this could vary!
+	dblRad = 1 'radius - as we start with a circle and rebuild to number of segments
+
+	'loop through all curves
+	For i = 0 To Ubound(arrCrv)	
+		
+		'get an array of evenly spaced positions on curve
+		arrPts = Rhino.DivideCurve (arrCrv(i), noProfiles)
+		'size array to store cross section profiles
+		ReDim profiles(Ubound(arrPts))
+		'loop through points
+		For k = 0 To Ubound(arrPts)
+			dblPara = Rhino.CurveClosestPoint (arrCrv(i), arrPts(k))
+			arrPlane = Rhino.CurvePerpFrame(arrCrv(i), dblPara)
+			profiles(k)  = Rhino.AddCircle(arrPlane, (dblRad + k/3))
+			Rhino.RebuildCurve profiles(k),1,segments
+		Next
+		
+		strSrf = Rhino.AddSweep1 (arrCrv(i), profiles)
+		Rhino.CapPlanarHoles (strSrf(0))
+	Next
+End Sub

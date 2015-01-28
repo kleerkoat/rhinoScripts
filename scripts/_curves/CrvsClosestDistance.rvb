@@ -1,0 +1,21 @@
+Option Explicit
+
+'Call CrvsClosestDistance()
+Sub CrvsClosestDistance()
+
+	'getting input curves
+	Dim idC1 : idC1=Rhino.GetObject("Curve #1?",4,True)
+	If isnull(idC1) Then Exit Sub
+	Dim idC2 : idC2=Rhino.GetObject("Curve #2?",4,True)
+	If isnull(idC2) Then Exit Sub
+	'finding closest distance between them
+	Dim arrResult : arrResult=Rhino.CurveClosestObject(idC1,idC2)
+	Rhino.Print "Curves Closest Distance: "& round(Rhino.Distance(arrResult(1),arrResult(2)),4)
+	'if then don't touch/intersect make temp line
+	If Not Rhino.PointCompare(arrResult(1),arrResult(2)) Then
+		Dim idLine : idLine=Rhino.AddLine(arrResult(1),arrResult(2))
+		'select distance line
+		Rhino.SelectObject idLine
+	End If
+	
+End Sub

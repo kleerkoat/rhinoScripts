@@ -1,0 +1,48 @@
+' ****************************** RhinoScript.org ******************************
+'
+'   Orient Planar Curves on CPlane, version 1
+'
+'   by Johannes Kuhnen, published Feb 07, 2008
+'
+'
+'   Orients one or more planar curves on CPlane. Simmilar to "Project to CPlane" but all Curves keep their geometry and length. 
+'
+'
+'
+'
+'   This RhinoScript Tool has been downloaded from RhinoScript.org.
+'
+'   Rhino versions: Rhino 4
+'
+'   LICENSE INFORMATION:
+'   This script is published under the GNU General Public License, version 3
+'   or any later version, and thus comes WITHOUT ANY WARRANTY. You can get
+'   the complete license text here: www.rhinoscript.org/gpl
+'
+' ****************************** RhinoScript.org ******************************
+
+
+
+Option Explicit
+
+'Call OrientPlanarCurvesOnCPlane()
+Sub OrientPlanarCurvesOnCPlane()
+
+	Dim arrCurves : arrCurves = Rhino.GetObjects ("Get planar Curves")
+	Dim i, arrPoints, arrTarget
+	
+	For i = 0 To UBound(arrCurves)
+		
+		arrPoints = Rhino.DivideCurve (arrCurves(i), 3)
+		
+		arrTarget = arrPoints
+		
+		arrTarget(0)(2) = 0
+		arrTarget(1)(2) = 0
+		arrTarget(2)(2) = 0
+		
+		Rhino.OrientObject arrCurves(i), arrPoints, arrTarget		
+			
+	Next
+
+End Sub

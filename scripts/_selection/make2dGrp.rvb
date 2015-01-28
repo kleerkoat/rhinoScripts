@@ -1,0 +1,39 @@
+﻿Option Explicit
+'Script written by Pascal
+
+Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+Rhino.AddAlias "Make2dGrp","_NoEcho _-Runscript (Make2dGrp)"
+
+'Call Make2dGrp()
+Sub Make2dGrp()
+	
+	Rhino.Command "_Make2d"
+	
+	If Rhino.LastCommandResult <> 0 then exit sub
+	
+	Dim alast: aLast = Rhino.LastCreatedObjects
+	If not isArray(aLast) then exit sub
+	
+	dim sCrv, aLayers(), n
+	n = 0
+	
+	for each sCrv in aLast
+		redim preserve aLayers(n)
+		alayers(n) = Rhino.ObjectLayer(sCrv)
+		n = n + 1
+	Next
+	
+	Dim aCulled: aCulled = Rhino.CullDuplicateStrings(aLayers)
+	dim sGrp, slayer
+	
+	for each slayer in aCulled
+		sGrp = Rhino.AddGroup
+		For each sCrv in aLast
+			if Rhino.ObjectLayer(sCrv) = slayer Then
+				Rhino.AddObjectToGroup sCrv, sGrp
+			End If
+		Next
+	next
+	
+
+End Sub

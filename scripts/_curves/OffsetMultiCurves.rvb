@@ -1,0 +1,219 @@
+Option explicit
+
+'store and re-use the command line options the user sets
+Private sOldOffset, dblOldOffset, sOldCornerStyle
+
+If IsEmpty(sOldOffset) Then
+	sOldOffset = "Inside"
+End If
+
+If IsEmpty(DblOldOffset) Then
+	DblOldOffset = 1
+End If
+
+If IsEmpty(sOldCornerStyle) Then
+	sOldCornerStyle = "Round"
+End If
+
+'Call OffsetMultiCurves()
+Sub OffsetMultiCurves()
+  
+	Dim aCrvs, sCrv
+	Dim A, aCornerStyles 
+  
+	A = False 'a marker to tell the script if any offsets have failed
+
+	'select the curves to offset
+	aCrvs = Rhino.GetObjects("Select closed planar curves to offset",,True, True)
+	
+	'if there is no selection, bail.
+	If Not isArray(aCrvs) Then Exit Sub
+	
+	 
+	aCornerStyles = Array("Sharp", "Round", "Smooth", "Chamfer")
+	'user input  to get the corner style
+	Dim sCornerStyle: sCornerStyle = Rhino.GetString("Corner style", sOldCornerStyle, aCornerStyles)
+	
+	'vertify that the entry is valid, otherwise bail
+	
+	If Not IsNull(sCornerStyle) Then
+		If Not CheckValidArray(aCornerStyles, sCornerStyle) Then
+			Rhino.Print "Invalid corner style."
+			Exit Sub
+		End If
+	Else Exit Sub
+	End If
+	
+	'assign an interger to the text corner style for use
+	'in the offset function
+	Dim intCornerStyle
+	
+	If lcase(sCornerStyle) = "sharp" Then
+		sCornerStyle = "Sharp"
+		intCornerStyle = 1
+		
+		
+	ElseIf lCase(sCornerStyle) = "round" Then
+		sCornerStyle = "Round"
+		intCornerStyle = 2
+		
+	ElseIf lCase(sCornerStyle) = "smooth" Then
+		sCornerStyle = "Smooth"
+		intCornerStyle = 3
+		
+	ElseIf lCase(sCornerStyle) = "chamfer" Then
+		sCornerStyle = "Chamfer"
+		intCornerStyle = 4
+		
+	End If
+	
+	'reset the stored value for re-use
+	sOldCornerStyle = sCornerStyle
+	
+	
+	'get the offset distance
+	Dim dblOffset:dblOffset = Rhino.Getreal("Offset distance",dblOldOffset)
+    
+	'store the offset distance for re-use  as a default value if valid
+	'otherwise bail
+	If IsNumeric(dblOffset) Then
+		dblOldOffset = dblOffset
+	Else Exit Sub 
+	End If
+     
+	'user input
+	Dim sOffset:sOffset = Rhino.GetString("Direction to offset", sOldOffset, Array("Inside", "Outside"))
+
+	'save the input for re-use as a default value
+	If Not IsNull(sOffset) Then
+		sOldOffset = sOffset
+	Else Exit Sub
+	End If
+	
+	'shut off redraw to speed up the script
+	Rhino.EnableRedraw(False)
+		
+	Dim arrCen, arrOut, aOffset, sOffsetCrv, i, aFailure(), aSide, aOffsetCrv
+	i = 0	
+	
+	For Each sCrv In aCrvs
+		
+		If Rhino.IsCurveClosed(sCrv) Then 'check if the curve is closed
+			If Rhino.IsCurvePlanar(sCrv) Then'check if the curve is planar
+		 
+				'go get two points, one inside the curve and one outside
+				'the function is below
+				aSide = GetSidePts(sCrv)
+			
+				'decide which of the two points to use
+				If lcase(sOffset) = "outside" Then
+					aOffset = aSide(1)
+				ElseIf lcase(sOffset) = "inside" Then
+					aOffset = aSide(0)
+				End If
+			
+				'offset the curve
+				aOffsetCrv = Rhino.OffsetCurve(sCrv, aOffset, dblOffset,,intCornerStyle)
+
+				
+				Rhino.UnselectAllObjects
+
+				'if the offset fails, add the input curve
+				'to an array and flip the switch (A) to tell
+				'the script that at least one offsset has failed.
+				If Not isArray(aOffsetCrv) Then
+					ReDim Preserve aFailure(i)
+					aFailure(i) = sCrv
+					i = i + 1
+					A = True
+				End If
+	
+			Else
+				ReDim Preserve aFailure(i)
+				aFailure(i) = sCrv
+				i = i + 1
+				A = True
+			End If
+		Else
+			ReDim Preserve aFailure(i)
+			aFailure(i) = sCrv
+			i = i + 1
+			A = True
+		End If
+       
+	Next
+	
+	'select the inputs
+	Rhino.SelectObjects aCrvs
+
+	'redraw the viewports
+	Rhino.EnableRedraw(True)
+
+	'inform the user if there have been any curves that did not offset, and select these curves.
+	If A = True Then 
+		'	Rhino.SelectObjects(aFailure)
+		MsgBox "Some curves could not be offset." _
+			&vbnewline  & "They may not be closed or may not be planar."
+	End If
+
+End Sub 
+  
+'Rhino.AddAlias "OffsetMulti", "_NoEcho _-Runscript OffsetMulti"
+'Rhino.AddStartupScript Rhino.LastLoadedScriptFile
+
+Function GetSidePts (sCrv) 
+	
+	'finds a point inside and outside of a closed lanar curve
+	
+	Dim num : num = Rhino.UnitAbsoluteTolerance
+	num = num * 10
+	
+	'	Dim aEnd: aEnd = Rhino.CurveStartPoint(sCrv)
+	Dim aDom: aDom = Rhino.CurveDomain(sCrv)
+	Dim dblDom:dblDom = .5*(aDom(0) + adom (1) )
+	Dim aEnd: aEnd = Rhino.EvaluateCurve(sCrv,dblDom)
+	Dim plane: PLane = Rhino.ViewCPlane
+	
+	Plane(0) = aEnd
+	
+	Dim testCirc:testCirc = Rhino.AddCircle(Plane, num)
+	
+	Dim aPts: aPts = Rhino.DivideCurve (testCirc, 32)
+	
+	Dim PtIn, PtOut, aPt
+	
+	For Each aPt In aPts
+		If 	Rhino.PointInPlanarClosedCurve (aPt, sCrv) = 1 Then
+			PtIn = aPt
+			Exit For
+		End If
+	Next
+	
+	For Each aPt In aPts
+		If 	Rhino.PointInPlanarClosedCurve (aPt, sCrv) = 0 Then
+			PtOut = aPt
+			Exit For
+		End If
+	Next
+	
+	Rhino.DeleteObject TestCirc 
+	GetSidePts = array(PtIn, PtOut)
+	
+End Function
+
+Function CheckValidArray(arrCheck, strToCheck)
+
+	Dim blnStatus, strCheck
+
+	blnStatus =False
+	If IsArray(arrCheck) Then
+		For Each strCheck In arrCheck
+			If UCase(strToCheck) = UCase(strCheck) Or strToCheck = ""Then
+				blnStatus = True
+				Exit For
+			End If
+		Next
+	End If
+	CheckValidArray = blnStatus
+
+End Function

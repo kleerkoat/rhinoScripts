@@ -1,0 +1,132 @@
+Option Explicit
+'Script by Mitch Heynick
+'Revised August 22, 2010
+
+Private oldOff,oldConn,oldTrans
+If IsEmpty(oldOff) Then oldOff=1
+If IsEmpty(oldConn) Then oldConn="None"
+If IsEmpty(oldTrans) Then oldTrans="Sharp"
+
+'Call OffsetMultiCrvs2SidesWEnds()
+Sub OffsetMultiCrvs2SidesWEnds()
+	
+	Dim strcrv,arrCrvs,dblOdist,strEndType,arrEChoice,strTrans,arrTChoice,intCrvs
+	Dim dblTol : dblTol=Rhino.UnitAbsoluteTolerance	
+	arrEChoice=Array("None","Straight","Arc")
+	arrTChoice=Array("Sharp","Round","Smooth","Chamfer")
+
+	arrCrvs=Rhino.GetObjects("Select curve(s) to offset both sides",4,True,True)
+	If Not IsArray(arrCrvs) Then Exit Sub
+	intCrvs=Ubound(arrCrvs)+1
+		
+	dblODist=Rhino.GetReal("Distance to offset",oldOff,dblTol)
+	If IsNull(dblODist) Then Exit Sub
+	oldOff=dblODist
+	
+	strTrans=Rhino.GetString("Offset transition?",oldTrans,arrTChoice)
+	If IsNull(strTrans) Then Exit Sub
+	oldTrans=strTrans
+	
+	strEndType=Rhino.GetString("End connection type?",oldConn,arrEChoice)
+	If IsNull(strEndType) Then Exit Sub
+	oldConn=strEndType
+	
+	Dim intConn
+	Select Case strEndType
+		Case "Straight"
+			intConn=0
+		Case "Arc"
+			intConn=1
+		Case Else
+			intConn=-1
+	End Select
+	
+	Call Rhino.EnableRedraw(False)
+	Call Rhino.UnselectAllObjects
+	Dim intCount,blnSuccess : intCount=0
+	For Each strCrv in arrCrvs		
+		blnSuccess=OffsetCurve2Sides(strCrv,dblODist,strTrans,intConn)		
+		If blnSuccess Then intCount=intCount+1		
+	Next
+	Call Rhino.EnableRedraw(True)
+  Call Rhino.Print("Successfully offset "&intCount&" of "&intCrvs&" curves")	
+End Sub	
+	
+Function OffsetCurve2Sides (strCrv,dist,trans,conn)
+	
+	OffsetCurve2Sides=False
+	Dim arrCheckPt,arrPlane,arrZVect,arrTanVect,arrNormVect,arrPickPt,strPt
+	
+	'find midpoint of first segment
+	arrCheckPt=CrvSegmentMidPt(strCrv)	
+	If not IsArray(arrCheckPt) Then Exit Function
+	
+	arrPlane=Rhino.CurvePlane(strCrv)
+	arrZvect=arrPlane(3)
+	arrTanVect=Rhino.CurveTangent(strCrv,Rhino.CurveClosestPoint(strCrv,arrCheckPt))	
+	arrNormVect=Rhino.VectorCrossProduct(arrZVect,arrTanVect)
+	arrNormVect=Rhino.VectorScale(arrNormVect,dist)  '!!!!
+	arrPickPt=Rhino.PointAdd(arrCheckPt,arrNormVect)
+	strPt=Rhino.Pt2Str(arrPickPt)	
+	'check pick point for debug
+	'Call Rhino.AddPoint(arrPickPt)
+	
+	'The Rhino command is more reliable than the Rhinoscript function !!
+	Dim strComm,arrOffset
+	strComm="_-Offset _Distance "&dist&" _Corner "&trans
+	strComm=strComm&" _BothSides "&strPt&" _Enter"
+	Call Rhino.SelectObject(strCrv)
+	Call Rhino.Command(strComm)	
+	arrOffset=Rhino.LastCreatedObjects
+	Call Rhino.UnselectAllObjects
+	
+	If Not IsArray(arrOffset) Then
+		Exit Function	'error message?
+	ElseIf Ubound(arrOffset)<>1 Then
+		Exit Function
+	End If
+	
+	If conn>=0 and Not Rhino.IsCurveClosed(strCrv) Then
+		Call AddEndsToOffset(arrOffset,conn)
+	End If
+	OffsetCurve2Sides=True
+	
+End Function
+
+Function CrvSegmentMidPt(crv)
+	CrvSegmentMidPt=Null
+	Dim arrMidPt
+	If Rhino.IsPolyline(crv) Then
+		Dim arrVerts
+		arrVerts=Rhino.PolylineVertices(crv)
+		arrMidPt=Rhino.PointDivide(Rhino.PointAdd(arrVerts(1),arrVerts(0)),2)
+	ElseIf Rhino.IsPolyCurve(crv) Then
+		arrMidPt=Rhino.CurveMidPoint(crv,0) 'first segment
+	Else
+		arrMidPt=Rhino.CurveMidPoint(crv)		
+	End If
+	CrvSegmentMidPt=arrMidPt	
+End Function
+
+Sub AddEndsToOffset(arrOffset,conn)
+	
+	Dim arrOC1SP,arrOC2SP,arrOC1EP,arrOC2EP,arrResult()	
+	arrOC1SP=Rhino.CurveStartPoint(arrOffset(0))
+	arrOC2SP=Rhino.CurveStartPoint(arrOffset(1))
+	arrOC1EP=Rhino.CurveEndPoint(arrOffset(0))
+	arrOC2EP=Rhino.CurveEndPoint(arrOffset(1))
+	
+	If conn=0 Then		
+		Redim arrResult(3)
+		arrResult(0)=arrOffset(0)
+		arrResult(1)=arrOffset(1)
+		arrResult(2)=Rhino.AddLine(arrOC1SP,arrOC2SP)
+		arrResult(3)=Rhino.AddLine(arrOC1EP,arrOC2EP)
+	ElseIf conn=1 Then
+		ReDim arrResult(1)
+		arrResult(0)=Rhino.ExtendCurvePoint (arrOffset(0),0,arrOC2SP,1)
+		arrResult(1)=Rhino.ExtendCurvePoint (arrOffset(1),1,arrOC1EP,1)
+	End If
+	
+	Call Rhino.JoinCurves(arrResult,True)	
+End Sub

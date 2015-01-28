@@ -1,0 +1,71 @@
+'--------------------------------------------------------------
+'Command   :  miw(mirror world plane)
+'Date      :  2011/04/14
+'Version   :  1.0
+'Organization   :  Rhino+
+'--------------------------------------------------------------
+
+Sub MirrorWorldPlane()
+
+Dim strObject,strView,arr0,arrXPt,arrYPt,arrZPt
+
+strObject = Rhino.GetObjects("Select mirror objects",0,True,True)
+
+If Not IsNull(strObject) Then
+
+
+
+strView = Rhino.CurrentView
+arr0=Rhino.Str2Pt("0,0,0")
+arrXPt = Rhino.Str2Pt("1,0,0")
+arrYPt = Rhino.Str2Pt("0,1,0")
+arrZPt = Rhino.Str2Pt("0,0,1")
+ 
+  
+'-----------------------------------------------------------------------  
+Dim arrNames(2), str,arrDefaults
+
+arrNames(0) = "Z_XY"
+arrNames(1) = "Y_ZX"
+arrNames(2) = "X_ZY"
+
+str = Rhino.GetDocumentData("MIPlane","arrDefaults")
+If IsNull(str) Then
+   
+ arrDefaults = Rhino.GetString("Set mirror plane","Z_XY", arrNames) 
+If IsNull(arrDefaults) Then Exit Sub 
+Else
+ arrDefaults = Rhino.GetString("Set mirror plane",CStr(str) , arrNames) 
+ 
+ If IsNull(arrDefaults) Then Exit Sub 
+End If 
+ Rhino.SetDocumentData "MIPlane", "arrDefaults",CStr(arrDefaults)
+ 
+
+'-----------------------------------------------------------------------  
+Select Case arrDefaults
+  
+Case "Z_XY" realType = 0
+Rhino.ViewCPlane strView, Rhino.WorldYZPlane
+Rhino.MirrorObjects strObject, arr0, arrYPt, True    
+
+Case "Y_ZX" realType = 1
+Rhino.ViewCPlane strView, Rhino.WorldXYPlane
+Rhino.MirrorObjects strObject, arr0, arrXPt, True
+
+Case "X_ZY" realType = 2
+Rhino.ViewCPlane strView, Rhino.WorldXYPlane
+Rhino.MirrorObjects strObject, arr0, arrYPt, True 
+
+End Select
+
+
+
+Rhino.command"_NoEcho _CPlane _Previous"
+
+
+End If
+
+
+End Sub
+

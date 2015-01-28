@@ -1,0 +1,143 @@
+Option Explicit
+'Script written by Tobias Schwinn
+'Script version 25 October 2008 13:21:42
+
+'Call NestedCircles(()
+Sub NestedCircles()
+	
+	' select some circles
+	Const rhObjectCurve = 4
+	
+	Dim arrCircles: arrCircles = Rhino.GetObjects("Select some circles", rhObjectCurve)
+	If Not IsArray(arrCircles) Then Exit Sub
+	
+	' nest circles inside parent circle(s)
+	Dim numCircles: numCircles = Rhino.GetInteger("Number of circles to be nested", 5, 1, 100)
+	Dim numRecursions: numRecursions = Rhino.GetInteger("Number of recursions", 3, 1, 10)
+	
+	Call nestCircles(arrCircles, numCircles, numRecursions)
+
+End Sub
+
+Function nestCircles(arrObjects, numCircles, numRecursions)
+	
+	Dim circleDictionary
+	Set circleDictionary = CreateObject("Scripting.Dictionary")
+	
+	Dim numGen: numGen = numRecursions - 1
+	
+	Dim strObject
+	For Each strObject In arrObjects
+		
+		If Rhino.IsCircle(strObject) Then 
+		
+			' get the center of the parent circle and its radius
+			Dim arrCenter: arrCenter = Rhino.CircleCenterPoint(strObject)
+			Dim dblRadius: dblRadius = Rhino.CircleRadius(strObject)
+			
+			' create the first circle inside the parent circle such that is tangent to that circle
+			' here I think we should use polar coordinates
+			Dim dblDist: dblDist = dblRadius * RND
+			Dim dblAngle: dblAngle = 360 * RND
+				
+			Dim arrNewCenter: arrNewCenter = Rhino.Polar(arrCenter, dblAngle, dblDist)
+			Dim dblNewRadius: dblNewRadius = dblRadius - dblDist
+			
+			Dim arrPlane: arrPlane = Rhino.PlaneFromFrame(arrNewCenter, Array(1.0,0.0,0.0), Array(0.0,1.0,0.0))
+			Dim strCircle: strCircle = Rhino.AddCircle(arrPlane, dblNewRadius)
+			
+			' add the new circle to the dicitonary
+			circleDictionary.Add CStr(circleDictionary.Count), strCircle
+			
+			' now lets create all the remaining circles
+			Dim i: i = 1
+			Do While i < numCircles
+				
+				' find a new random point inside the main circle
+				dblDist = dblRadius * RND
+				dblAngle = 360 * RND
+				
+				arrNewCenter = Rhino.Polar(arrCenter, dblAngle, dblDist)
+				
+				' then check if that new point is inside one of the existing circles
+				If Not isInsideCircles(circleDictionary, arrNewCenter) Then
+					
+					' find the closest circle
+					Dim strClosestCircle: strClosestCircle = PointClosestCircle(circleDictionary, arrNewCenter)
+					
+					' calculate the distance to the closest circle
+					Dim dblParam: dblParam = Rhino.CurveClosestPoint(strClosestCircle, arrNewCenter)
+					Dim arrPtCrv: arrPtCrv = Rhino.EvaluateCurve(strClosestCircle, dblParam)
+					dblNewRadius = Rhino.Distance(arrPtCrv, arrNewCenter)
+					
+					' check if the new circle is going to be fully enclosed by the parent circle
+					If dblDist + dblNewRadius > dblRadius Then
+						' adjust the new radius to fit in the outline of the parent circle
+						dblNewRadius = dblRadius - dblDist
+					End If
+			
+					arrPlane = Rhino.PlaneFromFrame(arrNewCenter, Array(1.0,0.0,0.0), Array(0.0,1.0,0.0))
+					strCircle = Rhino.AddCircle(arrPlane, dblNewRadius)
+					
+					' add the new circle to the dicitonary
+					circleDictionary.Add CStr(circleDictionary.Count), strCircle
+					i = i + 1
+					
+				End If
+				
+			Loop
+			
+		End If
+	
+	Next
+	
+	If numGen > 0 Then
+		Call nestCircles(circleDictionary.Items, numCircles, numGen)
+	End If
+	
+End Function
+
+Function PointClosestCircle(circleDictionary, arrPoint)
+	
+	Dim strItem, dblParam, arrPtCrv, dblDist, dblDistCurrent
+	
+	For Each strItem In circleDictionary.Items
+		
+		' get the closest point on curve
+		dblParam = Rhino.CurveClosestPoint(strItem, arrPoint)
+		arrPtCrv = Rhino.EvaluateCurve(strItem, dblParam)
+		
+		dblDistCurrent = Rhino.Distance(arrPtCrv, arrPoint)
+		If dblDist = vbEmpty Then
+			dblDist = dblDistCurrent
+			PointClosestCircle = strItem
+		Else
+			If dblDistCurrent < dblDist Then
+				dblDist = dblDistCurrent
+				PointClosestCircle = strItem
+			End If
+		End If
+		
+	Next
+	
+End Function
+
+Function isInsideCircles(circleDictionary, arrPoint)
+	
+	isInsideCircles = False
+	
+	Dim strItem, arrCenter, dblRadius
+	For Each strItem In circleDictionary.Items
+		
+		' get the center and the radius of the current circle
+		arrCenter = Rhino.CircleCenterPoint(strItem)
+		dblRadius = Rhino.CircleRadius(strItem)
+		
+		If Rhino.Distance(arrCenter, arrPoint) <= dblRadius Then
+			isInsideCircles = True
+			Exit Function
+		End If
+		
+	Next
+	
+End Function

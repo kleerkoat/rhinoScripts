@@ -1,0 +1,24 @@
+Option Explicit
+'Call ColorScaleAttractor()
+Sub ColorScaleAttractor()
+Dim object,attr,bottles,attr1,points,i,arrpoints
+bottles= rhino.getobjects (" select bottles")
+
+attr=rhino.getobject (" select attractor",1)
+attr1=Rhino.PointCoordinates(attr)
+For i=0 To Ubound(bottles)
+
+
+object=rhino.surfaceVolumecentroid (bottles(i))
+
+Dim dist:dist= rhino.distance ( object(0), attr1)
+
+Dim material5
+
+material5 = rhino.AddMaterialToObject ( bottles(i))
+Call rhino.MaterialColor (material5, rgb((dist*100)+10,(dist*30),(dist*60)+10))
+Call rhino.MaterialShine (material5, 255)
+Call rhino.ScaleObject (bottles(i),object(0),array(dist*0.5,dist*0.5,dist*0.5),False)
+Next
+
+End Sub
