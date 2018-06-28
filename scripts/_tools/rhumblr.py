@@ -38,5 +38,5 @@ def PostViewToTumblr(email, password):
         print 'Upload failed ' + e.code
 
 #PostViewToTumblr(<your email>, <your password>)
-PostViewToTumblr('monkeygrip@gmail.com', 'rrg1235')
+PostViewToTumblr('<EMAIL>', '<PASSWORD>')
 
