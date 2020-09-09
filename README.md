@@ -3,7 +3,8 @@
 Mix of scripts written by me and forum members.
 Hopefully proper credit is in the comments.  
 If you are the person who originally wrote one
-and would like it removed please contact me.  
+or created anything in this repo and would like it 
+removed please contact me. I meant no harm.
 Apologies in advance.
 
 ### Purpose: 
