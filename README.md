@@ -1,6 +1,6 @@
 ### Disclaimer:  
 
-Mix of scripts written by me and forum members.
+Mix of RhinoScript and Rhino Python scripts written by me and forum members.
 Hopefully proper credit is in the comments.  
 If you are the person who originally wrote one
 or created anything in this repo and would like it 
